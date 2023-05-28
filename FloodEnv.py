@@ -21,6 +21,7 @@ class FloodEnv:
         if x < 0 or x >= self.width or y < 0 or y >= self.height:
             return
         if self.state[x, y] != old_color:
+            self.neighbor_colors[self.state[x, y]] = 1
             return
         self.state[x, y] = new_color
         self.color_counts[old_color] -= 1
@@ -32,6 +33,7 @@ class FloodEnv:
 
     def step(self, action):
         if action != self.state[0, 0]:
+            self.neighbor_colors[:] = 0
             self.flood(0, 0, self.state[0, 0], action)
 
         reward = None
@@ -42,6 +44,8 @@ class FloodEnv:
     def reset(self):
         self.state = np.random.randint(0, self.n_colors, (self.width, self.height))
         self.color_counts = np.bincount(self.state.flatten(), minlength=self.n_colors)
+        # Assume all colors are neighbors to start
+        self.neighbor_colors = np.ones(self.n_colors, dtype=np.int8)
         return self.state
 
     def render(self):
