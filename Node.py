@@ -2,13 +2,14 @@ import numpy as np
 
 
 class Node:
-    def __init__(self, state, prior_prob):
+    def __init__(self, state, prior_prob, parent=None):
         self.state = state
         self.visit_count = 0
         self.total_action_value = 0
         self.mean_action_value = 0
         self.prior_prob = prior_prob
         self.children = {}
+        self.parent = parent
 
     def uct(self, cpuct, total_visit_count):
         return self.mean_action_value + cpuct * self.prior_prob * np.sqrt(
@@ -18,13 +19,24 @@ class Node:
 
 def select(node, cpuct):
     total_visit_count = sum(child.visit_count for child in node.children.values())
-    return max(node.children.items(), key=lambda x: x[1].uct(cpuct, total_visit_count))
+    return max(node.children.values(), key=lambda x: x.uct(cpuct, total_visit_count))
 
 
 def expand_and_evaluate(node, neural_network):
-    actions, probabilities, state_value = neural_network.predict(node.state)
-    for a, p in zip(actions, probabilities):
-        node.children[a] = Node(a, p)
+    if node.env.is_terminal():
+        return node.env.value
+
+    probabilities, state_value = neural_network.predict(node.env.state)
+
+    for i in range(node.env.n_colors):
+        if not node.env.valid_actions[i]:
+            continue
+        action = i
+        prob = probabilities[action]
+        new_env = node.env.copy()
+        new_env.step(action)
+        node.children[action] = Node(new_env, prob, parent=node)
+
     return state_value
 
 
@@ -32,10 +44,8 @@ def backup(node, value):
     node.visit_count += 1
     node.total_action_value += value
     node.mean_action_value = node.total_action_value / node.visit_count
-    if node.state.is_terminal():
-        return
-    for child in node.children.values():
-        child.mean_action_value = backup(child, child.state, -value)
+    if node.parent is not None:
+        backup(node.parent, value)
 
 
 def play(node, temperature):
@@ -55,7 +65,7 @@ def alphago_zero_search(
     for i in range(num_simulations):
         node = root_node
         while node.children:
-            action, node = select(node, cpuct)
+            node = select(node, cpuct)
         state_value = expand_and_evaluate(node, neural_network)
         backup(node, state_value)
 
