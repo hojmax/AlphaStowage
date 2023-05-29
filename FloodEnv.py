@@ -1,3 +1,4 @@
+import torch
 import pygame
 import numpy as np
 
@@ -13,6 +14,9 @@ class FloodEnv:
         self.n_colors = n_colors
         self.screen = None
         self.reset()
+
+    def get_tensor_state(self):
+        return torch.tensor(self.state).unsqueeze(0).unsqueeze(0).float()
 
     def is_terminal(self):
         return np.any(self.color_counts == self.width * self.height)
@@ -106,6 +110,9 @@ class FloodEnv:
         env.valid_actions = np.copy(self.valid_actions)
         env.value = self.value
         return env
+
+    def __str__(self):
+        return str(self.state)
 
 
 if __name__ == "__main__":
