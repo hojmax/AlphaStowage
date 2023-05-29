@@ -1,5 +1,6 @@
 import numpy as np
 from FloodEnv import FloodEnv
+from NeuralNetwork import NeuralNetwork
 
 
 class Node:
@@ -30,7 +31,9 @@ def expand_and_evaluate(node, neural_network):
     if node.env.is_terminal():
         return node.env.value
 
-    probabilities, state_value = neural_network.predict(node.env.get_tensor_state())
+    probabilities, state_value = neural_network(node.env.get_tensor_state())
+    probabilities = probabilities.detach().numpy().squeeze()
+    state_value = state_value.detach().numpy().squeeze()
 
     for i in range(node.env.n_colors):
         if not node.env.valid_actions[i]:
@@ -52,48 +55,43 @@ def backup(node, value):
         backup(node.parent, value)
 
 
-def play(node, temperature):
-    action_probs = [
-        np.power(child.visit_count, 1 / temperature) for child in node.children.values()
-    ]
+def get_tree_probs(node, temperature):
+    action_probs = []
+    for i in range(node.env.n_colors):
+        if i in node.children:
+            action_probs.append(np.power(node.children[i].visit_count, 1 / temperature))
+        else:
+            action_probs.append(0)
     action_probs /= np.sum(action_probs)
-    action_index = np.random.choice(len(node.children), p=action_probs)
-    return list(node.children.keys())[action_index]
+    return action_probs
 
 
 def alphago_zero_search(root_env, neural_network, num_simulations, cpuct, temperature):
     root_node = Node(root_env, None)
 
     for i in range(num_simulations):
-        print(f"Simulation: {i}")
         node = root_node
 
-        print(node)
         while node.children:
             node = select(node, cpuct)
-            print(node)
 
         state_value = expand_and_evaluate(node, neural_network)
         backup(node, state_value)
 
-    return play(root_node, temperature)
+    return get_tree_probs(root_node, temperature)
 
 
 if __name__ == "__main__":
     width = 5
     height = 5
     n_colors = 3
-
-    class FakeNN:
-        def predict(self, state):
-            probs = np.random.rand(n_colors)
-            probs /= np.sum(probs)
-            value = np.random.randint(0, 10)
-            return probs, value
+    nn_blocks = 3
 
     env = FloodEnv(width, height, n_colors)
-    fake_nn = FakeNN()
+    net = NeuralNetwork(
+        n_colors=n_colors, width=width, height=height, n_blocks=nn_blocks
+    )
     c_puct = 1
     temperature = 1
-
-    alphago_zero_search(env, fake_nn, 2, 1, 1)
+    print(env)
+    print(alphago_zero_search(env, net, 100, 1, 1))
