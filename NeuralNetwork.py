@@ -124,8 +124,8 @@ class NeuralNetwork(nn.Module):
 
 if __name__ == "__main__":
     n_colors = 3
-    width = 8
-    height = 8
+    width = 5
+    height = 5
     n_blocks = 3
     net = NeuralNetwork(
         n_colors=n_colors, width=width, height=height, n_blocks=n_blocks
