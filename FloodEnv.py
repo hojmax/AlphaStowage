@@ -108,6 +108,7 @@ class FloodEnv:
         return str(self.state)
 
 
+# Testing the environment
 if __name__ == "__main__":
     # set seed
     np.random.seed(0)

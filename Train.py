@@ -46,7 +46,7 @@ l2_weight_reg = 1e-4
 batch_size = 8
 batches_per_episode = 16
 learning_rate = 1e-3
-training_iterations = 10000
+training_iterations = 100
 width = 5
 height = 5
 n_colors = 3
@@ -106,3 +106,8 @@ for i in range(training_iterations):
     avg_loss = train_network(net, all_data, batch_size, batches_per_episode)
 
     wandb.log({"loss": avg_loss, "value": value, "episode": i})
+
+torch.save(net.state_dict(), "model.pt")
+wandb.save("model.pt")
+
+wandb.finish()

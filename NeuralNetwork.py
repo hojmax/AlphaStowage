@@ -122,6 +122,7 @@ class NeuralNetwork(nn.Module):
         return policy, value
 
 
+# Testing the network
 if __name__ == "__main__":
     n_colors = 3
     width = 5

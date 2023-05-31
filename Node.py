@@ -2,6 +2,41 @@ import numpy as np
 from FloodEnv import FloodEnv
 from NeuralNetwork import NeuralNetwork
 import torch
+import matplotlib.pyplot as plt
+import networkx as nx
+
+
+def _draw_tree_recursive(ax, graph, node):
+    for action, child in enumerate(node.children.values()):
+        graph.add_node(
+            hash(child),
+            label=f"N={child.visit_count}, Q={child.mean_action_value:.2f}, P={child.prior_prob:.2f}",
+        )
+        graph.add_edge(hash(node), hash(child), label=action)
+        _draw_tree_recursive(ax, graph, child)
+
+
+def draw_tree(node):
+    fig, ax = plt.subplots()
+    graph = nx.DiGraph()
+    graph.add_node(
+        hash(node),
+        label=f"N={node.visit_count}, Q={node.mean_action_value:.2f}, P={node.prior_prob}",
+    )
+
+    _draw_tree_recursive(ax, graph, node)
+
+    pos = nx.kamada_kawai_layout(graph)
+    labels = nx.get_node_attributes(graph, "label")
+    edge_labels = nx.get_edge_attributes(graph, "label")
+    print(edge_labels)
+
+    nx.draw(
+        graph, pos, labels=labels, with_labels=True, node_color="#d1d8e0", font_size=9
+    )
+    nx.draw_networkx_edge_labels(graph, pos, edge_labels=edge_labels, font_size=9)
+
+    plt.show()
 
 
 class Node:
@@ -79,12 +114,13 @@ def alphago_zero_search(root_env, neural_network, num_simulations, cpuct, temper
         state_value = expand_and_evaluate(node, neural_network)
         backup(node, state_value)
 
-    return get_tree_probs(root_node, temperature)
+    return root_node, get_tree_probs(root_node, temperature)
 
 
+# Testing the tree search
 if __name__ == "__main__":
-    width = 5
-    height = 5
+    width = 3
+    height = 3
     n_colors = 3
     nn_blocks = 3
 
@@ -95,4 +131,6 @@ if __name__ == "__main__":
     c_puct = 1
     temperature = 1
     print(env)
-    print(alphago_zero_search(env, net, 100, 1, 1))
+    root, probs = alphago_zero_search(env, net, 100, 1, 1)
+    print(root)
+    draw_tree(root)
