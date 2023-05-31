@@ -21,35 +21,28 @@ class FloodEnv:
     def is_terminal(self):
         return np.any(self.color_counts == self.width * self.height)
 
-    def flood(self, x, y, old_color, new_color, visited):
+    def flood(self, x, y, old_color, new_color):
         if x < 0 or x >= self.width or y < 0 or y >= self.height:
             return
-        if visited[x, y]:
-            return
-        visited[x, y] = 1
 
         if self.state[x, y] != old_color:
-            self.valid_actions[self.state[x, y]] = 1
-        else:
-            self.state[x, y] = new_color
-            self.color_counts[old_color] -= 1
-            self.color_counts[new_color] += 1
+            return
 
-        if self.state[x, y] == new_color:
-            self.flood(x + 1, y, old_color, new_color, visited)
-            self.flood(x - 1, y, old_color, new_color, visited)
-            self.flood(x, y + 1, old_color, new_color, visited)
-            self.flood(x, y - 1, old_color, new_color, visited)
+        self.state[x, y] = new_color
+        self.color_counts[old_color] -= 1
+        self.color_counts[new_color] += 1
+        self.flood(x + 1, y, old_color, new_color)
+        self.flood(x - 1, y, old_color, new_color)
+        self.flood(x, y + 1, old_color, new_color)
+        self.flood(x, y - 1, old_color, new_color)
 
     def step(self, action):
-        self.value += 1
-        visited = np.zeros((self.width, self.height), dtype=np.int8)
+        self.value -= 1
 
         if action != self.state[0, 0]:
-            self.valid_actions[:] = 0
-            self.flood(0, 0, self.state[0, 0], action, visited)
+            self.flood(0, 0, self.state[0, 0], action)
 
-        self.valid_actions[action] = 0
+        self.find_neighbors()
         reward = None
         terminal = self.is_terminal()
         info = {}
@@ -116,6 +109,8 @@ class FloodEnv:
 
 
 if __name__ == "__main__":
+    # set seed
+    np.random.seed(0)
     env = FloodEnv(10, 10, 4)
 
     moves = [0, 3, 1, 2]

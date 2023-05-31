@@ -1,6 +1,7 @@
 import numpy as np
 from FloodEnv import FloodEnv
 from NeuralNetwork import NeuralNetwork
+import torch
 
 
 class Node:
@@ -30,10 +31,10 @@ def select(node, cpuct):
 def expand_and_evaluate(node, neural_network):
     if node.env.is_terminal():
         return node.env.value
-
-    probabilities, state_value = neural_network(node.env.get_tensor_state())
-    probabilities = probabilities.detach().numpy().squeeze()
-    state_value = state_value.detach().numpy().squeeze()
+    with torch.no_grad():
+        probabilities, state_value = neural_network(node.env.get_tensor_state())
+        probabilities = probabilities.detach().numpy().squeeze()
+        state_value = state_value.detach().numpy().squeeze()
 
     for i in range(node.env.n_colors):
         if not node.env.valid_actions[i]:
