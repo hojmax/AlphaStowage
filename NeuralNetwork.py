@@ -40,14 +40,15 @@ class Residual_Block(nn.Module):
             padding="same",
         )
         self.relu = nn.ReLU()
-        self.batch = nn.BatchNorm2d(out_channels)
+        self.batch1 = nn.BatchNorm2d(out_channels)
+        self.batch2 = nn.BatchNorm2d(out_channels)
 
     def forward(self, x):
         out = self.conv1(x)
-        out = self.batch(out)
+        out = self.batch1(out)
         out = self.relu(out)
         out = self.conv2(out)
-        out = self.batch(out)
+        out = self.batch2(out)
         out = out + x
         out = self.relu(out)
         return out

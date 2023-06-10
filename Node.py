@@ -4,35 +4,40 @@ from NeuralNetwork import NeuralNetwork
 import torch
 import matplotlib.pyplot as plt
 import networkx as nx
+from networkx.drawing.nx_pydot import graphviz_layout
 
 
-def _draw_tree_recursive(ax, graph, node):
-    for action, child in enumerate(node.children.values()):
+def _draw_tree_recursive(graph, node):
+    for action, child in node.children.items():
         graph.add_node(
-            hash(child),
-            label=f"N={child.visit_count}, Q={child.mean_action_value:.2f}, P={child.prior_prob:.2f}",
+            str(hash(child)),
+            label=f"{np.array2string(child.env.state, separator=',')}\nN={child.visit_count}, Q={child.mean_action_value:.2f}, P={child.prior_prob:.2f}",
         )
-        graph.add_edge(hash(node), hash(child), label=action)
-        _draw_tree_recursive(ax, graph, child)
+        graph.add_edge(str(hash(node)), str(hash(child)), label=str(action))
+        _draw_tree_recursive(graph, child)
 
 
 def draw_tree(node):
-    fig, ax = plt.subplots()
     graph = nx.DiGraph()
     graph.add_node(
-        hash(node),
-        label=f"N={node.visit_count}, Q={node.mean_action_value:.2f}, P={node.prior_prob}",
+        str(hash(node)),
+        label=f"{np.array2string(node.env.state, separator=',')}\nN={node.visit_count}, Q={node.mean_action_value:.2f}, P={node.prior_prob}",
     )
 
-    _draw_tree_recursive(ax, graph, node)
+    _draw_tree_recursive(graph, node)
 
-    pos = nx.kamada_kawai_layout(graph)
+    pos = graphviz_layout(graph, prog="dot")
     labels = nx.get_node_attributes(graph, "label")
     edge_labels = nx.get_edge_attributes(graph, "label")
-    print(edge_labels)
 
     nx.draw(
-        graph, pos, labels=labels, with_labels=True, node_color="#d1d8e0", font_size=9
+        graph,
+        pos,
+        labels=labels,
+        with_labels=True,
+        node_size=4000,
+        font_size=9,
+        node_color="#00000000",
     )
     nx.draw_networkx_edge_labels(graph, pos, edge_labels=edge_labels, font_size=9)
 
@@ -59,7 +64,7 @@ class Node:
 
 
 def select(node, cpuct):
-    total_visit_count = sum(child.visit_count for child in node.children.values())
+    total_visit_count = node.visit_count - 1
     return max(node.children.values(), key=lambda x: x.uct(cpuct, total_visit_count))
 
 
@@ -84,10 +89,11 @@ def expand_and_evaluate(node, neural_network):
 
 
 def backup(node, value):
+    node.visit_count += 1
+    node.total_action_value += value
+    node.mean_action_value = node.total_action_value / node.visit_count
+
     if node.parent is not None:
-        node.visit_count += 1
-        node.total_action_value += value
-        node.mean_action_value = node.total_action_value / node.visit_count
         backup(node.parent, value)
 
 
@@ -125,12 +131,18 @@ if __name__ == "__main__":
     nn_blocks = 3
 
     env = FloodEnv(width, height, n_colors)
-    net = NeuralNetwork(
-        n_colors=n_colors, width=width, height=height, n_blocks=nn_blocks
-    )
+
+    class FakeNet:
+        def __init__(self, n_colors):
+            self.n_colors = n_colors
+
+        def __call__(self, state):
+            return torch.ones(n_colors) / n_colors, torch.zeros(1)
+
+    net = FakeNet(n_colors)
     c_puct = 1
     temperature = 1
     print(env)
     root, probs = alphago_zero_search(env, net, 100, 1, 1)
-    print(root)
+    print("Possible Action", root.children.keys())
     draw_tree(root)
