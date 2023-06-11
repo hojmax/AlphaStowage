@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.optim as optim
 
 
 class Convulutional_Block(nn.Module):
@@ -125,16 +126,47 @@ class NeuralNetwork(nn.Module):
 
 # Testing the network
 if __name__ == "__main__":
+    from Train import train_network, loss_fn
+
     n_colors = 3
     width = 5
     height = 5
     n_blocks = 3
+    learning_rate = 0.01
+    l2_weight_reg = 0.0001
     net = NeuralNetwork(
         n_colors=n_colors, width=width, height=height, n_blocks=n_blocks
     )
-    # batch size, channels, width, height
-    x = torch.randint(0, n_colors, (1, 1, width, height), dtype=torch.float32)
-    print(x)
-    policy, value = net(x)
-    print(policy)
-    print(value)
+    net.train()
+    optimizer = optim.Adam(
+        net.parameters(),
+        lr=learning_rate,
+        weight_decay=l2_weight_reg,
+    )
+    n_fake_samples = 10
+    soft_max = nn.Softmax(dim=1)
+    # set torch seed
+    torch.manual_seed(0)
+    fake_training_data = [
+        (
+            torch.randint(0, n_colors, (1, 1, width, height), dtype=torch.float32),
+            soft_max(torch.rand(1, n_colors, dtype=torch.float32)).numpy(),
+            torch.randint(0, n_colors, (1,)),
+        )
+        for _ in range(n_fake_samples)
+    ]
+    print("REAL input", fake_training_data[0][0])
+    print("REAL input2", fake_training_data[1][0])
+    print("REAL", fake_training_data[0][1], fake_training_data[0][2])
+    print("REAL2", fake_training_data[1][1], fake_training_data[1][2])
+    for i in range(1000):
+        if i % 100 == 0:
+            with torch.no_grad():
+                net.eval()
+                print(net(fake_training_data[0][0]))
+                print(net(fake_training_data[1][0]))
+                net.train()
+        loss = train_network(net, fake_training_data, n_fake_samples, 1, optimizer)
+
+        if i % 100 == 0:
+            print(f"Loss: {loss}")

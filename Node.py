@@ -41,6 +41,7 @@ def draw_tree(node):
     )
     nx.draw_networkx_edge_labels(graph, pos, edge_labels=edge_labels, font_size=9)
 
+    plt.gcf().set_size_inches(10, 7)
     plt.show()
 
 
@@ -130,6 +131,7 @@ if __name__ == "__main__":
     n_colors = 3
     nn_blocks = 3
 
+    np.random.seed(2)
     env = FloodEnv(width, height, n_colors)
 
     class FakeNet:
@@ -144,5 +146,4 @@ if __name__ == "__main__":
     temperature = 1
     print(env)
     root, probs = alphago_zero_search(env, net, 100, 1, 1)
-    print("Possible Action", root.children.keys())
     draw_tree(root)
