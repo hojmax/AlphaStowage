@@ -56,11 +56,23 @@ if __name__ == "__main__":
         "width": 3,
         "height": 3,
         "n_colors": 3,
-        "nn_blocks": 5,
         "c_puct": 2,
         "temperature": 1 / 3,
         "search_iterations": 50,
         "max_data": int(1e3),
+        "nn": {
+            "blocks": 5,
+            "hidden_channels": 8,
+            "hidden_kernel_size": 3,
+            "hidden_stride": 1,
+            "policy_channels": 2,
+            "policy_kernel_size": 1,
+            "policy_stride": 1,
+            "value_channels": 1,
+            "value_kernel_size": 1,
+            "value_stride": 1,
+            "value_hidden": 256,
+        },
     }
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -68,7 +80,7 @@ if __name__ == "__main__":
         n_colors=config["n_colors"],
         width=config["width"],
         height=config["height"],
-        n_blocks=config["nn_blocks"],
+        config=config["nn"],
     )
     net.to(device)
     optimizer = optim.Adam(
