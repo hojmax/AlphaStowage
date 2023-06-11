@@ -154,7 +154,7 @@ if __name__ == "__main__":
                     config["temperature"],
                 )
                 print("MCTS probabilities:", probabilities)
-                pred_probs, pred_value = net(env.get_tensor_state())
+                pred_probs, pred_value = net(env.get_tensor_state().to(device))
                 print("NN probabilities:", pred_probs)
                 print("NN value:", pred_value)
                 action = np.random.choice(env.n_colors, p=probabilities)
