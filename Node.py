@@ -70,10 +70,13 @@ def select(node, cpuct):
 
 
 def expand_and_evaluate(node, neural_network):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if node.env.is_terminal():
         return node.env.value
     with torch.no_grad():
-        probabilities, state_value = neural_network(node.env.get_tensor_state())
+        probabilities, state_value = neural_network(
+            node.env.get_tensor_state().to(device)
+        )
         probabilities = probabilities.detach().numpy().squeeze()
         state_value = state_value.detach().numpy().squeeze()
 
