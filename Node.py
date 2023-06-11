@@ -77,8 +77,8 @@ def expand_and_evaluate(node, neural_network):
         probabilities, state_value = neural_network(
             node.env.get_tensor_state().to(device)
         )
-        probabilities = probabilities.detach().numpy().squeeze()
-        state_value = state_value.detach().numpy().squeeze()
+        probabilities = probabilities.detach().cpu().numpy().squeeze()
+        state_value = state_value.detach().cpu().numpy().squeeze()
 
     for i in range(node.env.n_colors):
         if not node.env.valid_actions[i]:
