@@ -19,6 +19,7 @@ def loss_fn(pred_values, values, pred_probs, probs):
 
 
 def train_network(network, data, batch_size, n_batches, optimizer):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if len(data) < batch_size:
         batch_size = len(data)
 
@@ -27,9 +28,11 @@ def train_network(network, data, batch_size, n_batches, optimizer):
     for _ in range(n_batches):
         batch_indices = np.random.choice(len(data), batch_size, replace=False)
         batch = [data[i] for i in batch_indices]
-        state_batch = torch.stack([x[0].squeeze(0) for x in batch])
-        prob_batch = torch.stack([torch.tensor(x[1]) for x in batch])
-        value_batch = torch.tensor([[x[2]] for x in batch], dtype=torch.float32)
+        state_batch = torch.stack([x[0].squeeze(0) for x in batch]).to(device)
+        prob_batch = torch.stack([torch.tensor(x[1]) for x in batch]).to(device)
+        value_batch = torch.tensor([[x[2]] for x in batch], dtype=torch.float32).to(
+            device
+        )
 
         pred_prob_batch, pred_value_batch = network(state_batch)
         loss = loss_fn(pred_value_batch, value_batch, pred_prob_batch, prob_batch)
