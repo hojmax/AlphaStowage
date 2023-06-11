@@ -5,13 +5,14 @@ import torch
 import matplotlib.pyplot as plt
 import networkx as nx
 from networkx.drawing.nx_pydot import graphviz_layout
+import wandb
 
 
 def _draw_tree_recursive(graph, node):
     for action, child in node.children.items():
         graph.add_node(
             str(hash(child)),
-            label=f"{np.array2string(child.env.state, separator=',')}\nN={child.visit_count}, Q={child.mean_action_value:.2f}, P={child.prior_prob:.2f}",
+            label=str(child),
         )
         graph.add_edge(str(hash(node)), str(hash(child)), label=str(action))
         _draw_tree_recursive(graph, child)
@@ -19,10 +20,7 @@ def _draw_tree_recursive(graph, node):
 
 def draw_tree(node):
     graph = nx.DiGraph()
-    graph.add_node(
-        str(hash(node)),
-        label=f"{np.array2string(node.env.state, separator=',')}\nN={node.visit_count}, Q={node.mean_action_value:.2f}, P={node.prior_prob}",
-    )
+    graph.add_node(str(hash(node)), label=str(node))
 
     _draw_tree_recursive(graph, node)
 
@@ -61,7 +59,9 @@ class Node:
         ) / (1 + self.visit_count)
 
     def __str__(self):
-        return f"Node(N={self.visit_count}, Q={self.mean_action_value}, P={self.prior_prob}, Children={list(self.children.keys())})\n{self.env}\n"
+        if self.prior_prob is None:
+            return f"{self.env}\nN={self.visit_count}, Q={self.mean_action_value:.2f}"
+        return f"{self.env}\nN={self.visit_count}, Q={self.mean_action_value:.2f}, P={self.prior_prob:.2f}"
 
 
 def select(node, cpuct):
@@ -126,24 +126,43 @@ def alphago_zero_search(root_env, neural_network, num_simulations, cpuct, temper
 
 # Testing the tree search
 if __name__ == "__main__":
-    width = 3
-    height = 3
-    n_colors = 3
-    nn_blocks = 3
+    run_path = "hojmax/bachelor/tkek63zs"
+    api = wandb.Api()
+    run = api.run(run_path)
+    file = run.file("model.pt")
+    file.download(replace=True)
+    config = run.config
 
-    np.random.seed(2)
-    env = FloodEnv(width, height, n_colors)
+    net = NeuralNetwork(
+        n_colors=config["n_colors"],
+        width=config["width"],
+        height=config["height"],
+        config=config["nn"],
+    )
+    net.load_state_dict(torch.load("model.pt"))
+    net.eval()
 
-    class FakeNet:
-        def __init__(self, n_colors):
-            self.n_colors = n_colors
-
-        def __call__(self, state):
-            return torch.ones(n_colors) / n_colors, torch.zeros(1)
-
-    net = FakeNet(n_colors)
-    c_puct = 1
-    temperature = 1
-    print(env)
-    root, probs = alphago_zero_search(env, net, 100, 1, 1)
-    draw_tree(root)
+    env = FloodEnv(
+        n_colors=config["n_colors"],
+        width=config["width"],
+        height=config["height"],
+    )
+    env.reset(
+        np.array(
+            [
+                [0, 1, 1],
+                [2, 1, 1],
+                [0, 2, 2],
+            ]
+        )
+    )
+    for i in range(1, 10):
+        root, probs = alphago_zero_search(
+            env,
+            net,
+            i,
+            config["c_puct"],
+            config["temperature"],
+        )
+        print(probs)
+        draw_tree(root)

@@ -71,9 +71,12 @@ class FloodEnv:
         self.valid_actions = np.zeros(self.n_colors, dtype=np.int8)
         self.neighbor_flood(0, 0, self.state[0, 0], visited)
 
-    def reset(self):
+    def reset(self, state=None):
         self.value = 0
-        self.state = np.random.randint(0, self.n_colors, (self.width, self.height))
+        if state is None:
+            self.state = np.random.randint(0, self.n_colors, (self.width, self.height))
+        else:
+            self.state = state
         self.color_counts = np.bincount(self.state.flatten(), minlength=self.n_colors)
         self.find_neighbors()
         return self.state
