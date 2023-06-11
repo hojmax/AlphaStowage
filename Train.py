@@ -44,6 +44,7 @@ def train_network(network, data, batch_size, n_batches, optimizer):
 
 
 if __name__ == "__main__":
+    with_wandb = True
     all_data = []
 
     config = {
@@ -51,15 +52,15 @@ if __name__ == "__main__":
         "batch_size": 8,
         "batches_per_episode": 16,
         "learning_rate": 1e-3,
-        "training_iterations": 1000,
+        "training_iterations": 5000,
         "width": 3,
         "height": 3,
         "n_colors": 3,
-        "nn_blocks": 4,
+        "nn_blocks": 5,
         "c_puct": 1,
-        "temperature": 0.5,
-        "search_iterations": 100,
-        "max_data": 1e5,
+        "temperature": 0.25,
+        "search_iterations": 50,
+        "max_data": int(5e2),
     }
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -76,12 +77,14 @@ if __name__ == "__main__":
         weight_decay=config["l2_weight_reg"],
     )
 
-    wandb.init(
-        entity="hojmax",
-        project="bachelor",
-        config=config,
-    )
+    if with_wandb:
+        wandb.init(
+            entity="hojmax",
+            project="bachelor",
+            config=config,
+        )
 
+    net.train()
     for i in range(config["training_iterations"]):
         episode_data = []
         env = FloodEnv(config["width"], config["height"], config["n_colors"])
@@ -111,15 +114,18 @@ if __name__ == "__main__":
             config["batches_per_episode"],
             optimizer,
         )
-
-        wandb.log({"loss": avg_loss, "value": value, "episode": i})
+        if with_wandb:
+            wandb.log({"loss": avg_loss, "value": value, "episode": i})
 
     torch.save(net.state_dict(), "model.pt")
-    wandb.save("model.pt")
 
-    wandb.finish()
+    if with_wandb:
+        wandb.save("model.pt")
+
+        wandb.finish()
 
     with torch.no_grad():
+        net.eval()
         for i in range(5):
             # showcase episode
             env = FloodEnv(config["width"], config["height"], config["n_colors"])
