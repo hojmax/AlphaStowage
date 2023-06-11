@@ -65,7 +65,7 @@ class Node:
 
 
 def select(node, cpuct):
-    total_visit_count = node.visit_count - 1
+    total_visit_count = node.visit_count
     return max(node.children.values(), key=lambda x: x.uct(cpuct, total_visit_count))
 
 

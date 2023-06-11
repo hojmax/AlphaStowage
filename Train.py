@@ -48,7 +48,7 @@ if __name__ == "__main__":
     all_data = []
 
     config = {
-        "l2_weight_reg": 1e-4,
+        "l2_weight_reg": 1e-3,
         "batch_size": 8,
         "batches_per_episode": 16,
         "learning_rate": 1e-3,
@@ -57,10 +57,10 @@ if __name__ == "__main__":
         "height": 3,
         "n_colors": 3,
         "nn_blocks": 5,
-        "c_puct": 1,
-        "temperature": 0.25,
+        "c_puct": 2,
+        "temperature": 1 / 3,
         "search_iterations": 50,
-        "max_data": int(5e2),
+        "max_data": int(1e3),
     }
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

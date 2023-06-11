@@ -58,7 +58,7 @@ class Residual_Block(nn.Module):
 class NeuralNetwork(nn.Module):
     def __init__(self, n_colors, width, height, n_blocks):
         super().__init__()
-        input_channels = 1
+        input_channels = n_colors
         hidden_channels = 8
         hidden_kernel_size = 3
         hidden_stride = 1

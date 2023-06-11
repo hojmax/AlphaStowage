@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 import pygame
 import numpy as np
 
@@ -16,7 +17,10 @@ class FloodEnv:
         self.reset()
 
     def get_tensor_state(self):
-        return torch.tensor(self.state).unsqueeze(0).unsqueeze(0).float()
+        tensor = torch.tensor(self.state).unsqueeze(0)
+        one_hot_encoded_tensor = F.one_hot(tensor, num_classes=self.n_colors)
+        one_hot_encoded_tensor = one_hot_encoded_tensor.permute(0, 3, 1, 2)
+        return one_hot_encoded_tensor.float()
 
     def is_terminal(self):
         return np.any(self.color_counts == self.width * self.height)
@@ -108,12 +112,9 @@ class FloodEnv:
         return str(self.state)
 
 
-# Testing the environment
 if __name__ == "__main__":
-    # set seed
     np.random.seed(0)
-    env = FloodEnv(10, 10, 4)
-
+    env = FloodEnv(3, 3, 4)
     moves = [0, 3, 1, 2]
     for move in moves:
         print(env.state)
