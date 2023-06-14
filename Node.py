@@ -39,7 +39,7 @@ def draw_tree(node):
     )
     nx.draw_networkx_edge_labels(graph, pos, edge_labels=edge_labels, font_size=9)
 
-    plt.gcf().set_size_inches(10, 7)
+    plt.gcf().set_size_inches(12, 7)
     plt.show()
 
 
@@ -61,7 +61,7 @@ class Node:
     def __str__(self):
         if self.prior_prob is None:
             return f"{self.env}\nN={self.visit_count}, Q={self.mean_action_value:.2f}"
-        return f"{self.env}\nN={self.visit_count}, Q={self.mean_action_value:.2f}, P={self.prior_prob:.2f}"
+        return f"{self.env}\nN={self.visit_count}, Q={self.mean_action_value:.2f}, P={self.prior_prob:.2f}, Q+U={self.uct(1, self.parent.visit_count):.2f}"
 
 
 def select(node, cpuct):
@@ -137,7 +137,7 @@ def alphago_zero_search(root_env, neural_network, num_simulations, cpuct, temper
 
 # Testing the tree search
 if __name__ == "__main__":
-    run_path = "hojmax/bachelor/tkek63zs"
+    run_path = "hojmax/bachelor/lgegma1b"
     api = wandb.Api()
     run = api.run(run_path)
     file = run.file("model.pt")
@@ -167,7 +167,7 @@ if __name__ == "__main__":
             ]
         )
     )
-    for i in range(1, 10):
+    for i in range(1, 20):
         root, probs = alphago_zero_search(
             env,
             net,

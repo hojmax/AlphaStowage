@@ -29,7 +29,12 @@ def train_network(network, data, batch_size, n_batches, optimizer):
         batch_indices = np.random.choice(len(data), batch_size, replace=False)
         batch = [data[i] for i in batch_indices]
         state_batch = torch.stack([x[0].squeeze(0) for x in batch]).to(device)
+        # Data Augmentation: random shuffling of color channels
+        permutation = torch.randperm(state_batch.shape[1])
+        state_batch = state_batch[:, permutation, :, :]
         prob_batch = torch.stack([torch.tensor(x[1]) for x in batch]).to(device)
+        prob_batch = prob_batch[:, permutation]
+
         value_batch = torch.tensor([[x[2]] for x in batch], dtype=torch.float32).to(
             device
         )
@@ -55,16 +60,16 @@ if __name__ == "__main__":
         "batch_size": 8,
         "batches_per_episode": 16,
         "learning_rate": 1e-3,
-        "training_iterations": 100,
-        "width": 5,
-        "height": 5,
-        "n_colors": 4,
-        "c_puct": 2,
+        "training_iterations": 1000,
+        "width": 3,
+        "height": 3,
+        "n_colors": 3,
+        "c_puct": 1,
         "temperature": 1 / 3,
         "search_iterations": 100,
-        "max_data": int(1e3),
+        "max_data": int(5e2),
         "nn": {
-            "blocks": 5,
+            "blocks": 4,
             "hidden_channels": 8,
             "hidden_kernel_size": 3,
             "hidden_stride": 1,

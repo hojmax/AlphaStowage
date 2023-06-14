@@ -78,6 +78,10 @@ class FloodEnv:
         else:
             self.state = state
         self.color_counts = np.bincount(self.state.flatten(), minlength=self.n_colors)
+
+        if self.is_terminal():
+            return self.reset()
+
         self.find_neighbors()
         return self.state
 
@@ -113,3 +117,12 @@ class FloodEnv:
 
     def __str__(self):
         return str(self.state)
+
+
+if __name__ == "__main__":
+    np.random.seed(0)
+
+    env = FloodEnv(3, 3, 4)
+    print(env)
+    print("🔴")
+    print(env.get_tensor_state())
