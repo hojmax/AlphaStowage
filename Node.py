@@ -46,6 +46,7 @@ def draw_tree(node):
 class Node:
     def __init__(self, env, prior_prob, estimated_value=0, parent=None):
         self.env = env
+        self.pruned = False
         self.visit_count = 0
         self.total_action_value = 0
         self.mean_action_value = estimated_value
@@ -61,12 +62,16 @@ class Node:
     def __str__(self):
         if self.prior_prob is None:
             return f"{self.env}\nN={self.visit_count}, Q={self.mean_action_value:.2f}"
-        return f"{self.env}\nN={self.visit_count}, Q={self.mean_action_value:.2f}, P={self.prior_prob:.2f}, Q+U={self.uct(1, self.parent.visit_count):.2f}"
+        output = f"{self.env}\nN={self.visit_count}, Q={self.mean_action_value:.2f}, P={self.prior_prob:.2f}, Q+U={self.uct(1, self.parent.visit_count):.2f}"
+        if self.pruned:
+            output = "(pruned) " + output
+        return output
 
 
 def select(node, cpuct):
     total_visit_count = node.visit_count
-    return max(node.children.values(), key=lambda x: x.uct(cpuct, total_visit_count))
+    valid_children = [child for child in node.children.values() if not child.pruned]
+    return max(valid_children, key=lambda x: x.uct(cpuct, total_visit_count))
 
 
 def expand_and_evaluate(node, neural_network):
@@ -87,7 +92,7 @@ def expand_and_evaluate(node, neural_network):
         prob = probabilities[action]
         new_env = node.env.copy()
         new_env.step(action)
-        estimated_value = min(0, state_value + 1)
+        estimated_value = min(-1, state_value + 1)
         node.children[action] = Node(
             new_env, prob, estimated_value=estimated_value, parent=node
         )
@@ -119,17 +124,37 @@ def reset_action_value(node):
     node.mean_action_value = 0
 
 
+def backtrack(node):
+    node.pruned = True
+    return node.parent
+
+
 def alphago_zero_search(root_env, neural_network, num_simulations, cpuct, temperature):
     root_node = Node(root_env, None)
+    best_depth = float("inf")
 
     for i in range(num_simulations):
         node = root_node
+        depth = 0
 
         while node.children:
-            node = select(node, cpuct)
+            try:
+                node = select(node, cpuct)
+                depth += 1
+            except ValueError:
+                node = backtrack(node)
+                depth -= 1
+
+            if not node.env.is_terminal() and depth >= best_depth:
+                node = backtrack(node)
+                depth -= 1
 
         reset_action_value(node)
         state_value = expand_and_evaluate(node, neural_network)
+
+        if node.env.is_terminal():
+            best_depth = min(best_depth, abs(state_value))
+
         backup(node, state_value)
 
     return root_node, get_tree_probs(root_node, temperature)
@@ -144,14 +169,24 @@ if __name__ == "__main__":
     file.download(replace=True)
     config = run.config
 
-    net = NeuralNetwork(
-        n_colors=config["n_colors"],
-        width=config["width"],
-        height=config["height"],
-        config=config["nn"],
-    )
-    net.load_state_dict(torch.load("model.pt"))
-    net.eval()
+    # net = NeuralNetwork(
+    #     n_colors=config["n_colors"],
+    #     width=config["width"],
+    #     height=config["height"],
+    #     config=config["nn"],
+    # )
+    # net.load_state_dict(torch.load("model.pt"))
+    # net.eval()
+    class FakeNet:
+        def __init__(self):
+            pass
+
+        def __call__(self, x):
+            return torch.ones(1, config["n_colors"]) / config["n_colors"], -torch.ones(
+                1, 1
+            )
+
+    net = FakeNet()
 
     env = FloodEnv(
         n_colors=config["n_colors"],
@@ -161,9 +196,9 @@ if __name__ == "__main__":
     env.reset(
         np.array(
             [
-                [0, 1, 1],
-                [2, 1, 1],
-                [0, 2, 2],
+                [1, 2, 0],
+                [0, 2, 1],
+                [2, 1, 0],
             ]
         )
     )
