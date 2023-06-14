@@ -113,18 +113,3 @@ class FloodEnv:
 
     def __str__(self):
         return str(self.state)
-
-
-if __name__ == "__main__":
-    np.random.seed(0)
-    env = FloodEnv(3, 3, 4)
-    moves = [0, 3, 1, 2]
-    for move in moves:
-        print(env.state)
-        print(env.valid_actions)
-        env.step(move)
-        env.render()
-        pygame.time.wait(1000)
-
-    print(env.state)
-    print(env.valid_actions)

@@ -44,11 +44,11 @@ def draw_tree(node):
 
 
 class Node:
-    def __init__(self, env, prior_prob, parent=None):
+    def __init__(self, env, prior_prob, estimated_value=0, parent=None):
         self.env = env
         self.visit_count = 0
         self.total_action_value = 0
-        self.mean_action_value = 0
+        self.mean_action_value = estimated_value
         self.prior_prob = prior_prob
         self.children = {}
         self.parent = parent
@@ -87,7 +87,10 @@ def expand_and_evaluate(node, neural_network):
         prob = probabilities[action]
         new_env = node.env.copy()
         new_env.step(action)
-        node.children[action] = Node(new_env, prob, parent=node)
+        estimated_value = min(0, state_value + 1)
+        node.children[action] = Node(
+            new_env, prob, estimated_value=estimated_value, parent=node
+        )
 
     return state_value
 
@@ -112,6 +115,10 @@ def get_tree_probs(node, temperature):
     return action_probs
 
 
+def reset_action_value(node):
+    node.mean_action_value = 0
+
+
 def alphago_zero_search(root_env, neural_network, num_simulations, cpuct, temperature):
     root_node = Node(root_env, None)
 
@@ -121,6 +128,7 @@ def alphago_zero_search(root_env, neural_network, num_simulations, cpuct, temper
         while node.children:
             node = select(node, cpuct)
 
+        reset_action_value(node)
         state_value = expand_and_evaluate(node, neural_network)
         backup(node, state_value)
 
