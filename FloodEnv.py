@@ -17,7 +17,7 @@ class FloodEnv:
         self.reset()
 
     def get_tensor_state(self):
-        tensor = torch.tensor(self.state).unsqueeze(0)
+        tensor = torch.tensor(self.state).unsqueeze(0).to(torch.long)
         one_hot_encoded_tensor = F.one_hot(tensor, num_classes=self.n_colors)
         one_hot_encoded_tensor = one_hot_encoded_tensor.permute(0, 3, 1, 2)
         return one_hot_encoded_tensor.float()
