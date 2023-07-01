@@ -44,7 +44,7 @@ def draw_tree(node):
 
 
 class Node:
-    def __init__(self, env, prior_prob, estimated_value=0, parent=None):
+    def __init__(self, env, prior_prob=None, estimated_value=0, parent=None, depth=0):
         self.env = env
         self.pruned = False
         self.visit_count = 0
@@ -53,6 +53,7 @@ class Node:
         self.prior_prob = prior_prob
         self.children = {}
         self.parent = parent
+        self.depth = depth
 
     def uct(self, cpuct, total_visit_count):
         return self.mean_action_value + cpuct * self.prior_prob * np.sqrt(
@@ -83,7 +84,7 @@ def expand_and_evaluate(node, neural_network):
             node.env.get_tensor_state().to(device)
         )
         probabilities = probabilities.detach().cpu().numpy().squeeze()
-        state_value = state_value.detach().cpu().numpy().squeeze()
+        state_value = state_value.detach().cpu().numpy().squeeze() - node.depth
 
     for i in range(node.env.n_colors):
         if not node.env.valid_actions[i]:
@@ -91,10 +92,14 @@ def expand_and_evaluate(node, neural_network):
         action = i
         prob = probabilities[action]
         new_env = node.env.copy()
+        next_depth = node.depth + 1
         new_env.step(action)
-        estimated_value = min(-1, state_value + 1)
         node.children[action] = Node(
-            new_env, prob, estimated_value=estimated_value, parent=node
+            new_env,
+            prob,
+            estimated_value=state_value,
+            parent=node,
+            depth=next_depth,
         )
 
     return state_value
@@ -130,7 +135,7 @@ def backtrack(node):
 
 
 def alphago_zero_search(root_env, neural_network, num_simulations, cpuct, temperature):
-    root_node = Node(root_env, None)
+    root_node = Node(root_env)
     best_depth = float("inf")
 
     for i in range(num_simulations):
@@ -160,33 +165,32 @@ def alphago_zero_search(root_env, neural_network, num_simulations, cpuct, temper
     return root_node, get_tree_probs(root_node, temperature)
 
 
-# Testing the tree search
 if __name__ == "__main__":
-    run_path = "hojmax/bachelor/lgegma1b"
+    run_path = "hojmax/bachelor/85q9qnrq"
     api = wandb.Api()
     run = api.run(run_path)
     file = run.file("model.pt")
     file.download(replace=True)
     config = run.config
 
-    # net = NeuralNetwork(
-    #     n_colors=config["n_colors"],
-    #     width=config["width"],
-    #     height=config["height"],
-    #     config=config["nn"],
-    # )
-    # net.load_state_dict(torch.load("model.pt"))
-    # net.eval()
-    class FakeNet:
-        def __init__(self):
-            pass
+    net = NeuralNetwork(
+        n_colors=config["n_colors"],
+        width=config["width"],
+        height=config["height"],
+        config=config["nn"],
+    )
+    net.load_state_dict(torch.load("model.pt"))
+    net.eval()
+    # class FakeNet:
+    #     def __init__(self):
+    #         pass
 
-        def __call__(self, x):
-            return torch.ones(1, config["n_colors"]) / config["n_colors"], -torch.ones(
-                1, 1
-            )
+    #     def __call__(self, x):
+    #         return torch.ones(1, config["n_colors"]) / config["n_colors"], -torch.ones(
+    #             1, 1
+    #         )
 
-    net = FakeNet()
+    # net = FakeNet()
 
     env = FloodEnv(
         n_colors=config["n_colors"],
@@ -202,7 +206,7 @@ if __name__ == "__main__":
             ]
         )
     )
-    for i in range(1, 20):
+    for i in range(1, 5):
         root, probs = alphago_zero_search(
             env,
             net,

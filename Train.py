@@ -60,7 +60,7 @@ if __name__ == "__main__":
         "batch_size": 8,
         "batches_per_episode": 16,
         "learning_rate": 1e-3,
-        "training_iterations": 1000,
+        "training_iterations": 3500,
         "width": 3,
         "height": 3,
         "n_colors": 3,
