@@ -166,7 +166,7 @@ def alphago_zero_search(root_env, neural_network, num_simulations, cpuct, temper
 
 
 if __name__ == "__main__":
-    run_path = "hojmax/bachelor/85q9qnrq"
+    run_path = "hojmax/bachelor/ov4gcmwv"
     api = wandb.Api()
     run = api.run(run_path)
     file = run.file("model.pt")
@@ -197,16 +197,8 @@ if __name__ == "__main__":
         width=config["width"],
         height=config["height"],
     )
-    env.reset(
-        np.array(
-            [
-                [1, 2, 0],
-                [0, 2, 1],
-                [2, 1, 0],
-            ]
-        )
-    )
-    for i in range(1, 5):
+    env.reset(np.array([[1, 2, 0], [0, 2, 0], [1, 0, 1]]))
+    for i in range(1, 100):
         root, probs = alphago_zero_search(
             env,
             net,

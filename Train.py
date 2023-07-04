@@ -6,6 +6,7 @@ from NeuralNetwork import NeuralNetwork
 import Node
 import numpy as np
 import wandb
+import json
 
 
 def loss_fn(pred_values, values, pred_probs, probs):
@@ -55,46 +56,21 @@ if __name__ == "__main__":
     with_wandb = True
     all_data = []
 
-    config = {
-        "l2_weight_reg": 1e-3,
-        "batch_size": 8,
-        "batches_per_episode": 16,
-        "learning_rate": 1e-3,
-        "training_iterations": 3500,
-        "width": 3,
-        "height": 3,
-        "n_colors": 3,
-        "c_puct": 1,
-        "temperature": 1 / 3,
-        "search_iterations": 100,
-        "max_data": int(5e2),
-        "nn": {
-            "blocks": 4,
-            "hidden_channels": 8,
-            "hidden_kernel_size": 3,
-            "hidden_stride": 1,
-            "policy_channels": 2,
-            "policy_kernel_size": 1,
-            "policy_stride": 1,
-            "value_channels": 1,
-            "value_kernel_size": 1,
-            "value_stride": 1,
-            "value_hidden": 256,
-        },
-    }
+    with open("config.json", "r") as f:
+        config = json.load(f)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net = NeuralNetwork(
-        n_colors=config["n_colors"],
-        width=config["width"],
-        height=config["height"],
+        n_colors=config["env"]["n_colors"],
+        width=config["env"]["width"],
+        height=config["env"]["height"],
         config=config["nn"],
     )
     net.to(device)
     optimizer = optim.Adam(
         net.parameters(),
-        lr=config["learning_rate"],
-        weight_decay=config["l2_weight_reg"],
+        lr=config["train"]["learning_rate"],
+        weight_decay=config["train"]["l2_weight_reg"],
     )
 
     if with_wandb:
@@ -105,16 +81,18 @@ if __name__ == "__main__":
         )
 
     net.train()
-    for i in range(config["training_iterations"]):
+    for i in range(config["train"]["n_iterations"]):
         episode_data = []
-        env = FloodEnv(config["width"], config["height"], config["n_colors"])
+        env = FloodEnv(
+            config["env"]["width"], config["env"]["height"], config["env"]["n_colors"]
+        )
         while not env.is_terminal():
             _, probabilities = Node.alphago_zero_search(
                 env,
                 net,
-                config["search_iterations"],
-                config["c_puct"],
-                config["temperature"],
+                config["mcts"]["search_iterations"],
+                config["mcts"]["c_puct"],
+                config["mcts"]["temperature"],
             )
             episode_data.append((env.get_tensor_state(), probabilities))
             action = np.random.choice(env.n_colors, p=probabilities)
@@ -124,14 +102,14 @@ if __name__ == "__main__":
         for i, (state, probabilities) in enumerate(episode_data):
             all_data.append((state, probabilities, value + i))
 
-        if len(all_data) > config["max_data"]:
-            all_data = all_data[-config["max_data"] :]
+        if len(all_data) > config["train"]["max_data"]:
+            all_data = all_data[-config["train"]["max_data"] :]
 
         avg_loss = train_network(
             net,
             all_data,
-            config["batch_size"],
-            config["batches_per_episode"],
+            config["train"]["batch_size"],
+            config["train"]["batches_per_episode"],
             optimizer,
         )
         if with_wandb:
@@ -143,29 +121,3 @@ if __name__ == "__main__":
         wandb.save("model.pt")
 
         wandb.finish()
-
-    with torch.no_grad():
-        net.eval()
-        for i in range(5):
-            # showcase episode
-            env = FloodEnv(config["width"], config["height"], config["n_colors"])
-            print(env)
-            while not env.is_terminal():
-                _, probabilities = Node.alphago_zero_search(
-                    env,
-                    net,
-                    config["search_iterations"],
-                    config["c_puct"],
-                    config["temperature"],
-                )
-                print("MCTS probabilities:", probabilities)
-                pred_probs, pred_value = net(env.get_tensor_state().to(device))
-                print("NN probabilities:", pred_probs)
-                print("NN value:", pred_value)
-                action = np.random.choice(env.n_colors, p=probabilities)
-                env.step(action)
-                print("Action:", action)
-                print()
-                print(env)
-            print("True Value:", env.value)
-            print()
