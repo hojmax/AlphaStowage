@@ -134,7 +134,7 @@ def backtrack(node):
     return node.parent
 
 
-def alphago_zero_search(root_env, neural_network, num_simulations, cpuct, temperature):
+def alpha_zero_search(root_env, neural_network, num_simulations, cpuct, temperature):
     root_node = Node(root_env)
     best_depth = float("inf")
 
@@ -199,7 +199,7 @@ if __name__ == "__main__":
     )
     env.reset(np.array([[1, 2, 0], [0, 2, 0], [1, 0, 1]]))
     for i in range(1, 100):
-        root, probs = alphago_zero_search(
+        root, probs = alpha_zero_search(
             env,
             net,
             i,
