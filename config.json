@@ -1,11 +1,11 @@
 {
   "train": {
     "l2_weight_reg": 0.001,
-    "batch_size": 128,
+    "batch_size": 256,
     "batches_per_episode": 4,
     "learning_rate": 0.001,
-    "n_iterations": 3500,
-    "max_data": 500,
+    "n_iterations": 10000,
+    "max_data": 3000,
     "value_scaling": 0.5
   },
   "mcts": {
@@ -14,9 +14,9 @@
     "search_iterations": 100
   },
   "env": {
-    "width": 3,
-    "height": 3,
-    "n_colors": 3
+    "width": 5,
+    "height": 5,
+    "n_colors": 4
   },
   "nn": {
     "blocks": 4,
