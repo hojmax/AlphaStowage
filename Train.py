@@ -61,12 +61,7 @@ if __name__ == "__main__":
         config = json.load(f)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    net = NeuralNetwork(
-        n_colors=config["env"]["n_colors"],
-        width=config["env"]["width"],
-        height=config["env"]["height"],
-        config=config["nn"],
-    )
+    net = NeuralNetwork(config)
     net.to(device)
     optimizer = optim.Adam(
         net.parameters(),

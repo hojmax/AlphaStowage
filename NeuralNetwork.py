@@ -56,26 +56,28 @@ class Residual_Block(nn.Module):
 
 
 class NeuralNetwork(nn.Module):
-    def __init__(self, n_colors, width, height, config):
+    def __init__(self, config):
         super().__init__()
-        input_channels = n_colors
+        env_config = config["env"]
+        nn_config = config["nn"]
+        input_channels = env_config["n_colors"]
 
         layers = []
         layers.append(
             Convulutional_Block(
                 input_channels,
-                config["hidden_channels"],
-                config["hidden_kernel_size"],
-                stride=config["hidden_stride"],
+                nn_config["hidden_channels"],
+                nn_config["hidden_kernel_size"],
+                stride=nn_config["hidden_stride"],
             )
         )
-        for _ in range(config["blocks"]):
+        for _ in range(nn_config["blocks"]):
             layers.append(
                 Residual_Block(
-                    config["hidden_channels"],
-                    config["hidden_channels"],
-                    config["hidden_kernel_size"],
-                    config["hidden_stride"],
+                    nn_config["hidden_channels"],
+                    nn_config["hidden_channels"],
+                    nn_config["hidden_kernel_size"],
+                    nn_config["hidden_stride"],
                 )
             )
 
@@ -83,33 +85,41 @@ class NeuralNetwork(nn.Module):
 
         self.policy_head = nn.Sequential(
             nn.Conv2d(
-                in_channels=config["hidden_channels"],
-                out_channels=config["policy_channels"],
-                kernel_size=config["policy_kernel_size"],
-                stride=config["policy_stride"],
+                in_channels=nn_config["hidden_channels"],
+                out_channels=nn_config["policy_channels"],
+                kernel_size=nn_config["policy_kernel_size"],
+                stride=nn_config["policy_stride"],
             ),
-            nn.BatchNorm2d(config["policy_channels"]),
+            nn.BatchNorm2d(nn_config["policy_channels"]),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(config["policy_channels"] * width * height, n_colors),
+            nn.Linear(
+                nn_config["policy_channels"]
+                * env_config["width"]
+                * env_config["height"],
+                env_config["n_colors"],
+            ),
             nn.Softmax(dim=1),
         )
 
         self.value_head = nn.Sequential(
             nn.Conv2d(
-                in_channels=config["hidden_channels"],
-                out_channels=config["value_channels"],
-                kernel_size=config["value_kernel_size"],
-                stride=config["value_stride"],
+                in_channels=nn_config["hidden_channels"],
+                out_channels=nn_config["value_channels"],
+                kernel_size=nn_config["value_kernel_size"],
+                stride=nn_config["value_stride"],
             ),
-            nn.BatchNorm2d(config["value_channels"]),
+            nn.BatchNorm2d(nn_config["value_channels"]),
             nn.ReLU(),
             nn.Flatten(),
             nn.Linear(
-                config["value_channels"] * width * height, config["value_hidden"]
+                nn_config["value_channels"]
+                * env_config["width"]
+                * env_config["height"],
+                nn_config["value_hidden"],
             ),
             nn.ReLU(),
-            nn.Linear(config["value_hidden"], 1),
+            nn.Linear(nn_config["value_hidden"], 1),
         )
 
     def forward(self, x):
