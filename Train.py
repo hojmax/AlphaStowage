@@ -19,16 +19,15 @@ def loss_fn(pred_value, value, pred_prob, prob, value_scaling):
 
 
 def get_batch(data, batch_size):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     batch_indices = np.random.choice(len(data), batch_size, replace=False)
     batch = [data[i] for i in batch_indices]
-    state_batch = torch.stack([x[0].squeeze(0) for x in batch]).to(device)
+    state_batch = torch.stack([x[0].squeeze(0) for x in batch])
     # Data Augmentation: random shuffling of color channels
     permutation = torch.randperm(state_batch.shape[1])
     state_batch = state_batch[:, permutation, :, :]
-    prob_batch = torch.stack([torch.tensor(x[1]) for x in batch]).to(device)
+    prob_batch = torch.stack([torch.tensor(x[1]) for x in batch]).float()
     prob_batch = prob_batch[:, permutation]
-    value_batch = torch.tensor([[x[2]] for x in batch], dtype=torch.float32).to(device)
+    value_batch = torch.tensor([[x[2]] for x in batch], dtype=torch.float32)
 
     return state_batch, prob_batch, value_batch
 
@@ -49,7 +48,9 @@ def optimize_network(pred_value, value, pred_prob, prob, optimizer, value_scalin
     return loss.item()
 
 
-def train_network(network, data, batch_size, n_batches, optimizer, value_scaling):
+def train_network(
+    network, data, batch_size, n_batches, optimizer, value_scaling, device
+):
     if len(data) < batch_size:
         batch_size = len(data)
 
@@ -57,6 +58,9 @@ def train_network(network, data, batch_size, n_batches, optimizer, value_scaling
 
     for _ in range(n_batches):
         state, prob, value = get_batch(data, batch_size)
+        state = state.to(device)
+        prob = prob.to(device)
+        value = value.to(device)
         pred_prob, pred_value = network(state)
         loss = optimize_network(
             pred_value=pred_value,
@@ -72,7 +76,7 @@ def train_network(network, data, batch_size, n_batches, optimizer, value_scaling
     return sum_loss / n_batches
 
 
-def play_episode(env, net, config):
+def play_episode(env, net, config, device):
     episode_data = []
 
     while not env.is_terminal():
@@ -82,6 +86,7 @@ def play_episode(env, net, config):
             config["mcts"]["search_iterations"],
             config["mcts"]["c_puct"],
             config["mcts"]["temperature"],
+            device,
         )
         episode_data.append((env.get_tensor_state(), probabilities))
         action = np.random.choice(env.n_colors, p=probabilities)
@@ -99,7 +104,13 @@ if __name__ == "__main__":
     with open("config.json", "r") as f:
         config = json.load(f)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(
+        "cuda"
+        if torch.cuda.is_available()
+        else "mps"
+        if torch.backends.mps.is_available()
+        else "cpu"
+    )
     net = NeuralNetwork(config)
     net.to(device)
     optimizer = optim.Adam(
@@ -121,7 +132,7 @@ if __name__ == "__main__":
         env = FloodEnv(
             config["env"]["width"], config["env"]["height"], config["env"]["n_colors"]
         )
-        episode_data, episode_value = play_episode(env, net, config)
+        episode_data, episode_value = play_episode(env, net, config, device)
         all_data.extend(episode_data)
 
         if len(all_data) > config["train"]["max_data"]:
@@ -134,6 +145,7 @@ if __name__ == "__main__":
             config["train"]["batches_per_episode"],
             optimizer,
             config["train"]["value_scaling"],
+            device,
         )
 
         wandb.log({"loss": avg_loss, "value": episode_value, "episode": i})

@@ -75,8 +75,7 @@ def select(node, cpuct):
     return max(valid_children, key=lambda x: x.uct(cpuct, total_visit_count))
 
 
-def expand_and_evaluate(node, neural_network):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def expand_and_evaluate(node, neural_network, device):
     if node.env.is_terminal():
         return node.env.value
     with torch.no_grad():
@@ -134,7 +133,9 @@ def backtrack(node):
     return node.parent
 
 
-def alpha_zero_search(root_env, neural_network, num_simulations, cpuct, temperature):
+def alpha_zero_search(
+    root_env, neural_network, num_simulations, cpuct, temperature, device
+):
     root_node = Node(root_env)
     best_depth = float("inf")
 
@@ -155,7 +156,7 @@ def alpha_zero_search(root_env, neural_network, num_simulations, cpuct, temperat
                 depth -= 1
 
         reset_action_value(node)
-        state_value = expand_and_evaluate(node, neural_network)
+        state_value = expand_and_evaluate(node, neural_network, device)
 
         if node.env.is_terminal():
             best_depth = min(best_depth, abs(state_value))

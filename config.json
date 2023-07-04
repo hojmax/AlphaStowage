@@ -1,8 +1,8 @@
 {
   "train": {
     "l2_weight_reg": 0.001,
-    "batch_size": 8,
-    "batches_per_episode": 16,
+    "batch_size": 128,
+    "batches_per_episode": 4,
     "learning_rate": 0.001,
     "n_iterations": 3500,
     "max_data": 500,
