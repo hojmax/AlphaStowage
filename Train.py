@@ -9,17 +9,16 @@ import wandb
 import json
 
 
-def loss_fn(pred_values, values, pred_probs, probs):
-    value_error = torch.mean((values - pred_values) ** 2)
+def loss_fn(pred_values, values, pred_probs, probs, value_scaling):
+    value_error = torch.mean(torch.square(values - pred_values))
     cross_entropy = (
         -torch.sum(probs.flatten() * torch.log(pred_probs.flatten())) / probs.shape[0]
     )
-    scaling = 0.5
-    loss = scaling * value_error + cross_entropy
+    loss = value_scaling * value_error + cross_entropy
     return loss
 
 
-def train_network(network, data, batch_size, n_batches, optimizer):
+def train_network(network, data, batch_size, n_batches, optimizer, value_scaling):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if len(data) < batch_size:
         batch_size = len(data)
@@ -41,7 +40,9 @@ def train_network(network, data, batch_size, n_batches, optimizer):
         )
 
         pred_prob_batch, pred_value_batch = network(state_batch)
-        loss = loss_fn(pred_value_batch, value_batch, pred_prob_batch, prob_batch)
+        loss = loss_fn(
+            pred_value_batch, value_batch, pred_prob_batch, prob_batch, value_scaling
+        )
         optimizer.zero_grad()
         loss.backward()
 
@@ -111,6 +112,7 @@ if __name__ == "__main__":
             config["train"]["batch_size"],
             config["train"]["batches_per_episode"],
             optimizer,
+            config["train"]["value_scaling"],
         )
         if with_wandb:
             wandb.log({"loss": avg_loss, "value": value, "episode": i})

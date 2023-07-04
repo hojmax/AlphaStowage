@@ -5,7 +5,8 @@
     "batches_per_episode": 16,
     "learning_rate": 0.001,
     "n_iterations": 3500,
-    "max_data": 500
+    "max_data": 500,
+    "value_scaling": 0.5
   },
   "mcts": {
     "c_puct": 1,
