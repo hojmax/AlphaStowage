@@ -7,6 +7,7 @@ import Node
 import numpy as np
 import wandb
 import json
+from tqdm import tqdm
 
 
 def loss_fn(pred_value, value, pred_prob, prob, value_scaling):
@@ -128,7 +129,7 @@ if __name__ == "__main__":
 
     net.train()
 
-    for i in range(config["train"]["n_iterations"]):
+    for i in tqdm(range(config["train"]["n_iterations"])):
         env = FloodEnv(
             config["env"]["width"], config["env"]["height"], config["env"]["n_colors"]
         )

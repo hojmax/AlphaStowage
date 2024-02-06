@@ -10,13 +10,13 @@
   },
   "mcts": {
     "c_puct": 1,
-    "temperature": 0.33,
+    "temperature": 1,
     "search_iterations": 100
   },
   "env": {
-    "width": 12,
-    "height": 12,
-    "n_colors": 6
+    "width": 3,
+    "height": 3,
+    "n_colors": 3
   },
   "nn": {
     "blocks": 4,
