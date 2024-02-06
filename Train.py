@@ -33,7 +33,7 @@ def get_batch(data, batch_size):
     return state_batch, prob_batch, value_batch
 
 
-def optimize_network(pred_value, value, pred_prob, prob, optimizer, value_scaling):
+def optimize_network(pred_value, value, pred_prob, prob, optimizer,scheduler, value_scaling):
     loss = loss_fn(
         pred_value=pred_value,
         value=value,
@@ -45,12 +45,13 @@ def optimize_network(pred_value, value, pred_prob, prob, optimizer, value_scalin
     loss.backward()
 
     optimizer.step()
+    scheduler.step()
 
     return loss.item()
 
 
 def train_network(
-    network, data, batch_size, n_batches, optimizer, value_scaling, device
+    network, data, batch_size, n_batches, optimizer, scheduler, value_scaling, device
 ):
     if len(data) < batch_size:
         batch_size = len(data)
@@ -69,6 +70,7 @@ def train_network(
             pred_prob=pred_prob,
             prob=prob,
             optimizer=optimizer,
+            scheduler=scheduler,
             value_scaling=value_scaling,
         )
 
@@ -119,6 +121,10 @@ if __name__ == "__main__":
         lr=config["train"]["learning_rate"],
         weight_decay=config["train"]["l2_weight_reg"],
     )
+    # exponential decay
+    scheduler = optim.lr_scheduler.ExponentialLR(
+        optimizer, config["train"]["learning_rate_decay"]
+    )
     all_data = []
 
     wandb.init(
@@ -145,11 +151,12 @@ if __name__ == "__main__":
             config["train"]["batch_size"],
             config["train"]["batches_per_episode"],
             optimizer,
+            scheduler,
             config["train"]["value_scaling"],
             device,
         )
 
-        wandb.log({"loss": avg_loss, "value": episode_value, "episode": i})
+        wandb.log({"loss": avg_loss, "value": episode_value, "episode": i, "lr": optimizer.param_groups[0]["lr"]})
 
     torch.save(net.state_dict(), "model.pt")
 

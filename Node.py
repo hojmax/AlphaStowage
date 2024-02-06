@@ -167,7 +167,7 @@ def alpha_zero_search(
 
 
 if __name__ == "__main__":
-    run_path = "hojmax/bachelor/ov4gcmwv"
+    run_path = "hojmax/bachelor/37em45tw"
     api = wandb.Api()
     run = api.run(run_path)
     file = run.file("model.pt")
@@ -175,12 +175,9 @@ if __name__ == "__main__":
     config = run.config
 
     net = NeuralNetwork(
-        n_colors=config["n_colors"],
-        width=config["width"],
-        height=config["height"],
-        config=config["nn"],
+        config=config
     )
-    net.load_state_dict(torch.load("model.pt"))
+    net.load_state_dict(torch.load("model.pt", map_location="cpu"))
     net.eval()
     # class FakeNet:
     #     def __init__(self):
@@ -194,9 +191,9 @@ if __name__ == "__main__":
     # net = FakeNet()
 
     env = FloodEnv(
-        n_colors=config["n_colors"],
-        width=config["width"],
-        height=config["height"],
+        n_colors=config["env"]["n_colors"],
+        width=config["env"]["width"],
+        height=config["env"]["height"],
     )
     env.reset(np.array([[1, 2, 0], [0, 2, 0], [1, 0, 1]]))
     for i in range(1, 100):
@@ -204,8 +201,9 @@ if __name__ == "__main__":
             env,
             net,
             i,
-            config["c_puct"],
-            config["temperature"],
+            config["mcts"]["c_puct"],
+            config["mcts"]["temperature"],
+            device="cpu",
         )
         print(probs)
         draw_tree(root)
