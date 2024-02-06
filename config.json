@@ -4,9 +4,9 @@
     "batch_size": 256,
     "batches_per_episode": 4,
     "learning_rate": 0.001,
-    "learning_rate_decay": 0.9995,
+    "learning_rate_decay": 0.99995,
     "n_iterations": 10000,
-    "max_data": 3000,
+    "max_data": 2000,
     "value_scaling": 0.5
   },
   "mcts": {
