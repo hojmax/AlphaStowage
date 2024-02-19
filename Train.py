@@ -133,7 +133,7 @@ def extend_and_handle_duplicates(all_data, episode_data):
 
 def create_testset(config):
     testset = []
-    for i in range(10):
+    for i in range(100):
         np.random.seed(i)
         env = FloodEnv(
             config["env"]["width"], config["env"]["height"], config["env"]["n_colors"]

@@ -8,12 +8,12 @@
     "n_iterations": 1e8,
     "max_data": 4000,
     "value_scaling": 0.5,
-    "test_interval": 10
+    "test_interval": 200
   },
   "mcts": {
     "c_puct": 1,
-    "temperature": 0.5,
-    "search_iterations": 30
+    "temperature": 1,
+    "search_iterations": 100
   },
   "env": {
     "width": 6,
