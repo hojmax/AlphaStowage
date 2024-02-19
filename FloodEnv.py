@@ -60,6 +60,7 @@ class FloodEnv:
         if self.state[x, y] != old_color:
             self.valid_actions[self.state[x, y]] = 1
             return
+        self.coverage += 1
         visited[x, y] = 1
         self.neighbor_flood(x + 1, y, old_color, visited)
         self.neighbor_flood(x - 1, y, old_color, visited)
@@ -69,6 +70,7 @@ class FloodEnv:
     def find_neighbors(self):
         visited = np.zeros((self.width, self.height), dtype=np.int8)
         self.valid_actions = np.zeros(self.n_colors, dtype=np.int8)
+        self.coverage = 0
         self.neighbor_flood(0, 0, self.state[0, 0], visited)
 
     def reset(self, state=None):
@@ -114,6 +116,7 @@ class FloodEnv:
         env.color_counts = np.copy(self.color_counts)
         env.valid_actions = np.copy(self.valid_actions)
         env.value = self.value
+        env.coverage = self.coverage
         return env
 
     def __str__(self):
@@ -139,10 +142,53 @@ def bfs_solver(env):
     raise ValueError("No solution found")
 
 
+def n_lookahead_run_episode(env, n):
+    while not env.is_terminal():
+        action = n_lookahead_find_best_move(env, n)
+        env.step(action)
+    return env.value
+
+
+def n_lookahead_find_best_move(env, n):
+    best_coverage = 0
+    best_move = None
+    nodes = [{"env": env, "depth": 0, "initial_move": None}]
+
+    while nodes:
+        node = nodes.pop(0)
+
+        if node["depth"] > n:
+            return best_move
+
+        if node["env"].is_terminal():
+            return node["initial_move"]
+
+        if node["env"].coverage > best_coverage:
+            best_coverage = node["env"].coverage
+            best_move = node["initial_move"]
+
+        for i in range(node["env"].n_colors):
+            if not node["env"].valid_actions[i]:
+                continue
+            new_env = node["env"].copy()
+            new_env.step(i)
+            nodes.append(
+                {
+                    "env": new_env,
+                    "depth": node["depth"] + 1,
+                    "initial_move": node["initial_move"] if node["depth"] > 0 else i,
+                }
+            )
+
+    raise ValueError("No solution found")
+
+
 if __name__ == "__main__":
-    for i in range(10):
-        # seed
-        env = FloodEnv(3, 3, 4)
+    for i in range(100):
+        np.random.seed(i+100)
+        # compare 2 lookahead to solve
+        env = FloodEnv(3, 3, 3)
         print(env)
-        print(bfs_solver(env))
+        print("Optimal", bfs_solver(env.copy()))
+        print("1-lookahead", n_lookahead_run_episode(env.copy(), 1))
         print()

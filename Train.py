@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from FloodEnv import FloodEnv, bfs_solver
+from FloodEnv import FloodEnv, n_lookahead_run_episode
 from NeuralNetwork import NeuralNetwork
 import Node
 import numpy as np
@@ -138,8 +138,8 @@ def create_testset(config):
         env = FloodEnv(
             config["env"]["width"], config["env"]["height"], config["env"]["n_colors"]
         )
-        solution = bfs_solver(env)
-        testset.append((env, solution))
+        solution = n_lookahead_run_episode(env.copy(), config["eval"]["n_lookahead"])
+        testset.append((env.copy(), solution))
     return testset
 
 
@@ -149,7 +149,7 @@ def test_network(net, testset, config, device):
 
     for env, solution in testset:
         _, value = play_episode(env, net, config, device)
-        avg_error += abs(value - solution)
+        avg_error += value - solution
 
     avg_error /= len(testset)
     return avg_error
