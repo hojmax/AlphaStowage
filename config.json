@@ -20,7 +20,7 @@
     "n_colors": 3
   },
   "nn": {
-    "blocks": 4,
+    "blocks": 8,
     "hidden_channels": 16,
     "hidden_kernel_size": 3,
     "hidden_stride": 1,

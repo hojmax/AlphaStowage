@@ -148,6 +148,7 @@ def alpha_zero_search(
                 node = select(node, cpuct)
                 depth += 1
             except ValueError:
+                # In case all children are pruned
                 node = backtrack(node)
                 depth -= 1
 
