@@ -187,7 +187,7 @@ if __name__ == "__main__":
     net.train()
 
     for i in tqdm(range(int(config["train"]["n_iterations"]))):
-        if i % config["train"]["test_interval"] == 0:
+        if (i + 1) % config["train"]["test_interval"] == 0:
             avg_error = test_network(net, testset, config, device)
             wandb.log({"test_error": avg_error, "episode": i})
         env = FloodEnv(

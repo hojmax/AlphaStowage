@@ -13,7 +13,7 @@
   "mcts": {
     "c_puct": 1,
     "temperature": 0.5,
-    "search_iterations": 100
+    "search_iterations": 30
   },
   "env": {
     "width": 6,
@@ -21,7 +21,7 @@
     "n_colors": 4
   },
   "nn": {
-    "blocks": 8,
+    "blocks": 4,
     "hidden_channels": 16,
     "hidden_kernel_size": 3,
     "hidden_stride": 1,
