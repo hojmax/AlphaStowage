@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from FloodEnv import FloodEnv
+from FloodEnv import FloodEnv, bfs_solver
 from NeuralNetwork import NeuralNetwork
 import Node
 import numpy as np
@@ -33,7 +33,9 @@ def get_batch(data, batch_size):
     return state_batch, prob_batch, value_batch
 
 
-def optimize_network(pred_value, value, pred_prob, prob, optimizer,scheduler, value_scaling):
+def optimize_network(
+    pred_value, value, pred_prob, prob, optimizer, scheduler, value_scaling
+):
     loss, value_loss, cross_entropy = loss_fn(
         pred_value=pred_value,
         value=value,
@@ -80,7 +82,11 @@ def train_network(
         sum_value_loss += value_loss
         sum_cross_entropy += cross_entropy
 
-    return sum_loss / n_batches, sum_value_loss / n_batches, sum_cross_entropy / n_batches
+    return (
+        sum_loss / n_batches,
+        sum_value_loss / n_batches,
+        sum_cross_entropy / n_batches,
+    )
 
 
 def play_episode(env, net, config, device):
@@ -118,23 +124,46 @@ def extend_and_handle_duplicates(all_data, episode_data):
                 else:
                     shouldAdd = False
                 break
-        
+
         if removalIndex is not None:
             all_data.pop(removalIndex)
         if shouldAdd:
             all_data.append((state, probabilities, value))
- 
+
+
+def create_testset(config):
+    testset = []
+    for i in range(100):
+        np.random.seed(i)
+        env = FloodEnv(
+            config["env"]["width"], config["env"]["height"], config["env"]["n_colors"]
+        )
+        solution = bfs_solver(env)
+        testset.append((env, solution))
+    return testset
+
+
+def test_network(net, testset, config, device):
+    net.eval()
+    avg_error = 0
+
+    for env, solution in testset:
+        _, value = play_episode(env, net, config, device)
+        avg_error += abs(value - solution)
+
+    avg_error /= len(testset)
+    return avg_error
+
 
 if __name__ == "__main__":
     with open("config.json", "r") as f:
         config = json.load(f)
 
+    testset = create_testset(config)
     device = torch.device(
         "cuda"
         if torch.cuda.is_available()
-        else "mps"
-        if torch.backends.mps.is_available()
-        else "cpu"
+        else "mps" if torch.backends.mps.is_available() else "cpu"
     )
     net = NeuralNetwork(config)
     net.to(device)
@@ -158,16 +187,17 @@ if __name__ == "__main__":
     net.train()
 
     for i in tqdm(range(int(config["train"]["n_iterations"]))):
+        if i % config["train"]["test_interval"] == 0:
+            avg_error = test_network(net, testset, config, device)
+            wandb.log({"test_error": avg_error, "episode": i})
         env = FloodEnv(
             config["env"]["width"], config["env"]["height"], config["env"]["n_colors"]
         )
         episode_data, episode_value = play_episode(env, net, config, device)
         extend_and_handle_duplicates(all_data, episode_data)
-    
 
         if len(all_data) > config["train"]["max_data"]:
             all_data = all_data[-config["train"]["max_data"] :]
-
 
         avg_loss, avg_value_loss, avg_cross_entropy = train_network(
             net,
@@ -180,11 +210,16 @@ if __name__ == "__main__":
             device,
         )
 
-        wandb.log({
-            "loss": avg_loss,
-            "value_loss": avg_value_loss,
-            "cross_entropy": avg_cross_entropy,
-            "value": episode_value, "episode": i, "lr": optimizer.param_groups[0]["lr"]})
+        wandb.log(
+            {
+                "loss": avg_loss,
+                "value_loss": avg_value_loss,
+                "cross_entropy": avg_cross_entropy,
+                "value": episode_value,
+                "episode": i,
+                "lr": optimizer.param_groups[0]["lr"],
+            }
+        )
 
     torch.save(net.state_dict(), "model.pt")
 

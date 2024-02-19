@@ -7,7 +7,8 @@
     "learning_rate_decay": 0.99995,
     "n_iterations": 1e8,
     "max_data": 4000,
-    "value_scaling": 0.5
+    "value_scaling": 0.5,
+    "test_interval": 100
   },
   "mcts": {
     "c_puct": 1,

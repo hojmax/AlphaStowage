@@ -72,6 +72,7 @@ class FloodEnv:
         self.neighbor_flood(0, 0, self.state[0, 0], visited)
 
     def reset(self, state=None):
+        """Note: You cannot set the state to a terminal state."""
         self.value = 0
         if state is None:
             self.state = np.random.randint(0, self.n_colors, (self.width, self.height))
@@ -119,10 +120,29 @@ class FloodEnv:
         return str(self.state)
 
 
-if __name__ == "__main__":
-    np.random.seed(0)
+def bfs_solver(env):
+    envs = [env]
 
-    env = FloodEnv(3, 3, 4)
-    print(env)
-    print("🔴")
-    print(env.get_tensor_state())
+    while envs:
+        env = envs.pop(0)
+
+        if env.is_terminal():
+            return env.value
+
+        for i in range(env.n_colors):
+            if not env.valid_actions[i]:
+                continue
+            new_env = env.copy()
+            new_env.step(i)
+            envs.append(new_env)
+
+    raise ValueError("No solution found")
+
+
+if __name__ == "__main__":
+    for i in range(10):
+        # seed
+        env = FloodEnv(3, 3, 4)
+        print(env)
+        print(bfs_solver(env))
+        print()
