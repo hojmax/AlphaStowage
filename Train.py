@@ -133,7 +133,7 @@ def extend_and_handle_duplicates(all_data, episode_data):
 
 def create_testset(config):
     testset = []
-    for i in range(100):
+    for i in range(10):
         np.random.seed(i)
         env = FloodEnv(
             config["env"]["width"], config["env"]["height"], config["env"]["n_colors"]
@@ -191,6 +191,8 @@ if __name__ == "__main__":
         if (i + 1) % config["train"]["test_interval"] == 0:
             avg_error = test_network(net, testset, config, device)
             wandb.log({"test_error": avg_error, "episode": i})
+            net.train()
+
         env = FloodEnv(
             config["env"]["width"], config["env"]["height"], config["env"]["n_colors"]
         )
