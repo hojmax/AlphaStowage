@@ -144,15 +144,16 @@ def create_testset(config):
 
 
 def test_network(net, testset, config, device):
-    net.eval()
-    avg_error = 0
+    with torch.no_grad():
+        net.eval()
+        avg_error = 0
 
-    for env, solution in testset:
-        _, value = play_episode(env, net, config, device)
-        avg_error += value - solution
+        for env, solution in testset:
+            _, value = play_episode(env, net, config, device)
+            avg_error += value - solution
 
-    avg_error /= len(testset)
-    return avg_error
+        avg_error /= len(testset)
+        return avg_error
 
 
 if __name__ == "__main__":
