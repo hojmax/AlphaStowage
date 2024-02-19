@@ -16,7 +16,7 @@ def loss_fn(pred_value, value, pred_prob, prob, value_scaling):
         -torch.sum(prob.flatten() * torch.log(pred_prob.flatten())) / prob.shape[0]
     )
     loss = value_scaling * value_error + cross_entropy
-    return loss
+    return loss, value_error, cross_entropy
 
 
 def get_batch(data, batch_size):
@@ -34,7 +34,7 @@ def get_batch(data, batch_size):
 
 
 def optimize_network(pred_value, value, pred_prob, prob, optimizer,scheduler, value_scaling):
-    loss = loss_fn(
+    loss, value_loss, cross_entropy = loss_fn(
         pred_value=pred_value,
         value=value,
         pred_prob=pred_prob,
@@ -47,7 +47,7 @@ def optimize_network(pred_value, value, pred_prob, prob, optimizer,scheduler, va
     optimizer.step()
     scheduler.step()
 
-    return loss.item()
+    return loss.item(), value_loss.item(), cross_entropy.item()
 
 
 def train_network(
@@ -57,6 +57,8 @@ def train_network(
         batch_size = len(data)
 
     sum_loss = 0
+    sum_value_loss = 0
+    sum_cross_entropy = 0
 
     for _ in range(n_batches):
         state, prob, value = get_batch(data, batch_size)
@@ -64,7 +66,7 @@ def train_network(
         prob = prob.to(device)
         value = value.to(device)
         pred_prob, pred_value = network(state)
-        loss = optimize_network(
+        loss, value_loss, cross_entropy = optimize_network(
             pred_value=pred_value,
             value=value,
             pred_prob=pred_prob,
@@ -75,8 +77,10 @@ def train_network(
         )
 
         sum_loss += loss
+        sum_value_loss += value_loss
+        sum_cross_entropy += cross_entropy
 
-    return sum_loss / n_batches
+    return sum_loss / n_batches, sum_value_loss / n_batches, sum_cross_entropy / n_batches
 
 
 def play_episode(env, net, config, device):
@@ -102,6 +106,15 @@ def play_episode(env, net, config, device):
 
     return output_data, real_value
 
+
+def check_duplicates(all_data, episode_data):
+    for state, _, value in episode_data:
+        for state2, _, value2 in all_data:
+            if torch.equal(state, state2) and value != value2:
+                print("Problem")
+                print(state, state2)
+                print(value, value2)
+ 
 
 if __name__ == "__main__":
     with open("config.json", "r") as f:
@@ -135,17 +148,20 @@ if __name__ == "__main__":
 
     net.train()
 
-    for i in tqdm(range(config["train"]["n_iterations"])):
+    for i in tqdm(range(int(config["train"]["n_iterations"]))):
         env = FloodEnv(
             config["env"]["width"], config["env"]["height"], config["env"]["n_colors"]
         )
         episode_data, episode_value = play_episode(env, net, config, device)
+        check_duplicates(all_data, episode_data)
+        
         all_data.extend(episode_data)
 
         if len(all_data) > config["train"]["max_data"]:
             all_data = all_data[-config["train"]["max_data"] :]
 
-        avg_loss = train_network(
+
+        avg_loss, avg_value_loss, avg_cross_entropy = train_network(
             net,
             all_data,
             config["train"]["batch_size"],
@@ -156,7 +172,11 @@ if __name__ == "__main__":
             device,
         )
 
-        wandb.log({"loss": avg_loss, "value": episode_value, "episode": i, "lr": optimizer.param_groups[0]["lr"]})
+        wandb.log({
+            "loss": avg_loss,
+            "value_loss": avg_value_loss,
+            "cross_entropy": avg_cross_entropy,
+            "value": episode_value, "episode": i, "lr": optimizer.param_groups[0]["lr"]})
 
     torch.save(net.state_dict(), "model.pt")
 

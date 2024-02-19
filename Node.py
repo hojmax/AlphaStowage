@@ -167,7 +167,7 @@ def alpha_zero_search(
 
 
 if __name__ == "__main__":
-    run_path = "hojmax/bachelor/37em45tw"
+    run_path = "hojmax/bachelor/o0wg8efi"
     api = wandb.Api()
     run = api.run(run_path)
     file = run.file("model.pt")
