@@ -107,13 +107,22 @@ def play_episode(env, net, config, device):
     return output_data, real_value
 
 
-def check_duplicates(all_data, episode_data):
-    for state, _, value in episode_data:
-        for state2, _, value2 in all_data:
-            if torch.equal(state, state2) and value != value2:
-                print("Problem")
-                print(state, state2)
-                print(value, value2)
+def extend_and_handle_duplicates(all_data, episode_data):
+    for state, probabilities, value in episode_data:
+        removalIndex = None
+        shouldAdd = True
+        for i, (state2, _, value2) in enumerate(all_data):
+            if torch.equal(state, state2):
+                if value < value2:
+                    removalIndex = i
+                else:
+                    shouldAdd = False
+                break
+        
+        if removalIndex is not None:
+            all_data.pop(removalIndex)
+        if shouldAdd:
+            all_data.append((state, probabilities, value))
  
 
 if __name__ == "__main__":
@@ -153,9 +162,8 @@ if __name__ == "__main__":
             config["env"]["width"], config["env"]["height"], config["env"]["n_colors"]
         )
         episode_data, episode_value = play_episode(env, net, config, device)
-        check_duplicates(all_data, episode_data)
-        
-        all_data.extend(episode_data)
+        extend_and_handle_duplicates(all_data, episode_data)
+    
 
         if len(all_data) > config["train"]["max_data"]:
             all_data = all_data[-config["train"]["max_data"] :]
