@@ -8,9 +8,7 @@ from NeuralNetwork import NeuralNetwork
 import torch.optim as optim
 
 
-def optimize_network(
-    pred_value, value, pred_prob, prob, optimizer, value_scaling
-):
+def optimize_network(pred_value, value, pred_prob, prob, optimizer, value_scaling):
     loss, value_loss, cross_entropy = loss_fn(
         pred_value=pred_value,
         value=value,
@@ -66,7 +64,6 @@ if __name__ == "__main__":
         weight_decay=config["train"]["l2_weight_reg"],
     )
 
-
     all_data = []
 
     wandb.init(
@@ -76,7 +73,7 @@ if __name__ == "__main__":
     )
 
     net.train()
-    n_epochs = 1000
+    n_epochs = 100
     for i in tqdm(range(n_epochs)):
         epoch_loss = 0
         epoch_value_loss = 0
@@ -139,3 +136,7 @@ if __name__ == "__main__":
                     "test_cross_entropy": test_cross_entropy,
                 }
             )
+
+    # save model
+    torch.save(net.state_dict(), "model.pth")
+    wandb.save("model.pth")
