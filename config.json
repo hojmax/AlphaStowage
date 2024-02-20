@@ -22,7 +22,7 @@
   },
   "nn": {
     "blocks": 16,
-    "hidden_channels": 32,
+    "hidden_channels": 64,
     "hidden_kernel_size": 3,
     "hidden_stride": 1,
     "policy_channels": 2,
