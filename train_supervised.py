@@ -123,7 +123,7 @@ if __name__ == "__main__":
                 state = state.to(device)
                 action = action.to(device)
                 value = value.to(device)
-                pred_value, pred_prob = net(state)
+                pred_prob, pred_value = net(state)
                 loss, value_loss, cross_entropy = loss_fn(
                     pred_value=pred_value,
                     value=value,
