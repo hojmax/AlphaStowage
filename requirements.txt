@@ -1,2 +1,4 @@
 wandb==0.15.4
 tqdm
+pygame
+networkx
