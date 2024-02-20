@@ -51,7 +51,7 @@ def optimize_network(pred_value, value, pred_prob, prob, optimizer, value_scalin
 
 
 def train_network(
-    network, data, batch_size, n_batches, optimizer, scheduler, value_scaling, device
+    network, data, batch_size, n_batches, optimizer, value_scaling, device
 ):
     if len(data) < batch_size:
         batch_size = len(data)
@@ -72,7 +72,6 @@ def train_network(
             pred_prob=pred_prob,
             prob=prob,
             optimizer=optimizer,
-            scheduler=scheduler,
             value_scaling=value_scaling,
         )
 
