@@ -9,7 +9,7 @@ import torch.optim as optim
 
 
 def optimize_network(
-    pred_value, value, pred_prob, prob, optimizer, scheduler, value_scaling
+    pred_value, value, pred_prob, prob, optimizer, value_scaling
 ):
     loss, value_loss, cross_entropy = loss_fn(
         pred_value=pred_value,
@@ -22,7 +22,6 @@ def optimize_network(
     loss.backward()
 
     optimizer.step()
-    scheduler.step()
 
     return loss.item(), value_loss.item(), cross_entropy.item()
 
@@ -66,10 +65,7 @@ if __name__ == "__main__":
         lr=config["train"]["learning_rate"],
         weight_decay=config["train"]["l2_weight_reg"],
     )
-    # exponential decay
-    scheduler = optim.lr_scheduler.ExponentialLR(
-        optimizer, config["train"]["learning_rate_decay"]
-    )
+
 
     all_data = []
 
@@ -80,7 +76,7 @@ if __name__ == "__main__":
     )
 
     net.train()
-    n_epochs = 10
+    n_epochs = 1000
     for i in tqdm(range(n_epochs)):
         epoch_loss = 0
         epoch_value_loss = 0
@@ -97,7 +93,6 @@ if __name__ == "__main__":
                 pred_prob,
                 action,
                 optimizer,
-                scheduler,
                 config["train"]["value_scaling"],
             )
             epoch_loss += loss
