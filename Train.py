@@ -33,9 +33,7 @@ def get_batch(data, batch_size):
     return state_batch, prob_batch, value_batch
 
 
-def optimize_network(
-    pred_value, value, pred_prob, prob, optimizer, scheduler, value_scaling
-):
+def optimize_network(pred_value, value, pred_prob, prob, optimizer, value_scaling):
     loss, value_loss, cross_entropy = loss_fn(
         pred_value=pred_value,
         value=value,
@@ -47,7 +45,7 @@ def optimize_network(
     loss.backward()
 
     optimizer.step()
-    scheduler.step()
+    # scheduler.step()
 
     return loss.item(), value_loss.item(), cross_entropy.item()
 
@@ -152,7 +150,7 @@ def test_network(net, testset, config, device):
         avg_error = 0
 
         for env, solution in testset:
-            _, value = play_episode(env, net, config, device, deterministic=True)
+            _, value = play_episode(env.copy(), net, config, device, deterministic=True)
             avg_error += value - solution
 
         avg_error /= len(testset)
@@ -176,10 +174,10 @@ if __name__ == "__main__":
         lr=config["train"]["learning_rate"],
         weight_decay=config["train"]["l2_weight_reg"],
     )
-    # exponential decay
-    scheduler = optim.lr_scheduler.ExponentialLR(
-        optimizer, config["train"]["learning_rate_decay"]
-    )
+    # # exponential decay
+    # scheduler = optim.lr_scheduler.ExponentialLR(
+    #     optimizer, config["train"]["learning_rate_decay"]
+    # )
     all_data = []
 
     wandb.init(
@@ -189,11 +187,16 @@ if __name__ == "__main__":
     )
 
     net.train()
+    best_score = float("-inf")
 
     for i in tqdm(range(int(config["train"]["n_iterations"]))):
         if (i + 1) % config["train"]["test_interval"] == 0:
-            avg_error = test_network(net, testset, config, device)
-            wandb.log({"test_error": avg_error, "episode": i})
+            relative_score = test_network(net, testset, config, device)
+            if relative_score > best_score:
+                best_score = relative_score
+                torch.save(net.state_dict(), f"model{i}.pt")
+                wandb.save(f"model{i}.pt")
+            wandb.log({"relative_score": relative_score, "episode": i})
             net.train()
 
         env = FloodEnv(
@@ -211,7 +214,7 @@ if __name__ == "__main__":
             config["train"]["batch_size"],
             config["train"]["batches_per_episode"],
             optimizer,
-            scheduler,
+            # scheduler,
             config["train"]["value_scaling"],
             device,
         )
