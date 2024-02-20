@@ -75,6 +75,7 @@ if __name__ == "__main__":
     net.train()
     n_epochs = 100
     for i in tqdm(range(n_epochs)):
+        net.train()
         epoch_loss = 0
         epoch_value_loss = 0
         epoch_cross_entropy = 0
