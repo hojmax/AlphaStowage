@@ -16,7 +16,7 @@ class FloodEnv:
         self.screen = None
         self.reset()
 
-    def get_tensor_state(self):
+    def get_tensor_state(self) -> torch.Tensor:
         tensor = torch.tensor(self.state).unsqueeze(0).to(torch.long)
         one_hot_encoded_tensor = F.one_hot(tensor, num_classes=self.n_colors)
         one_hot_encoded_tensor = one_hot_encoded_tensor.permute(0, 3, 1, 2)
@@ -124,20 +124,21 @@ class FloodEnv:
 
 
 def bfs_solver(env):
-    envs = [env]
+    envs = [(env, None)]
 
     while envs:
-        env = envs.pop(0)
+        env, first_move = envs.pop(0)
 
         if env.is_terminal():
-            return env.value
+            return env.value, first_move
 
         for i in range(env.n_colors):
             if not env.valid_actions[i]:
                 continue
             new_env = env.copy()
             new_env.step(i)
-            envs.append(new_env)
+            new_first_move = first_move if first_move is not None else i
+            envs.append((new_env, new_first_move))
 
     raise ValueError("No solution found")
 
@@ -185,7 +186,7 @@ def n_lookahead_find_best_move(env, n):
 
 if __name__ == "__main__":
     for i in range(100):
-        np.random.seed(i+100)
+        np.random.seed(i + 100)
         # compare 2 lookahead to solve
         env = FloodEnv(3, 3, 3)
         print(env)

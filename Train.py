@@ -89,7 +89,7 @@ def train_network(
     )
 
 
-def play_episode(env, net, config, device):
+def play_episode(env, net, config, device, deterministic=False):
     episode_data = []
 
     while not env.is_terminal():
@@ -102,7 +102,10 @@ def play_episode(env, net, config, device):
             device,
         )
         episode_data.append((env.get_tensor_state(), probabilities))
-        action = np.random.choice(env.n_colors, p=probabilities)
+        if deterministic:
+            action = np.argmax(probabilities)
+        else:
+            action = np.random.choice(env.n_colors, p=probabilities)
         env.step(action)
 
     output_data = []
@@ -149,7 +152,7 @@ def test_network(net, testset, config, device):
         avg_error = 0
 
         for env, solution in testset:
-            _, value = play_episode(env, net, config, device)
+            _, value = play_episode(env, net, config, device, deterministic=True)
             avg_error += value - solution
 
         avg_error /= len(testset)

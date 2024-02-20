@@ -16,9 +16,9 @@
     "search_iterations": 100
   },
   "env": {
-    "width": 6,
-    "height": 6,
-    "n_colors": 4
+    "width": 3,
+    "height": 3,
+    "n_colors": 3
   },
   "nn": {
     "blocks": 4,

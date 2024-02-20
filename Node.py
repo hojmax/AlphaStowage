@@ -55,9 +55,9 @@ class Node:
         self.parent = parent
         self.depth = depth
 
-    def uct(self, cpuct, total_visit_count):
+    def uct(self, cpuct):
         return self.mean_action_value + cpuct * self.prior_prob * np.sqrt(
-            total_visit_count
+            self.parent.visit_count
         ) / (1 + self.visit_count)
 
     def __str__(self):
@@ -70,9 +70,8 @@ class Node:
 
 
 def select(node, cpuct):
-    total_visit_count = node.visit_count
     valid_children = [child for child in node.children.values() if not child.pruned]
-    return max(valid_children, key=lambda x: x.uct(cpuct, total_visit_count))
+    return max(valid_children, key=lambda x: x.uct(cpuct))
 
 
 def expand_and_evaluate(node, neural_network, device):
@@ -94,8 +93,8 @@ def expand_and_evaluate(node, neural_network, device):
         next_depth = node.depth + 1
         new_env.step(action)
         node.children[action] = Node(
-            new_env,
-            prob,
+            env=new_env,
+            prior_prob=prob,
             estimated_value=state_value,
             parent=node,
             depth=next_depth,
@@ -175,9 +174,7 @@ if __name__ == "__main__":
     file.download(replace=True)
     config = run.config
 
-    net = NeuralNetwork(
-        config=config
-    )
+    net = NeuralNetwork(config=config)
     net.load_state_dict(torch.load("model.pt", map_location="cpu"))
     net.eval()
     # class FakeNet:
