@@ -1,6 +1,6 @@
 {
   "train": {
-    "l2_weight_reg": 0.001,
+    "l2_weight_reg": 0,
     "batch_size": 256,
     "batches_per_episode": 4,
     "learning_rate": 0.001,

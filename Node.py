@@ -63,7 +63,7 @@ class Node:
     def __str__(self):
         if self.prior_prob is None:
             return f"{self.env}\nN={self.visit_count}, Q={self.mean_action_value:.2f}"
-        output = f"{self.env}\nN={self.visit_count}, Q={self.mean_action_value:.2f}, P={self.prior_prob:.2f}, Q+U={self.uct(1, self.parent.visit_count):.2f}"
+        output = f"{self.env}\nN={self.visit_count}, Q={self.mean_action_value:.2f}, P={self.prior_prob:.2f}, Q+U={self.uct(1):.2f}"
         if self.pruned:
             output = "(pruned) " + output
         return output
@@ -167,10 +167,10 @@ def alpha_zero_search(
 
 
 if __name__ == "__main__":
-    run_path = "hojmax/bachelor/o0wg8efi"
+    run_path = "hojmax/bachelor/lfdk3eju"
     api = wandb.Api()
     run = api.run(run_path)
-    file = run.file("model.pt")
+    file = run.file("model.pth")
     file.download(replace=True)
     config = run.config
 
