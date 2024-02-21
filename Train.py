@@ -103,6 +103,7 @@ def play_episode(env, net, config, device, deterministic=False):
             config["mcts"]["dirichlet_weight"],
             config["mcts"]["dirichlet_alpha"],
             device,
+            deterministic=deterministic,
         )
         episode_data.append((env.get_tensor_state(), probabilities))
         if deterministic:
@@ -117,24 +118,6 @@ def play_episode(env, net, config, device, deterministic=False):
         output_data.append((state, probabilities, real_value + i))
 
     return output_data, real_value
-
-
-def extend_and_handle_duplicates(all_data, episode_data):
-    for state, probabilities, value in episode_data:
-        removalIndex = None
-        shouldAdd = True
-        for i, (state2, _, value2) in enumerate(all_data):
-            if torch.equal(state, state2):
-                if value < value2:
-                    removalIndex = i
-                else:
-                    shouldAdd = False
-                break
-
-        if removalIndex is not None:
-            all_data.pop(removalIndex)
-        if shouldAdd:
-            all_data.append((state, probabilities, value))
 
 
 def create_testset(config):
@@ -178,7 +161,6 @@ def merge_dicts(a, b):
 
 
 if __name__ == "__main__":
-    # args
     parser = argparse.ArgumentParser()
     parser.add_argument("--load_run", type=str, default=None)
     parser.add_argument("--model_path", type=str, default=None)
@@ -218,7 +200,7 @@ if __name__ == "__main__":
     )
     scheduler = optim.lr_scheduler.StepLR(
         optimizer,
-        config["train"]["scheduler_step_size"],
+        config["train"]["scheduler_step_size"] * config["train"]["batches_per_episode"],
         config["train"]["scheduler_gamma"],
     )
     all_data = []
@@ -253,7 +235,8 @@ if __name__ == "__main__":
             config["env"]["width"], config["env"]["height"], config["env"]["n_colors"]
         )
         episode_data, episode_value = play_episode(env, net, config, device)
-        extend_and_handle_duplicates(all_data, episode_data)
+
+        all_data.extend(episode_data)
 
         if len(all_data) > config["train"]["max_data"]:
             all_data = all_data[-config["train"]["max_data"] :]
