@@ -96,6 +96,8 @@ def play_episode(env, net, config, device, deterministic=False):
             config["mcts"]["search_iterations"],
             config["mcts"]["c_puct"],
             config["mcts"]["temperature"],
+            config["mcts"]["dirichlet_weight"],
+            config["mcts"]["dirichlet_alpha"],
             device,
         )
         episode_data.append((env.get_tensor_state(), probabilities))
@@ -234,3 +236,12 @@ if __name__ == "__main__":
     wandb.save("model.pt")
 
     wandb.finish()
+
+
+# Things to add:
+# - Learning rate schedule, i.e 0-5k steps: 0.01, 5k-10k steps: 0.001, 10k+ steps: 0.0001
+# - Always keeping the best model for further self play
+# - L2 weight regularization
+# - Diritichlet noise to prior probabilities
+# - Other implementations
+#   - https://github.com/geochri/AlphaZero_Chess/blob/master/src/MCTS_chess.py

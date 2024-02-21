@@ -2,18 +2,19 @@
   "train": {
     "l2_weight_reg": 0,
     "batch_size": 256,
-    "batches_per_episode": 4,
-    "learning_rate": 0.001,
-    "learning_rate_decay": 0.99995,
+    "batches_per_episode": 1,
+    "learning_rate": 0.01,
     "n_iterations": 1e8,
     "max_data": 4000,
-    "value_scaling": 0.5,
+    "value_scaling": 1,
     "test_interval": 200
   },
   "mcts": {
     "c_puct": 1,
     "temperature": 1,
-    "search_iterations": 100
+    "search_iterations": 100,
+    "dirichlet_weight": 0.25,
+    "dirichlet_alpha": 0.03
   },
   "env": {
     "width": 6,

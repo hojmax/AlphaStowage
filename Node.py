@@ -74,7 +74,9 @@ def select(node, cpuct):
     return max(valid_children, key=lambda x: x.uct(cpuct))
 
 
-def expand_and_evaluate(node, neural_network, device):
+def expand_and_evaluate(
+    node, neural_network, dirichlet_weight, dirichlet_alpha, device
+):
     if node.env.is_terminal():
         return node.env.value
     with torch.no_grad():
@@ -83,6 +85,14 @@ def expand_and_evaluate(node, neural_network, device):
         )
         probabilities = probabilities.detach().cpu().numpy().squeeze()
         state_value = state_value.detach().cpu().numpy().squeeze() - node.depth
+
+    is_root_node = node.parent == None
+    if is_root_node:
+        # Add dirichlet noise to prior probs for more exploration
+        noise = np.random.dirichlet(np.zeros_like(probabilities) + dirichlet_alpha)
+        probabilities = (
+            1 - dirichlet_weight
+        ) * probabilities + dirichlet_weight * noise
 
     for i in range(node.env.n_colors):
         if not node.env.valid_actions[i]:
@@ -133,7 +143,14 @@ def backtrack(node):
 
 
 def alpha_zero_search(
-    root_env, neural_network, num_simulations, cpuct, temperature, device
+    root_env,
+    neural_network,
+    num_simulations,
+    cpuct,
+    temperature,
+    dirichlet_weight,
+    dirichlet_alpha,
+    device,
 ):
     root_node = Node(root_env)
     best_depth = float("inf")
@@ -156,7 +173,9 @@ def alpha_zero_search(
                 depth -= 1
 
         reset_action_value(node)
-        state_value = expand_and_evaluate(node, neural_network, device)
+        state_value = expand_and_evaluate(
+            node, neural_network, dirichlet_weight, dirichlet_alpha, device
+        )
 
         if node.env.is_terminal():
             best_depth = min(best_depth, abs(state_value))
@@ -201,6 +220,8 @@ if __name__ == "__main__":
             i,
             config["mcts"]["c_puct"],
             config["mcts"]["temperature"],
+            config["mcts"]["dirichlet_weight"],
+            config["mcts"]["dirichlet_alpha"],
             device="cpu",
         )
         print(probs)
