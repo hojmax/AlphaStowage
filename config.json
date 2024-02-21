@@ -1,11 +1,13 @@
 {
   "train": {
-    "l2_weight_reg": 0,
+    "l2_weight_reg": 0.0001,
     "batch_size": 256,
     "batches_per_episode": 1,
-    "learning_rate": 0.01,
+    "learning_rate": 0.001,
+    "scheduler_step_size": 2000,
+    "scheduler_gamma": 0.1,
     "n_iterations": 1e8,
-    "max_data": 4000,
+    "max_data": 6000,
     "value_scaling": 1,
     "test_interval": 200
   },
@@ -14,7 +16,7 @@
     "temperature": 1,
     "search_iterations": 100,
     "dirichlet_weight": 0.25,
-    "dirichlet_alpha": 0.03
+    "dirichlet_alpha": 0.6
   },
   "env": {
     "width": 6,

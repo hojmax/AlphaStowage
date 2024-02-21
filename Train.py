@@ -7,6 +7,7 @@ import Node
 import numpy as np
 import wandb
 import json
+import argparse
 from tqdm import tqdm
 
 
@@ -33,7 +34,9 @@ def get_batch(data, batch_size):
     return state_batch, prob_batch, value_batch
 
 
-def optimize_network(pred_value, value, pred_prob, prob, optimizer, value_scaling):
+def optimize_network(
+    pred_value, value, pred_prob, prob, optimizer, scheduler, value_scaling
+):
     loss, value_loss, cross_entropy = loss_fn(
         pred_value=pred_value,
         value=value,
@@ -45,13 +48,13 @@ def optimize_network(pred_value, value, pred_prob, prob, optimizer, value_scalin
     loss.backward()
 
     optimizer.step()
-    # scheduler.step()
+    scheduler.step()
 
     return loss.item(), value_loss.item(), cross_entropy.item()
 
 
 def train_network(
-    network, data, batch_size, n_batches, optimizer, value_scaling, device
+    network, data, batch_size, n_batches, optimizer, scheduler, value_scaling, device
 ):
     if len(data) < batch_size:
         batch_size = len(data)
@@ -72,6 +75,7 @@ def train_network(
             pred_prob=pred_prob,
             prob=prob,
             optimizer=optimizer,
+            scheduler=scheduler,
             value_scaling=value_scaling,
         )
 
@@ -158,27 +162,65 @@ def test_network(net, testset, config, device):
         return avg_error
 
 
-if __name__ == "__main__":
-    with open("config.json", "r") as f:
-        config = json.load(f)
+def merge_dicts(a, b):
+    """
+    Recursively merges dictionary b into dictionary a. Prefers the values of a.
 
-    testset = create_testset(config)
+    :param a: Target dictionary where the merge results will be stored.
+    :param b: Source dictionary from which keys and values are taken if they don't exist in a.
+    """
+    for key in b:
+        if key in a:
+            if isinstance(a[key], dict) and isinstance(b[key], dict):
+                merge_dicts(a[key], b[key])
+        else:
+            a[key] = b[key]
+
+
+if __name__ == "__main__":
+    # args
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--load_run", type=str, default=None)
+    parser.add_argument("--model_path", type=str, default=None)
+    args = parser.parse_args()
+
     device = torch.device(
         "cuda"
         if torch.cuda.is_available()
         else "mps" if torch.backends.mps.is_available() else "cpu"
     )
+
+    with open("config.json", "r") as f:
+        local_config = json.load(f)
+
+    if args.load_run is not None:
+        run_path = args.load_run
+        api = wandb.Api()
+        run = api.run(run_path)
+        file = run.file(args.model_path)
+        file.download(replace=True)
+        config = run.config
+        merge_dicts(config, local_config)
+    else:
+        config = local_config
+
     net = NeuralNetwork(config)
+
+    if args.load_run is not None:
+        net.load_state_dict(torch.load(args.model_path, map_location=device))
     net.to(device)
+
+    testset = create_testset(config)
     optimizer = optim.Adam(
         net.parameters(),
         lr=config["train"]["learning_rate"],
         weight_decay=config["train"]["l2_weight_reg"],
     )
-    # # exponential decay
-    # scheduler = optim.lr_scheduler.ExponentialLR(
-    #     optimizer, config["train"]["learning_rate_decay"]
-    # )
+    scheduler = optim.lr_scheduler.StepLR(
+        optimizer,
+        config["train"]["scheduler_step_size"],
+        config["train"]["scheduler_gamma"],
+    )
     all_data = []
 
     wandb.init(
@@ -189,14 +231,21 @@ if __name__ == "__main__":
 
     net.train()
     best_score = float("-inf")
+    best_model = None
 
     for i in tqdm(range(int(config["train"]["n_iterations"]))):
         if (i + 1) % config["train"]["test_interval"] == 0:
             relative_score = test_network(net, testset, config, device)
             if relative_score > best_score:
+                model_path = f"model{i}.pt"
                 best_score = relative_score
-                torch.save(net.state_dict(), f"model{i}.pt")
-                wandb.save(f"model{i}.pt")
+                best_model = model_path
+                torch.save(net.state_dict(), model_path)
+                wandb.save(model_path)
+            else:
+                # reload best model
+                net.load_state_dict(torch.load(best_model))
+                net.train()
             wandb.log({"relative_score": relative_score, "episode": i})
             net.train()
 
@@ -215,7 +264,7 @@ if __name__ == "__main__":
             config["train"]["batch_size"],
             config["train"]["batches_per_episode"],
             optimizer,
-            # scheduler,
+            scheduler,
             config["train"]["value_scaling"],
             device,
         )
@@ -239,9 +288,6 @@ if __name__ == "__main__":
 
 
 # Things to add:
-# - Learning rate schedule, i.e 0-5k steps: 0.01, 5k-10k steps: 0.001, 10k+ steps: 0.0001
-# - Always keeping the best model for further self play
 # - L2 weight regularization
-# - Diritichlet noise to prior probabilities
 # - Other implementations
 #   - https://github.com/geochri/AlphaZero_Chess/blob/master/src/MCTS_chess.py
