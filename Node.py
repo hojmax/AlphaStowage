@@ -151,8 +151,13 @@ def alpha_zero_search(
     dirichlet_weight,
     dirichlet_alpha,
     device,
+    reused_tree=None,
 ):
-    root_node = Node(root_env)
+    if reused_tree == None:
+        root_node = Node(root_env)
+    else:
+        root_node = reused_tree
+
     best_depth = float("inf")
 
     for i in range(num_simulations):
@@ -174,11 +179,7 @@ def alpha_zero_search(
 
         reset_action_value(node)
         state_value = expand_and_evaluate(
-            node,
-            neural_network,
-            dirichlet_weight,
-            dirichlet_alpha,
-            device
+            node, neural_network, dirichlet_weight, dirichlet_alpha, device
         )
 
         if node.env.is_terminal():

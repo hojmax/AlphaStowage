@@ -79,9 +79,10 @@ def train_batch(
 
 def play_episode(env, net, config, device, deterministic=False):
     episode_data = []
+    reused_tree = None
 
     while not env.is_terminal():
-        _, probabilities = Node.alpha_zero_search(
+        reused_tree, probabilities = Node.alpha_zero_search(
             env,
             net,
             config["mcts"]["search_iterations"],
@@ -90,13 +91,16 @@ def play_episode(env, net, config, device, deterministic=False):
             config["mcts"]["dirichlet_weight"],
             config["mcts"]["dirichlet_alpha"],
             device,
+            reused_tree,
         )
         episode_data.append((env.get_tensor_state(), probabilities))
         if deterministic:
             action = np.argmax(probabilities)
         else:
             action = np.random.choice(env.n_colors, p=probabilities)
+
         env.step(action)
+        reused_tree = reused_tree.children[action]
 
     output_data = []
     real_value = env.value
