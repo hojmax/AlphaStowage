@@ -53,40 +53,27 @@ def optimize_network(
     return loss.item(), value_loss.item(), cross_entropy.item()
 
 
-def train_network(
-    network, data, batch_size, n_batches, optimizer, scheduler, value_scaling, device
+def train_batch(
+    network, buffer, batch_size, optimizer, scheduler, value_scaling, device
 ):
-    if len(data) < batch_size:
-        batch_size = len(data)
-
-    sum_loss = 0
-    sum_value_loss = 0
-    sum_cross_entropy = 0
-
-    for _ in range(n_batches):
-        state, prob, value = get_batch(data, batch_size)
-        state = state.to(device)
-        prob = prob.to(device)
-        value = value.to(device)
-        pred_prob, pred_value = network(state)
-        loss, value_loss, cross_entropy = optimize_network(
-            pred_value=pred_value,
-            value=value,
-            pred_prob=pred_prob,
-            prob=prob,
-            optimizer=optimizer,
-            scheduler=scheduler,
-            value_scaling=value_scaling,
-        )
-
-        sum_loss += loss
-        sum_value_loss += value_loss
-        sum_cross_entropy += cross_entropy
-
+    state, prob, value = buffer.sample(batch_size)
+    state = state.to(device)
+    prob = prob.to(device)
+    value = value.to(device)
+    pred_prob, pred_value = network(state)
+    loss, value_loss, cross_entropy = optimize_network(
+        pred_value=pred_value,
+        value=value,
+        pred_prob=pred_prob,
+        prob=prob,
+        optimizer=optimizer,
+        scheduler=scheduler,
+        value_scaling=value_scaling,
+    )
     return (
-        sum_loss / n_batches,
-        sum_value_loss / n_batches,
-        sum_cross_entropy / n_batches,
+        loss,
+        value_loss,
+        cross_entropy,
     )
 
 
@@ -103,7 +90,6 @@ def play_episode(env, net, config, device, deterministic=False):
             config["mcts"]["dirichlet_weight"],
             config["mcts"]["dirichlet_alpha"],
             device,
-            deterministic=deterministic,
         )
         episode_data.append((env.get_tensor_state(), probabilities))
         if deterministic:
@@ -122,13 +108,13 @@ def play_episode(env, net, config, device, deterministic=False):
 
 def create_testset(config):
     testset = []
-    for i in range(100):
+    for i in range(config["eval"]["testset_size"]):
         np.random.seed(i)
         env = FloodEnv(
             config["env"]["width"], config["env"]["height"], config["env"]["n_colors"]
         )
         solution = n_lookahead_run_episode(env.copy(), config["eval"]["n_lookahead"])
-        testset.append((env.copy(), solution))
+        testset.append((env, solution))
     return testset
 
 
@@ -142,6 +128,7 @@ def test_network(net, testset, config, device):
             avg_error += value - solution
 
         avg_error /= len(testset)
+        net.train()
         return avg_error
 
 
@@ -160,81 +147,109 @@ def merge_dicts(a, b):
             a[key] = b[key]
 
 
-if __name__ == "__main__":
+def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--load_run", type=str, default=None)
     parser.add_argument("--model_path", type=str, default=None)
     args = parser.parse_args()
+    return args
 
-    device = torch.device(
+
+def get_device():
+    return torch.device(
         "cuda"
         if torch.cuda.is_available()
         else "mps" if torch.backends.mps.is_available() else "cpu"
     )
 
-    with open("config.json", "r") as f:
-        local_config = json.load(f)
 
-    if args.load_run is not None:
-        run_path = args.load_run
-        api = wandb.Api()
-        run = api.run(run_path)
-        file = run.file(args.model_path)
-        file.download(replace=True)
-        config = run.config
-        merge_dicts(config, local_config)
+def download_model_and_get_merged_config(run_path, model_path, local_config):
+    api = wandb.Api()
+    run = api.run(run_path)
+    file = run.file(model_path)
+    file.download(replace=True)
+    config = run.config
+    merge_dicts(config, local_config)
+
+
+def get_config():
+    with open("config.json", "r") as f:
+        return json.load(f)
+
+
+def get_model_and_config(load_run, model_path, local_config):
+    if load_run is not None:
+        config = download_model_and_get_merged_config(
+            load_run, model_path, local_config
+        )
     else:
         config = local_config
 
-    net = NeuralNetwork(config)
+    model = NeuralNetwork(config)
 
-    if args.load_run is not None:
-        net.load_state_dict(torch.load(args.model_path, map_location=device))
-    net.to(device)
+    if load_run is not None:
+        model.load_state_dict(torch.load(model_path, map_location=device))
 
-    testset = create_testset(config)
-    optimizer = optim.Adam(
-        net.parameters(),
+    model.to(device)
+
+    return model, config
+
+
+def get_optimizer(model, config):
+    return optim.Adam(
+        model.parameters(),
         lr=config["train"]["learning_rate"],
         weight_decay=config["train"]["l2_weight_reg"],
     )
-    scheduler = optim.lr_scheduler.StepLR(
+
+
+def get_scheduler(optimizer, config):
+    return optim.lr_scheduler.StepLR(
         optimizer,
-        config["train"]["scheduler_step_size"] * config["train"]["batches_per_episode"],
+        config["train"]["scheduler_step_size_in_batches"],
         config["train"]["scheduler_gamma"],
     )
+
+
+def run_training_loop(
+    model,
+    config,
+    device,
+    testset,
+    optimizer,
+    scheduler,
+):
     all_data = []
 
-    wandb.init(
-        entity="hojmax",
-        project="bachelor",
-        config=config,
-    )
-
-    net.train()
+    model.train()
     best_score = float("-inf")
     best_model = None
-
+    best_optimizer = None
     for i in tqdm(range(int(config["train"]["n_iterations"]))):
-        if (i + 1) % config["train"]["test_interval"] == 0:
-            relative_score = test_network(net, testset, config, device)
+        should_test = (i + 1) % config["train"]["test_interval"] == 0
+        if should_test:
+            relative_score = test_network(model, testset, config, device)
             if relative_score > best_score:
                 model_path = f"model{i}.pt"
+                optimizer_path = f"optimizer{i}.pt"
                 best_score = relative_score
                 best_model = model_path
-                torch.save(net.state_dict(), model_path)
+                best_optimizer = optimizer_path
+                torch.save(model.state_dict(), model_path)
+                torch.save(optimizer.state_dict(), optimizer_path)
                 wandb.save(model_path)
             else:
                 # reload best model
-                net.load_state_dict(torch.load(best_model))
-                net.train()
+                model.load_state_dict(torch.load(best_model))
+                optimizer.load_state_dict(torch.load(best_optimizer))
+                model.train()
             wandb.log({"relative_score": relative_score, "episode": i})
-            net.train()
+            model.train()
 
         env = FloodEnv(
             config["env"]["width"], config["env"]["height"], config["env"]["n_colors"]
         )
-        episode_data, episode_value = play_episode(env, net, config, device)
+        episode_data, episode_value = play_episode(env, model, config, device)
 
         all_data.extend(episode_data)
 
@@ -242,7 +257,7 @@ if __name__ == "__main__":
             all_data = all_data[-config["train"]["max_data"] :]
 
         avg_loss, avg_value_loss, avg_cross_entropy = train_network(
-            net,
+            model,
             all_data,
             config["train"]["batch_size"],
             config["train"]["batches_per_episode"],
@@ -263,14 +278,33 @@ if __name__ == "__main__":
             }
         )
 
-    torch.save(net.state_dict(), "model.pt")
+
+if __name__ == "__main__":
+    args = get_args()
+    device = get_device()
+    local_config = get_config()
+    model, config = get_model_and_config(args.load_run, args.model_path, local_config)
+    testset = create_testset(config)
+    optimizer = get_optimizer(model, config)
+    scheduler = get_scheduler(optimizer, config)
+
+    wandb.init(
+        entity="hojmax",
+        project="bachelor",
+        config=config,
+    )
+
+    run_training_loop(
+        model,
+        config,
+        device,
+        testset,
+        optimizer,
+        scheduler,
+    )
+
+    torch.save(model.state_dict(), "model.pt")
 
     wandb.save("model.pt")
 
     wandb.finish()
-
-
-# Things to add:
-# - L2 weight regularization
-# - Other implementations
-#   - https://github.com/geochri/AlphaZero_Chess/blob/master/src/MCTS_chess.py

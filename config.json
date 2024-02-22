@@ -1,15 +1,14 @@
 {
   "train": {
     "l2_weight_reg": 0.0001,
-    "batch_size": 256,
-    "batches_per_episode": 2,
+    "batch_size": 512,
     "learning_rate": 0.001,
-    "scheduler_step_size": 2000,
+    "scheduler_step_size_in_batches": 1e5,
     "scheduler_gamma": 0.1,
-    "n_iterations": 1e8,
+    "train_for_n_batches": 1e7,
     "max_data": 6000,
     "value_scaling": 1,
-    "test_interval": 200
+    "batches_before_swap": 1e3
   },
   "mcts": {
     "c_puct": 1,
@@ -37,6 +36,7 @@
     "value_hidden": 256
   },
   "eval": {
-    "n_lookahead": 1
+    "n_lookahead": 1,
+    "testset_size": 100
   }
 }

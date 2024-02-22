@@ -4,3 +4,5 @@ wandb
 model.pt
 model.pth
 model3399.pt
+final_model.pt
+model1000.pt

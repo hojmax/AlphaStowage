@@ -75,7 +75,7 @@ def select(node, cpuct):
 
 
 def expand_and_evaluate(
-    node, neural_network, dirichlet_weight, dirichlet_alpha, device, deterministic
+    node, neural_network, dirichlet_weight, dirichlet_alpha, device
 ):
     if node.env.is_terminal():
         return node.env.value
@@ -87,7 +87,7 @@ def expand_and_evaluate(
         state_value = state_value.detach().cpu().numpy().squeeze() - node.depth
 
     is_root_node = node.parent == None
-    if is_root_node and deterministic == False:
+    if is_root_node:
         # Add dirichlet noise to prior probs for more exploration
         noise = np.random.dirichlet(np.zeros_like(probabilities) + dirichlet_alpha)
         probabilities = (
@@ -151,7 +151,6 @@ def alpha_zero_search(
     dirichlet_weight,
     dirichlet_alpha,
     device,
-    deterministic=False,
 ):
     root_node = Node(root_env)
     best_depth = float("inf")
@@ -179,8 +178,7 @@ def alpha_zero_search(
             neural_network,
             dirichlet_weight,
             dirichlet_alpha,
-            device,
-            deterministic,
+            device
         )
 
         if node.env.is_terminal():
