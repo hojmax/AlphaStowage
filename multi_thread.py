@@ -76,6 +76,7 @@ def update_inference_params(model, inference_model, inference_lock):
 
 
 def log_model(model, test_set, config, device, i):
+    print("Starting eval")
     start = time.time()
     wandb.log(
         {
