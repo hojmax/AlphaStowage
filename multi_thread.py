@@ -87,7 +87,7 @@ def log_model(model, test_set, config, device, i):
 def training_function(
     model, device, inference_model, inference_lock, buffer, stop_event
 ):
-    while len(buffer.buffer) < config["train"]["batch_size"]:
+    while len(buffer.buffer) == 0:
         time.sleep(1)
 
     test_set = create_testset(config)

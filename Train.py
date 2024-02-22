@@ -9,6 +9,7 @@ import wandb
 import json
 import argparse
 from tqdm import tqdm
+from Node import remove_pruning
 
 
 def loss_fn(pred_value, value, pred_prob, prob, value_scaling):
@@ -101,6 +102,7 @@ def play_episode(env, net, config, device, deterministic=False):
 
         env.step(action)
         reused_tree = reused_tree.children[action]
+        remove_pruning(reused_tree)
 
     output_data = []
     real_value = env.value

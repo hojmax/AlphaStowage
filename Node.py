@@ -122,6 +122,12 @@ def backup(node, value):
         backup(node.parent, value)
 
 
+def remove_pruning(node):
+    node.pruned = False
+    for child in node.children.values():
+        remove_pruning(child)
+
+
 def get_tree_probs(node, temperature):
     action_probs = []
     for i in range(node.env.n_colors):
