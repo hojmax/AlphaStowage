@@ -31,6 +31,7 @@ class ReplayBuffer:
 
     def sample(self, batch_size):
         with self.lock:
+            batch_size = min(len(self.buffer), batch_size)
             batch_indices = np.random.choice(
                 len(self.buffer), batch_size, replace=False
             )
