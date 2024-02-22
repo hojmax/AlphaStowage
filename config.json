@@ -36,7 +36,7 @@
     "value_hidden": 256
   },
   "eval": {
-    "n_lookahead": 2,
-    "testset_size": 25
+    "n_lookahead": 4,
+    "testset_size": 50
   }
 }

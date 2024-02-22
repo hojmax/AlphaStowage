@@ -51,32 +51,29 @@ class ReplayBuffer:
         return len(self.buffer)
 
 
-def inference_function(model, device, inference_lock, buffer, stop_event):
+def inference_function(model, device, buffer, stop_event):
     i = 1
     while not stop_event.is_set():
-        with inference_lock:
-            env = FloodEnv(
-                config["env"]["width"],
-                config["env"]["height"],
-                config["env"]["n_colors"],
-            )
-            episode_data, value = play_episode(
-                env, model, config, device, deterministic=False
-            )
-            buffer.extend(episode_data)
+        env = FloodEnv(
+            config["env"]["width"],
+            config["env"]["height"],
+            config["env"]["n_colors"],
+        )
+        episode_data, value = play_episode(
+            env, model, config, device, deterministic=False
+        )
+        buffer.extend(episode_data)
 
-            wandb.log({"episode": i, "value": value})
+        wandb.log({"episode": i, "value": value})
 
-            i += 1
+        i += 1
 
 
-def update_inference_params(model, inference_model, inference_lock):
-    with inference_lock:
-        inference_model.load_state_dict(model.state_dict())
+def update_inference_params(model, inference_model):
+    inference_model.load_state_dict(model.state_dict())
 
 
 def log_model(model, test_set, config, device, i):
-    print("Starting eval")
     start = time.time()
     wandb.log(
         {
@@ -89,9 +86,7 @@ def log_model(model, test_set, config, device, i):
     wandb.save(f"model{i}.pt")
 
 
-def training_function(
-    model, device, inference_model, inference_lock, buffer, stop_event
-):
+def training_function(model, device, inference_model, buffer, stop_event):
     while len(buffer.buffer) == 0:
         time.sleep(1)
 
@@ -102,7 +97,7 @@ def training_function(
     model.train()
     for i in tqdm(range(1, int(config["train"]["train_for_n_batches"]) + 1)):
         if i % config["train"]["batches_before_swap"] == 0:
-            update_inference_params(model, inference_model, inference_lock)
+            update_inference_params(model, inference_model)
             log_model(model, test_set, config, device, i)
 
         avg_loss, avg_value_loss, avg_cross_entropy = train_batch(
@@ -131,17 +126,16 @@ def training_function(
 if __name__ == "__main__":
     config = get_config()
     buffer = ReplayBuffer(config["train"]["max_data"])
-    inference_lock = threading.Lock()
     stop_event = threading.Event()
-    training_device = torch.device("cuda:0")
-    inference_device = torch.device("cuda:1")
+    training_device = torch.device("cpu")
+    inference_device = torch.device("cpu")
 
     training_model = NeuralNetwork(config).to(training_device)
     inference_model = NeuralNetwork(config).to(inference_device)
 
     inference_thread = threading.Thread(
         target=inference_function,
-        args=(inference_model, inference_device, inference_lock, buffer, stop_event),
+        args=(inference_model, inference_device, buffer, stop_event),
     )
     training_thread = threading.Thread(
         target=training_function,
@@ -149,7 +143,6 @@ if __name__ == "__main__":
             training_model,
             training_device,
             inference_model,
-            inference_lock,
             buffer,
             stop_event,
         ),
