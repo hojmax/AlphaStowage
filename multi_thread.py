@@ -30,8 +30,9 @@ class ReplayBuffer:
             self.buffer = self.buffer[-self.capacity :]
 
     def sample(self, batch_size):
+        batch_size = min(len(self.buffer), batch_size)
+
         with self.lock:
-            batch_size = min(len(self.buffer), batch_size)
             batch_indices = np.random.choice(
                 len(self.buffer), batch_size, replace=False
             )
@@ -75,12 +76,14 @@ def update_inference_params(model, inference_model, inference_lock):
 
 
 def log_model(model, test_set, config, device, i):
+    start = time.time()
     wandb.log(
         {
             "eval_score": test_network(model, test_set, config, device),
             "batch": i,
         }
     )
+    print(f"Eval_{i} time: {time.time() - start}")
     torch.save(model.state_dict(), f"model{i}.pt")
     wandb.save(f"model{i}.pt")
 
