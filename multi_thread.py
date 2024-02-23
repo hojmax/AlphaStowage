@@ -98,6 +98,7 @@ def training_function(model, device, inference_model, buffer, stop_event):
     for i in tqdm(range(1, int(config["train"]["train_for_n_batches"]) + 1)):
         if i % config["train"]["batches_before_swap"] == 0:
             update_inference_params(model, inference_model)
+        if i % config["train"]["batches_before_eval"] == 0:
             log_model(model, test_set, config, device, i)
 
         avg_loss, avg_value_loss, avg_cross_entropy = train_batch(

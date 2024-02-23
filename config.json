@@ -2,13 +2,14 @@
   "train": {
     "l2_weight_reg": 0.0001,
     "batch_size": 512,
-    "learning_rate": 0.01,
-    "scheduler_step_size_in_batches": 5e3,
+    "learning_rate": 0.001,
+    "scheduler_step_size_in_batches": 1e4,
     "scheduler_gamma": 0.1,
     "train_for_n_batches": 1e5,
     "max_data": 4000,
     "value_scaling": 1,
-    "batches_before_swap": 200
+    "batches_before_swap": 200,
+    "batches_before_eval": 400
   },
   "mcts": {
     "c_puct": 1,
