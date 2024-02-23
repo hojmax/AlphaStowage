@@ -197,33 +197,24 @@ def alpha_zero_search(
 
 
 if __name__ == "__main__":
-    run_path = "hojmax/bachelor/lfdk3eju"
+    run_path = "hojmax/multi-thread/9h0s1ig7"
+    model_path = "model10800.pt"
     api = wandb.Api()
     run = api.run(run_path)
-    file = run.file("model.pth")
+    file = run.file(model_path)
     file.download(replace=True)
     config = run.config
 
     net = NeuralNetwork(config=config)
-    net.load_state_dict(torch.load("model.pt", map_location="cpu"))
+    net.load_state_dict(torch.load(model_path, map_location="cpu"))
     net.eval()
-    # class FakeNet:
-    #     def __init__(self):
-    #         pass
-
-    #     def __call__(self, x):
-    #         return torch.ones(1, config["n_colors"]) / config["n_colors"], -torch.ones(
-    #             1, 1
-    #         )
-
-    # net = FakeNet()
 
     env = FloodEnv(
         n_colors=config["env"]["n_colors"],
         width=config["env"]["width"],
         height=config["env"]["height"],
     )
-    env.reset(np.array([[1, 2, 0], [0, 2, 0], [1, 0, 1]]))
+    env.reset()
     for i in range(1, 100):
         root, probs = alpha_zero_search(
             env,

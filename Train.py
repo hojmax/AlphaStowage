@@ -21,20 +21,6 @@ def loss_fn(pred_value, value, pred_prob, prob, value_scaling):
     return loss, value_error, cross_entropy
 
 
-def get_batch(data, batch_size):
-    batch_indices = np.random.choice(len(data), batch_size, replace=False)
-    batch = [data[i] for i in batch_indices]
-    state_batch = torch.stack([x[0].squeeze(0) for x in batch])
-    # Data Augmentation: random shuffling of color channels
-    permutation = torch.randperm(state_batch.shape[1])
-    state_batch = state_batch[:, permutation, :, :]
-    prob_batch = torch.stack([torch.tensor(x[1]) for x in batch]).float()
-    prob_batch = prob_batch[:, permutation]
-    value_batch = torch.tensor([[x[2]] for x in batch], dtype=torch.float32)
-
-    return state_batch, prob_batch, value_batch
-
-
 def optimize_network(
     pred_value, value, pred_prob, prob, optimizer, scheduler, value_scaling
 ):
@@ -138,29 +124,6 @@ def test_network(net, testset, config, device):
         return avg_error
 
 
-def merge_dicts(a, b):
-    """
-    Recursively merges dictionary b into dictionary a. Prefers the values of a.
-
-    :param a: Target dictionary where the merge results will be stored.
-    :param b: Source dictionary from which keys and values are taken if they don't exist in a.
-    """
-    for key in b:
-        if key in a:
-            if isinstance(a[key], dict) and isinstance(b[key], dict):
-                merge_dicts(a[key], b[key])
-        else:
-            a[key] = b[key]
-
-
-def get_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--load_run", type=str, default=None)
-    parser.add_argument("--model_path", type=str, default=None)
-    args = parser.parse_args()
-    return args
-
-
 def get_device():
     return torch.device(
         "cuda"
@@ -169,36 +132,9 @@ def get_device():
     )
 
 
-def download_model_and_get_merged_config(run_path, model_path, local_config):
-    api = wandb.Api()
-    run = api.run(run_path)
-    file = run.file(model_path)
-    file.download(replace=True)
-    config = run.config
-    merge_dicts(config, local_config)
-
-
 def get_config():
     with open("config.json", "r") as f:
         return json.load(f)
-
-
-def get_model_and_config(load_run, model_path, local_config):
-    if load_run is not None:
-        config = download_model_and_get_merged_config(
-            load_run, model_path, local_config
-        )
-    else:
-        config = local_config
-
-    model = NeuralNetwork(config)
-
-    if load_run is not None:
-        model.load_state_dict(torch.load(model_path, map_location=device))
-
-    model.to(device)
-
-    return model, config
 
 
 def get_optimizer(model, config):
@@ -215,105 +151,6 @@ def get_scheduler(optimizer, config):
         config["train"]["scheduler_step_size_in_batches"],
         config["train"]["scheduler_gamma"],
     )
-
-
-def run_training_loop(
-    model,
-    config,
-    device,
-    testset,
-    optimizer,
-    scheduler,
-):
-    all_data = []
-
-    model.train()
-    best_score = float("-inf")
-    best_model = None
-    best_optimizer = None
-    for i in tqdm(range(int(config["train"]["n_iterations"]))):
-        should_test = (i + 1) % config["train"]["test_interval"] == 0
-        if should_test:
-            relative_score = test_network(model, testset, config, device)
-            if relative_score > best_score:
-                model_path = f"model{i}.pt"
-                optimizer_path = f"optimizer{i}.pt"
-                best_score = relative_score
-                best_model = model_path
-                best_optimizer = optimizer_path
-                torch.save(model.state_dict(), model_path)
-                torch.save(optimizer.state_dict(), optimizer_path)
-                wandb.save(model_path)
-            else:
-                # reload best model
-                model.load_state_dict(torch.load(best_model))
-                optimizer.load_state_dict(torch.load(best_optimizer))
-                model.train()
-            wandb.log({"relative_score": relative_score, "episode": i})
-            model.train()
-
-        env = FloodEnv(
-            config["env"]["width"], config["env"]["height"], config["env"]["n_colors"]
-        )
-        episode_data, episode_value = play_episode(env, model, config, device)
-
-        all_data.extend(episode_data)
-
-        if len(all_data) > config["train"]["max_data"]:
-            all_data = all_data[-config["train"]["max_data"] :]
-
-        avg_loss, avg_value_loss, avg_cross_entropy = train_network(
-            model,
-            all_data,
-            config["train"]["batch_size"],
-            config["train"]["batches_per_episode"],
-            optimizer,
-            scheduler,
-            config["train"]["value_scaling"],
-            device,
-        )
-
-        wandb.log(
-            {
-                "loss": avg_loss,
-                "value_loss": avg_value_loss,
-                "cross_entropy": avg_cross_entropy,
-                "value": episode_value,
-                "episode": i,
-                "lr": optimizer.param_groups[0]["lr"],
-            }
-        )
-
-
-if __name__ == "__main__":
-    args = get_args()
-    device = get_device()
-    local_config = get_config()
-    model, config = get_model_and_config(args.load_run, args.model_path, local_config)
-    testset = create_testset(config)
-    optimizer = get_optimizer(model, config)
-    scheduler = get_scheduler(optimizer, config)
-
-    wandb.init(
-        entity="hojmax",
-        project="bachelor",
-        config=config,
-    )
-
-    run_training_loop(
-        model,
-        config,
-        device,
-        testset,
-        optimizer,
-        scheduler,
-    )
-
-    torch.save(model.state_dict(), "model.pt")
-
-    wandb.save("model.pt")
-
-    wandb.finish()
 
 
 # "testset_size": 100,
