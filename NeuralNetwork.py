@@ -13,13 +13,13 @@ class Convulutional_Block(nn.Module):
             stride=stride,
             padding="same",
         )
-        self.relu = nn.ReLU()
+        self.silu = nn.SiLU()
         self.batch = nn.BatchNorm2d(out_channels)
 
     def forward(self, x):
         out = self.conv1(x)
         out = self.batch(out)
-        out = self.relu(out)
+        out = self.silu(out)
         return out
 
 
@@ -40,27 +40,27 @@ class Residual_Block(nn.Module):
             stride=stride,
             padding="same",
         )
-        self.relu = nn.ReLU()
+        self.silu = nn.SiLU()
         self.batch1 = nn.BatchNorm2d(out_channels)
         self.batch2 = nn.BatchNorm2d(out_channels)
 
     def forward(self, x):
         out = self.conv1(x)
         out = self.batch1(out)
-        out = self.relu(out)
+        out = self.silu(out)
         out = self.conv2(out)
         out = self.batch2(out)
         out = out + x
-        out = self.relu(out)
+        out = self.silu(out)
         return out
 
 
 class NeuralNetwork(nn.Module):
     def __init__(self, config):
         super().__init__()
-        env_config = config["env"]
+        self.env_config = config["env"]
         nn_config = config["nn"]
-        input_channels = env_config["n_colors"]
+        input_channels = self.env_config["N"]
 
         layers = []
         layers.append(
@@ -83,6 +83,13 @@ class NeuralNetwork(nn.Module):
 
         self.layers = nn.Sequential(*layers)
 
+        self.flat_T_reshaper = nn.Linear(
+            self.env_config["N"] * (self.env_config["N"] - 1) // 2,
+            self.env_config["R"] * self.env_config["C"],
+        )
+
+        self.sigmoid = nn.Sigmoid()
+
         self.policy_head = nn.Sequential(
             nn.Conv2d(
                 in_channels=nn_config["hidden_channels"],
@@ -91,15 +98,14 @@ class NeuralNetwork(nn.Module):
                 stride=nn_config["policy_stride"],
             ),
             nn.BatchNorm2d(nn_config["policy_channels"]),
-            nn.ReLU(),
+            nn.SiLU(),
             nn.Flatten(),
             nn.Linear(
                 nn_config["policy_channels"]
-                * env_config["width"]
-                * env_config["height"],
-                env_config["n_colors"],
+                * self.env_config["R"]
+                * self.env_config["C"],
+                2 * self.env_config["C"],
             ),
-            nn.Softmax(dim=1),
         )
 
         self.value_head = nn.Sequential(
@@ -110,20 +116,26 @@ class NeuralNetwork(nn.Module):
                 stride=nn_config["value_stride"],
             ),
             nn.BatchNorm2d(nn_config["value_channels"]),
-            nn.ReLU(),
+            nn.SiLU(),
             nn.Flatten(),
             nn.Linear(
                 nn_config["value_channels"]
-                * env_config["width"]
-                * env_config["height"],
+                * self.env_config["R"]
+                * self.env_config["C"],
                 nn_config["value_hidden"],
             ),
-            nn.ReLU(),
+            nn.SiLU(),
             nn.Linear(nn_config["value_hidden"], 1),
         )
 
-    def forward(self, x):
+    def forward(self, bay, flat_T, mask):
+        flat_T = self.flat_T_reshaper(flat_T)
+        flat_T = self.sigmoid(flat_T)
+        flat_T = flat_T.view(-1, 1, self.env_config["R"], self.env_config["C"])
+        x = torch.cat([bay, flat_T], dim=1)
         out = self.layers(x)
         policy = self.policy_head(out)
+        policy = policy - (1 - mask) * 1e9
+        policy = torch.softmax(policy, dim=-1)
         value = self.value_head(out)
         return policy, value

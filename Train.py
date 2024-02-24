@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from FloodEnv import FloodEnv, n_lookahead_run_episode
 from NeuralNetwork import NeuralNetwork
 import Node
 import numpy as np
@@ -9,7 +8,8 @@ import wandb
 import json
 import argparse
 from tqdm import tqdm
-from Node import remove_pruning
+from MPSPEnv import Env
+from Node import remove_pruning, get_torch_obs
 
 
 def loss_fn(pred_value, value, pred_prob, prob, value_scaling):
@@ -43,11 +43,13 @@ def optimize_network(
 def train_batch(
     network, buffer, batch_size, optimizer, scheduler, value_scaling, device
 ):
-    state, prob, value = buffer.sample(batch_size)
-    state = state.to(device)
+    bay, flat_T, mask, prob, value = buffer.sample(batch_size)
+    bay = bay.to(device)
+    flat_T = flat_T.to(device)
+    mask = mask.to(device)
     prob = prob.to(device)
     value = value.to(device)
-    pred_prob, pred_value = network(state)
+    pred_prob, pred_value = network(bay, flat_T, mask)
     loss, value_loss, cross_entropy = optimize_network(
         pred_value=pred_value,
         value=value,
@@ -64,12 +66,13 @@ def train_batch(
     )
 
 
-def play_episode(env, net, config, device, deterministic=False):
+def play_episode(env, net, config, device, deterministic=False, boost_add=False):
     episode_data = []
     reused_tree = None
+    transposition_table = {}
 
-    while not env.is_terminal():
-        reused_tree, probabilities = Node.alpha_zero_search(
+    while not env.terminal:
+        reused_tree, probabilities, transposition_table = Node.alpha_zero_search(
             env,
             net,
             config["mcts"]["search_iterations"],
@@ -79,19 +82,33 @@ def play_episode(env, net, config, device, deterministic=False):
             config["mcts"]["dirichlet_alpha"],
             device,
             reused_tree,
+            transposition_table,
         )
-        episode_data.append((env.get_tensor_state(), probabilities))
+
+        if boost_add:
+            add_sum = np.sum(probabilities[: env.C])
+            remove_sum = np.sum(probabilities[env.C :])
+            if add_sum > 0:
+                # Put 95% weight on adding containers
+                probabilities[: env.C] *= 0.95 / np.sum(probabilities[: env.C])
+            if remove_sum > 0:
+                # Put 5% weight on removing containers
+                probabilities[env.C :] *= 0.05 / np.sum(probabilities[env.C :])
+            # Normalize
+            probabilities /= np.sum(probabilities)
+
+        episode_data.append((get_torch_obs(env), probabilities))
         if deterministic:
             action = np.argmax(probabilities)
         else:
-            action = np.random.choice(env.n_colors, p=probabilities)
+            action = np.random.choice(2 * env.C, p=probabilities)
 
         env.step(action)
         reused_tree = reused_tree.children[action]
         remove_pruning(reused_tree)
 
     output_data = []
-    real_value = env.value
+    real_value = -env.steps
     for i, (state, probabilities) in enumerate(episode_data):
         output_data.append((state, probabilities, real_value + i))
 
@@ -102,11 +119,16 @@ def create_testset(config):
     testset = []
     for i in range(config["eval"]["testset_size"]):
         np.random.seed(i)
-        env = FloodEnv(
-            config["env"]["width"], config["env"]["height"], config["env"]["n_colors"]
+        env = Env(
+            config["env"]["R"],
+            config["env"]["C"],
+            config["env"]["N"],
+            skip_last_port=True,
+            take_first_action=True,
+            strict_mask=True,
         )
-        solution = n_lookahead_run_episode(env.copy(), config["eval"]["n_lookahead"])
-        testset.append((env, solution))
+        env.reset()
+        testset.append(env)
     return testset
 
 
@@ -115,9 +137,9 @@ def test_network(net, testset, config, device):
         net.eval()
         avg_error = 0
 
-        for env, solution in testset:
+        for env in testset:
             _, value = play_episode(env.copy(), net, config, device, deterministic=True)
-            avg_error += value - solution
+            avg_error += value
 
         avg_error /= len(testset)
         net.train()

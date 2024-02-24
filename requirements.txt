@@ -2,3 +2,4 @@ wandb==0.15.4
 tqdm
 pygame
 networkx
+MPSPEnv==0.0.8

@@ -1,5 +1,4 @@
 import threading
-import random
 from Train import (
     get_config,
     create_testset,
@@ -11,7 +10,7 @@ from Train import (
 )
 import torch
 from NeuralNetwork import NeuralNetwork
-from FloodEnv import FloodEnv
+from MPSPEnv import Env
 from tqdm import tqdm
 import numpy as np
 import wandb
@@ -37,15 +36,24 @@ class ReplayBuffer:
                 len(self.buffer), batch_size, replace=False
             )
             batch = [self.buffer[i] for i in batch_indices]
-            state_batch = torch.stack([x[0].squeeze(0) for x in batch])
-            # Data Augmentation: random shuffling of color channels
-            permutation = torch.randperm(state_batch.shape[1])
-            state_batch = state_batch[:, permutation, :, :]
-            prob_batch = torch.stack([torch.tensor(x[1]) for x in batch]).float()
-            prob_batch = prob_batch[:, permutation]
-            value_batch = torch.tensor([[x[2]] for x in batch], dtype=torch.float32)
-
-            return state_batch, prob_batch, value_batch
+            print(batch)
+            bay_batch = torch.stack(
+                [bay.squeeze(0) for (bay, flat_T, mask), probs, value in batch]
+            )
+            flat_T_batch = torch.stack(
+                [flat_T.squeeze(0) for (bay, flat_T, mask), probs, value in batch]
+            )
+            mask_batch = torch.stack(
+                [mask.squeeze(0) for (bay, flat_T, mask), probs, value in batch]
+            )
+            prob_batch = torch.stack(
+                [probs for (bay, flat_T, mask), probs, value in batch]
+            )
+            value_batch = torch.stack(
+                [torch.tensor(value) for (bay, flat_T, mask), probs, value in batch],
+                dtype=torch.float32,
+            )
+            return bay_batch, flat_T_batch, mask_batch, prob_batch, value_batch
 
     def __len__(self):
         return len(self.buffer)
@@ -54,13 +62,22 @@ class ReplayBuffer:
 def inference_function(model, device, buffer, stop_event):
     i = 1
     while not stop_event.is_set():
-        env = FloodEnv(
-            config["env"]["width"],
-            config["env"]["height"],
-            config["env"]["n_colors"],
+        env = Env(
+            config["env"]["R"],
+            config["env"]["C"],
+            config["env"]["N"],
+            skip_last_port=True,
+            take_first_action=True,
+            strict_mask=True,
         )
+        env.reset()
         episode_data, value = play_episode(
-            env, model, config, device, deterministic=False
+            env,
+            model,
+            config,
+            device,
+            deterministic=False,
+            boost_add=i < config["train"]["boost_add_until_episode"],
         )
         buffer.extend(episode_data)
 
@@ -88,6 +105,7 @@ def log_model(model, test_set, config, device, i):
 
 def training_function(model, device, inference_model, buffer, stop_event):
     while len(buffer.buffer) == 0:
+        print("Waiting for buffer to fill")
         time.sleep(1)
 
     test_set = create_testset(config)
@@ -128,8 +146,8 @@ if __name__ == "__main__":
     config = get_config()
     buffer = ReplayBuffer(config["train"]["max_data"])
     stop_event = threading.Event()
-    training_device = torch.device("cuda:0")
-    inference_device = torch.device("cuda:1")
+    training_device = torch.device("cpu")
+    inference_device = torch.device("cpu")
 
     training_model = NeuralNetwork(config).to(training_device)
     inference_model = NeuralNetwork(config).to(inference_device)
