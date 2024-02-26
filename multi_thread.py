@@ -36,7 +36,6 @@ class ReplayBuffer:
                 len(self.buffer), batch_size, replace=False
             )
             batch = [self.buffer[i] for i in batch_indices]
-            print(batch)
             bay_batch = torch.stack(
                 [bay.squeeze(0) for (bay, flat_T, mask), probs, value in batch]
             )
@@ -51,8 +50,7 @@ class ReplayBuffer:
             )
             value_batch = torch.stack(
                 [torch.tensor(value) for (bay, flat_T, mask), probs, value in batch],
-                dtype=torch.float32,
-            )
+            ).float()
             return bay_batch, flat_T_batch, mask_batch, prob_batch, value_batch
 
     def __len__(self):
@@ -72,12 +70,7 @@ def inference_function(model, device, buffer, stop_event):
         )
         env.reset()
         episode_data, value = play_episode(
-            env,
-            model,
-            config,
-            device,
-            deterministic=False,
-            boost_add=i < config["train"]["boost_add_until_episode"],
+            env, model, config, device, deterministic=False
         )
         buffer.extend(episode_data)
 
@@ -86,7 +79,8 @@ def inference_function(model, device, buffer, stop_event):
         i += 1
 
 
-def update_inference_params(model, inference_model):
+def update_inference_params(model, inference_model, config):
+    config["use_baseline_policy"] = False
     inference_model.load_state_dict(model.state_dict())
 
 
@@ -115,7 +109,7 @@ def training_function(model, device, inference_model, buffer, stop_event):
     model.train()
     for i in tqdm(range(1, int(config["train"]["train_for_n_batches"]) + 1)):
         if i % config["train"]["batches_before_swap"] == 0:
-            update_inference_params(model, inference_model)
+            update_inference_params(model, inference_model, config)
         if i % config["train"]["batches_before_eval"] == 0:
             log_model(model, test_set, config, device, i)
 
@@ -146,8 +140,8 @@ if __name__ == "__main__":
     config = get_config()
     buffer = ReplayBuffer(config["train"]["max_data"])
     stop_event = threading.Event()
-    training_device = torch.device("cpu")
-    inference_device = torch.device("cpu")
+    training_device = torch.device("cuda:0")
+    inference_device = torch.device("cuda:1")
 
     training_model = NeuralNetwork(config).to(training_device)
     inference_model = NeuralNetwork(config).to(inference_device)
