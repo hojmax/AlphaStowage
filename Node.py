@@ -5,6 +5,8 @@ import networkx as nx
 from networkx.drawing.nx_pydot import graphviz_layout
 from MPSPEnv import Env
 import json
+from NeuralNetwork import NeuralNetwork
+
 
 def _draw_tree_recursive(graph, node):
     for action, child in node.children.items():
@@ -83,7 +85,7 @@ def expand_and_evaluate(
     node, neural_network, dirichlet_weight, dirichlet_alpha, device, transposition_table
 ):
     if node.env.terminal:
-        return -node.env.steps
+        return -(node.env.containers_placed + node.env.containers_left)
 
     if node.env in transposition_table:
         probabilities, state_value = transposition_table[node.env]
@@ -146,7 +148,8 @@ def get_tree_probs(node, temperature):
             action_probs.append(np.power(node.children[i].visit_count, 1 / temperature))
         else:
             action_probs.append(0)
-    action_probs /= np.sum(action_probs)
+    action_probs = torch.tensor(action_probs)
+    action_probs /= action_probs.sum()
     return action_probs
 
 
@@ -230,16 +233,17 @@ if __name__ == "__main__":
     with open("config.json") as f:
         config = json.load(f)
 
-    class FakeNet:
-        def __init__(self):
-            pass
+    # class FakeNet:
+    #     def __init__(self):
+    #         pass
 
-        def __call__(self, x, y, z):
-            return torch.ones(1, 2 * config["env"]["C"]) / (
-                2 * config["env"]["C"]
-            ), -torch.ones(1, 1)
+    #     def __call__(self, x, y, z):
+    #         return torch.ones(1, 2 * config["env"]["C"]) / (
+    #             2 * config["env"]["C"]
+    #         ), -torch.ones(1, 1)
 
-    net = FakeNet()
+    # net = FakeNet()
+    net = NeuralNetwork(config)
 
     env = Env(
         config["env"]["R"],

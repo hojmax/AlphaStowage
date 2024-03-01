@@ -15,7 +15,10 @@ from Node import remove_pruning, get_torch_obs
 def loss_fn(pred_value, value, pred_prob, prob, value_scaling):
     value_error = torch.mean(torch.square(value - pred_value))
     cross_entropy = (
-        -torch.sum(prob.flatten() * torch.log(pred_prob.flatten())) / prob.shape[0]
+        -torch.sum(
+            prob.flatten() * torch.log(pred_prob.flatten())
+        )  # add 1e-8 if mask is used
+        / prob.shape[0]
     )
     loss = value_scaling * value_error + cross_entropy
     return loss, value_error, cross_entropy
@@ -114,7 +117,7 @@ def play_episode(env, net, config, device, deterministic=False):
             )
 
             if deterministic:
-                action = np.argmax(probabilities)
+                action = torch.argmax(probabilities).item()
             else:
                 action = np.random.choice(2 * env.C, p=probabilities)
 
@@ -126,7 +129,7 @@ def play_episode(env, net, config, device, deterministic=False):
             remove_pruning(reused_tree)
 
     output_data = []
-    real_value = -env.steps
+    real_value = -(env.containers_placed + env.containers_left)
     for i, (state, probabilities) in enumerate(episode_data):
         output_data.append((state, probabilities, real_value + i))
 

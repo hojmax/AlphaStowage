@@ -135,7 +135,7 @@ class NeuralNetwork(nn.Module):
         x = torch.cat([bay, flat_T], dim=1)
         out = self.layers(x)
         policy = self.policy_head(out)
-        policy = policy - (1 - mask) * 1e9
+        # policy = policy - (1 - mask) * 1e9
         policy = torch.softmax(policy, dim=-1)
         value = self.value_head(out)
         return policy, value

@@ -49,7 +49,7 @@ class ReplayBuffer:
                 [probs for (bay, flat_T, mask), probs, value in batch]
             )
             value_batch = torch.stack(
-                [torch.tensor(value) for (bay, flat_T, mask), probs, value in batch],
+                [torch.tensor([value]) for (bay, flat_T, mask), probs, value in batch],
             ).float()
             return bay_batch, flat_T_batch, mask_batch, prob_batch, value_batch
 
@@ -60,6 +60,13 @@ class ReplayBuffer:
 def inference_function(model, device, buffer, stop_event):
     i = 1
     while not stop_event.is_set():
+        if (
+            config["use_baseline_policy"]
+            and len(buffer.buffer) >= config["train"]["max_data"]
+        ):
+            print("Waiting for swap")
+            time.sleep(1)
+            continue
         env = Env(
             config["env"]["R"],
             config["env"]["C"],
@@ -85,6 +92,7 @@ def update_inference_params(model, inference_model, config):
 
 
 def log_model(model, test_set, config, device, i):
+    print("Starting eval")
     start = time.time()
     wandb.log(
         {
@@ -140,8 +148,8 @@ if __name__ == "__main__":
     config = get_config()
     buffer = ReplayBuffer(config["train"]["max_data"])
     stop_event = threading.Event()
-    training_device = torch.device("cuda:0")
-    inference_device = torch.device("cuda:1")
+    training_device = torch.device("cpu")
+    inference_device = torch.device("cpu")
 
     training_model = NeuralNetwork(config).to(training_device)
     inference_model = NeuralNetwork(config).to(inference_device)
