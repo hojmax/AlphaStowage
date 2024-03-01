@@ -148,8 +148,8 @@ if __name__ == "__main__":
     config = get_config()
     buffer = ReplayBuffer(config["train"]["max_data"])
     stop_event = threading.Event()
-    training_device = torch.device("cpu")
-    inference_device = torch.device("cpu")
+    training_device = torch.device("cuda:0")
+    inference_device = torch.device("cuda:1")
 
     training_model = NeuralNetwork(config).to(training_device)
     inference_model = NeuralNetwork(config).to(inference_device)
