@@ -1,4 +1,4 @@
-wandb==0.15.4
+wandb
 tqdm
 pygame
 networkx

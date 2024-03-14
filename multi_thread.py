@@ -84,6 +84,8 @@ def inference_function(model, device, buffer, stop_event):
         wandb.log({"episode": i, "value": value})
 
         i += 1
+        if i % 10000 == 0:
+            print(i)
 
 
 def update_inference_params(model, inference_model, config):

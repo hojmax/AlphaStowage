@@ -1,46 +1,5 @@
 import numpy as np
 import torch
-import matplotlib.pyplot as plt
-import networkx as nx
-from networkx.drawing.nx_pydot import graphviz_layout
-from MPSPEnv import Env
-import json
-from NeuralNetwork import NeuralNetwork
-
-
-def _draw_tree_recursive(graph, node):
-    for action, child in node.children.items():
-        graph.add_node(
-            str(hash(child)),
-            label=str(child),
-        )
-        graph.add_edge(str(hash(node)), str(hash(child)), label=str(action))
-        _draw_tree_recursive(graph, child)
-
-
-def draw_tree(node):
-    graph = nx.DiGraph()
-    graph.add_node(str(hash(node)), label=str(node))
-
-    _draw_tree_recursive(graph, node)
-
-    pos = graphviz_layout(graph, prog="dot")
-    labels = nx.get_node_attributes(graph, "label")
-    edge_labels = nx.get_edge_attributes(graph, "label")
-
-    nx.draw(
-        graph,
-        pos,
-        labels=labels,
-        with_labels=True,
-        node_size=4000,
-        font_size=9,
-        node_color="#00000000",
-    )
-    nx.draw_networkx_edge_labels(graph, pos, edge_labels=edge_labels, font_size=9)
-
-    plt.gcf().set_size_inches(12, 7)
-    plt.show()
 
 
 class Node:
@@ -49,16 +8,26 @@ class Node:
         self.pruned = False
         self.visit_count = 0
         self.total_action_value = 0
-        self.mean_action_value = estimated_value
+        self.mean_action_value = None
+        self.estimated_value = estimated_value
         self.prior_prob = prior_prob
         self.children = {}
         self.parent = parent
         self.depth = depth
 
     def uct(self, cpuct):
-        return self.mean_action_value + cpuct * self.prior_prob * np.sqrt(
-            self.parent.visit_count
-        ) / (1 + self.visit_count)
+        exploration_term = (
+            cpuct
+            * self.prior_prob
+            * np.sqrt(self.parent.visit_count)
+            / (1 + self.visit_count)
+        )
+        value_term = (
+            self.mean_action_value
+            if self.mean_action_value is not None
+            else self.estimated_value
+        )
+        return value_term + exploration_term
 
     def __str__(self):
         if self.prior_prob is None:
@@ -81,49 +50,86 @@ def get_torch_obs(env):
     return bay, flat_t, mask
 
 
-def expand_and_evaluate(
-    node, neural_network, dirichlet_weight, dirichlet_alpha, device, transposition_table
-):
-    if node.env.terminal:
-        return -(node.env.containers_placed + node.env.containers_left)
+def run_network(node, neural_network, device):
+    with torch.no_grad():
+        bay, flat_t, mask = get_torch_obs(node.env)
+        probabilities, state_value = neural_network(
+            bay.to(device), flat_t.to(device), mask.to(device)
+        )
+        probabilities = probabilities.detach().cpu().numpy().squeeze()
+        state_value = state_value.detach().cpu().numpy().squeeze()
+    return probabilities, state_value
 
+
+def get_prob_and_value(node, neural_network, device, transposition_table):
     if node.env in transposition_table:
         probabilities, state_value = transposition_table[node.env]
     else:
-        with torch.no_grad():
-            bay, flat_t, mask = get_torch_obs(node.env)
-            probabilities, state_value = neural_network(
-                bay.to(device), flat_t.to(device), mask.to(device)
-            )
-            probabilities = probabilities.detach().cpu().numpy().squeeze()
-            state_value = state_value.detach().cpu().numpy().squeeze() - node.depth
-            transposition_table[node.env] = (probabilities, state_value)
+        probabilities, state_value = run_network(node.env, neural_network, device)
+        transposition_table[node.env] = (probabilities, state_value)
 
-    is_root_node = node.parent == None
-    if is_root_node:
-        # Add dirichlet noise to prior probs for more exploration
-        noise = np.random.dirichlet(np.zeros_like(probabilities) + dirichlet_alpha)
-        probabilities = (
-            1 - dirichlet_weight
-        ) * probabilities + dirichlet_weight * noise
+    return probabilities, state_value - node.depth  # Counting the already made moves
 
-    for i in range(2 * node.env.C):
-        if not node.env.action_masks()[i]:
+
+def add_dirichlet_noise(probabilities, dirichlet_weight, dirichlet_alpha):
+    """Add dirichlet noise to prior probs for more exploration"""
+    noise = np.random.dirichlet(np.zeros_like(probabilities) + dirichlet_alpha)
+    probabilities = (1 - dirichlet_weight) * probabilities + dirichlet_weight * noise
+    return probabilities
+
+
+def is_root_node(node):
+    return node.parent == None
+
+
+def expand_node(
+    node, neural_network, dirichlet_weight, dirichlet_alpha, device, transposition_table
+):
+    probabilities, state_value = get_prob_and_value(
+        node.env, neural_network, device, transposition_table
+    )
+
+    if is_root_node(node):
+        probabilities = add_dirichlet_noise(
+            probabilities, dirichlet_weight, dirichlet_alpha
+        )
+
+    add_children(probabilities, state_value, node)
+
+    return state_value
+
+
+def evaluate(
+    node, neural_network, dirichlet_weight, dirichlet_alpha, device, transposition_table
+):
+    if node.env.terminal:
+        return -node.env.moves_to_solve
+    else:
+        state_value = expand_node(
+            node,
+            neural_network,
+            dirichlet_weight,
+            dirichlet_alpha,
+            device,
+            transposition_table,
+        )
+        return state_value
+
+
+def add_children(probabilities, state_value, node):
+    for action in range(2 * node.env.C):
+        is_legal = node.env.action_masks()[action]
+        if not is_legal:
             continue
-        action = i
-        prob = probabilities[action]
         new_env = node.env.copy()
-        next_depth = node.depth + 1
         new_env.step(action)
         node.children[action] = Node(
             env=new_env,
-            prior_prob=prob,
+            prior_prob=probabilities[action],
             estimated_value=state_value,
             parent=node,
-            depth=next_depth,
+            depth=node.depth + 1,
         )
-
-    return state_value
 
 
 def backup(node, value):
@@ -131,35 +137,47 @@ def backup(node, value):
     node.total_action_value += value
     node.mean_action_value = node.total_action_value / node.visit_count
 
-    if node.parent is not None:
+    if not is_root_node(node):
         backup(node.parent, value)
 
 
-def remove_pruning(node):
+def remove_all_pruning(node):
     node.pruned = False
     for child in node.children.values():
-        remove_pruning(child)
+        remove_all_pruning(child)
 
 
 def get_tree_probs(node, temperature):
-    action_probs = []
-    for i in range(2 * node.env.C):
-        if i in node.children:
-            action_probs.append(np.power(node.children[i].visit_count, 1 / temperature))
-        else:
-            action_probs.append(0)
-    action_probs = torch.tensor(action_probs)
-    action_probs /= action_probs.sum()
-    return action_probs
+    action_probs = [
+        (
+            np.power(node.children[i].visit_count, 1 / temperature)
+            if i in node.children
+            else 0
+        )
+        for i in range(2 * node.env.C)
+    ]
+    return torch.tensor(action_probs) / sum(action_probs)
 
 
-def reset_action_value(node):
-    node.mean_action_value = 0
-
-
-def backtrack(node):
+def prune_and_move_back_up(node):
     node.pruned = True
     return node.parent
+
+
+def find_leaf(root_node, cpuct, best_score):
+    node = root_node
+
+    while node.children:
+        try:
+            node = select(node, cpuct)
+        except ValueError:
+            # In case all children are pruned
+            node = prune_and_move_back_up(node)
+
+        if not node.env.terminal and node.env.moves_to_solve <= best_score:
+            node = prune_and_move_back_up(node)
+
+    return node
 
 
 def alpha_zero_search(
@@ -174,32 +192,13 @@ def alpha_zero_search(
     reused_tree=None,
     transposition_table={},
 ):
-    if reused_tree == None:
-        root_node = Node(root_env)
-    else:
-        root_node = reused_tree
+    root_node = reused_tree if reused_tree else Node(root_env)
+    best_score = float("-inf")
 
-    best_depth = float("inf")
+    for _ in range(num_simulations):
+        node = find_leaf(root_node, cpuct, best_score)
 
-    for i in range(num_simulations):
-        node = root_node
-        depth = 0
-
-        while node.children:
-            try:
-                node = select(node, cpuct)
-                depth += 1
-            except ValueError:
-                # In case all children are pruned
-                node = backtrack(node)
-                depth -= 1
-
-            if not node.env.terminal and depth >= best_depth:
-                node = backtrack(node)
-                depth -= 1
-
-        reset_action_value(node)
-        state_value = expand_and_evaluate(
+        state_value = evaluate(
             node,
             neural_network,
             dirichlet_weight,
@@ -209,63 +208,8 @@ def alpha_zero_search(
         )
 
         if node.env.terminal:
-            best_depth = min(best_depth, abs(state_value))
+            best_score = max(best_score, state_value)
 
         backup(node, state_value)
 
     return root_node, get_tree_probs(root_node, temperature), transposition_table
-
-
-if __name__ == "__main__":
-    # run_path = "hojmax/multi-thread/9h0s1ig7"
-    # model_path = "model10800.pt"
-    # api = wandb.Api()
-    # run = api.run(run_path)
-    # file = run.file(model_path)
-    # file.download(replace=True)
-    # config = run.config
-
-    # net = NeuralNetwork(config=config)
-    # net.load_state_dict(torch.load(model_path, map_location="cpu"))
-    # net.eval()
-
-    # load config.json
-    with open("config.json") as f:
-        config = json.load(f)
-
-    # class FakeNet:
-    #     def __init__(self):
-    #         pass
-
-    #     def __call__(self, x, y, z):
-    #         return torch.ones(1, 2 * config["env"]["C"]) / (
-    #             2 * config["env"]["C"]
-    #         ), -torch.ones(1, 1)
-
-    # net = FakeNet()
-    net = NeuralNetwork(config)
-
-    env = Env(
-        config["env"]["R"],
-        config["env"]["C"],
-        config["env"]["N"],
-        skip_last_port=True,
-        take_first_action=True,
-        strict_mask=True,
-    )
-    env.reset()
-
-    for i in range(1, 100):
-        np.random.seed(11)
-        root, probs, transposition_table = alpha_zero_search(
-            env,
-            net,
-            i,
-            config["mcts"]["c_puct"],
-            config["mcts"]["temperature"],
-            config["mcts"]["dirichlet_weight"],
-            config["mcts"]["dirichlet_alpha"],
-            device="cpu",
-        )
-        print(probs)
-        draw_tree(root)

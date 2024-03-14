@@ -178,7 +178,7 @@ def get_device():
 def get_config():
     with open("config.json", "r") as f:
         config = json.load(f)
-    
+
     config["use_baseline_policy"] = True
 
     return config
@@ -198,32 +198,3 @@ def get_scheduler(optimizer, config):
         config["train"]["scheduler_step_size_in_batches"],
         config["train"]["scheduler_gamma"],
     )
-
-
-# "testset_size": 100,
-# Testset 1 created in 0.39 seconds
-# Average score: -8.07
-
-# Testset 2 created in 0.81 seconds
-# Average score: -7.55
-
-# Testset 3 created in 1.80 seconds
-# Average score: -7.43
-
-# Testset 4 created in 3.95 seconds
-# Average score: -7.35
-
-# Testset 5 created in 7.92 seconds
-# Average score: -7.26
-
-# Testset 6 created in 14.59 seconds
-# Average score: -7.24
-
-# Testset 7 created in 21.82 seconds
-# Average score: -7.22
-
-# Testset 8 created in 28.14 seconds
-# Average score: -7.20
-
-# Testset 9 created in 29.44 seconds
-# Average score: -7.19
