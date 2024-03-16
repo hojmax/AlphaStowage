@@ -9,7 +9,7 @@ import json
 import argparse
 from tqdm import tqdm
 from MPSPEnv import Env
-from Node import remove_pruning, get_torch_obs
+from Node import remove_all_pruning, get_torch_obs, close_envs_in_tree, draw_tree
 
 
 def loss_fn(pred_value, value, pred_prob, prob, value_scaling):
@@ -126,8 +126,12 @@ def play_episode(env, net, config, device, deterministic=False):
 
         if reused_tree != None:
             reused_tree = reused_tree.children[action]
-            remove_pruning(reused_tree)
+            reused_tree.parent = None
+            reused_tree.prior_prob = None
+            remove_all_pruning(reused_tree)
 
+    if reused_tree:
+        close_envs_in_tree(reused_tree)
     output_data = []
     real_value = -(env.containers_placed + env.containers_left)
     for i, (state, probabilities) in enumerate(episode_data):
@@ -159,7 +163,9 @@ def test_network(net, testset, config, device):
         avg_error = 0
 
         for env in testset:
-            _, value = play_episode(env.copy(), net, config, device, deterministic=True)
+            copy_env = env.copy()
+            _, value = play_episode(copy_env, net, config, device, deterministic=True)
+            copy_env.close()
             avg_error += value
 
         avg_error /= len(testset)

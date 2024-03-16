@@ -4,9 +4,9 @@ import torch
 import matplotlib.pyplot as plt
 import networkx as nx
 from networkx.drawing.nx_pydot import graphviz_layout
-from ..NeuralNetwork import NeuralNetwork
+from NeuralNetwork import NeuralNetwork
 from MPSPEnv import Env
-from ..Node import draw_tree, alpha_zero_search
+from Node import alpha_zero_search
 
 
 def _draw_tree_recursive(graph, node):
@@ -86,3 +86,5 @@ for i in range(1, 100):
     )
     print(probs)
     draw_tree(root)
+
+env.close()

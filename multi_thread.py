@@ -14,7 +14,9 @@ from MPSPEnv import Env
 from tqdm import tqdm
 import numpy as np
 import wandb
+from Node import TruncatedEpisodeError
 import time
+from linetimer import CodeTimer
 
 
 class ReplayBuffer:
@@ -36,21 +38,15 @@ class ReplayBuffer:
                 len(self.buffer), batch_size, replace=False
             )
             batch = [self.buffer[i] for i in batch_indices]
-            bay_batch = torch.stack(
-                [bay.squeeze(0) for (bay, flat_T, mask), probs, value in batch]
-            )
+            bay_batch = torch.stack([bay.squeeze(0) for (bay, _, _), _, _ in batch])
             flat_T_batch = torch.stack(
-                [flat_T.squeeze(0) for (bay, flat_T, mask), probs, value in batch]
+                [flat_T.squeeze(0) for (_, flat_T, _), _, _ in batch]
             )
-            mask_batch = torch.stack(
-                [mask.squeeze(0) for (bay, flat_T, mask), probs, value in batch]
-            )
-            prob_batch = torch.stack(
-                [probs for (bay, flat_T, mask), probs, value in batch]
-            )
+            mask_batch = torch.stack([mask.squeeze(0) for (_, _, mask), _, _ in batch])
+            prob_batch = torch.stack([probs for _, probs, _ in batch])
             value_batch = torch.stack(
-                [torch.tensor([value]) for (bay, flat_T, mask), probs, value in batch],
-            ).float()
+                [torch.tensor([value], dtype=torch.float32) for _, _, value in batch]
+            )
             return bay_batch, flat_T_batch, mask_batch, prob_batch, value_batch
 
     def __len__(self):
@@ -76,16 +72,18 @@ def inference_function(model, device, buffer, stop_event):
             strict_mask=True,
         )
         env.reset()
-        episode_data, value = play_episode(
-            env, model, config, device, deterministic=False
-        )
-        buffer.extend(episode_data)
+        try:
+            episode_data, value = play_episode(
+                env, model, config, device, deterministic=False
+            )
+            buffer.extend(episode_data)
+        except TruncatedEpisodeError:
+            print("Truncated episode")
+            pass
 
+        env.close()
         wandb.log({"episode": i, "value": value})
-
         i += 1
-        if i % 10000 == 0:
-            print(i)
 
 
 def update_inference_params(model, inference_model, config):
@@ -94,15 +92,12 @@ def update_inference_params(model, inference_model, config):
 
 
 def log_model(model, test_set, config, device, i):
-    print("Starting eval")
-    start = time.time()
     wandb.log(
         {
             "eval_score": test_network(model, test_set, config, device),
             "batch": i,
         }
     )
-    print(f"Eval_{i} time: {time.time() - start}")
     torch.save(model.state_dict(), f"model{i}.pt")
     wandb.save(f"model{i}.pt")
 
@@ -143,6 +138,9 @@ def training_function(model, device, inference_model, buffer, stop_event):
             }
         )
 
+    for env in test_set:
+        env.close()
+
     stop_event.set()
 
 
@@ -150,7 +148,6 @@ if __name__ == "__main__":
     config = get_config()
     buffer = ReplayBuffer(config["train"]["max_data"])
     stop_event = threading.Event()
-    # check if cuda:0 and cuda:1 are available
     training_device = torch.device("cuda:0") if torch.cuda.is_available() else "cpu"
     inference_device = torch.device("cuda:1") if torch.cuda.is_available() else "cpu"
 
