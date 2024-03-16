@@ -125,6 +125,12 @@ def play_episode(env, net, config, device, deterministic=False):
         env.step(action)
 
         if reused_tree != None:
+            # close the other branches
+            for a in range(2 * env.C):
+                if a != action and a in reused_tree.children:
+                    close_envs_in_tree(reused_tree.children[a])
+            reused_tree.env.close()
+
             reused_tree = reused_tree.children[action]
             reused_tree.parent = None
             reused_tree.prior_prob = None

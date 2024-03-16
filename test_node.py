@@ -7,7 +7,7 @@ from networkx.drawing.nx_pydot import graphviz_layout
 from NeuralNetwork import NeuralNetwork
 from MPSPEnv import Env
 from Node import alpha_zero_search
-from Train import play_episode, get_config
+from Train import get_config
 import wandb
 
 

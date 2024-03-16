@@ -223,7 +223,7 @@ def alpha_zero_search(
     reused_tree=None,
     transposition_table={},
 ):
-    root_node = reused_tree if reused_tree else Node(root_env)
+    root_node = reused_tree if reused_tree else Node(root_env.copy())
     best_score = float("-inf")
 
     for _ in range(num_simulations):
