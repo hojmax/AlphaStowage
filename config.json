@@ -1,7 +1,7 @@
 {
   "train": {
     "l2_weight_reg": 0.0001,
-    "batch_size": 32,
+    "batch_size": 64,
     "learning_rate": 0.001,
     "scheduler_step_size_in_batches": 4e4,
     "scheduler_gamma": 0.1,
@@ -12,20 +12,20 @@
     "batches_before_eval": 400
   },
   "mcts": {
-    "c_puct": 1,
+    "c_puct": 10,
     "temperature": 1,
     "search_iterations": 100,
     "dirichlet_weight": 0.25,
     "dirichlet_alpha": 0.6
   },
   "env": {
-    "R": 3,
+    "R": 6,
     "C": 2,
-    "N": 4
+    "N": 6
   },
   "nn": {
-    "blocks": 4,
-    "hidden_channels": 8,
+    "blocks": 16,
+    "hidden_channels": 32,
     "hidden_kernel_size": 3,
     "hidden_stride": 1,
     "policy_channels": 2,
@@ -34,7 +34,7 @@
     "value_channels": 1,
     "value_kernel_size": 1,
     "value_stride": 1,
-    "value_hidden": 10
+    "value_hidden": 256
   },
   "eval": {
     "n_lookahead": 4,

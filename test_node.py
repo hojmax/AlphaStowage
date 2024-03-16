@@ -7,6 +7,8 @@ from networkx.drawing.nx_pydot import graphviz_layout
 from NeuralNetwork import NeuralNetwork
 from MPSPEnv import Env
 from Node import alpha_zero_search
+from Train import play_episode, get_config
+import wandb
 
 
 def _draw_tree_recursive(graph, node):
@@ -44,23 +46,21 @@ def draw_tree(node):
     plt.show()
 
 
-# run_path = "hojmax/multi-thread/9h0s1ig7"
-# model_path = "model10800.pt"
-# api = wandb.Api()
-# run = api.run(run_path)
-# file = run.file(model_path)
-# file.download(replace=True)
-# config = run.config
+run_path = "hojmax/multi-thread/32kirnc9"
+model_path = "model26000.pt"
+api = wandb.Api()
+run = api.run(run_path)
+file = run.file(model_path)
+file.download(replace=True)
+config = run.config
 
-# net = NeuralNetwork(config=config)
-# net.load_state_dict(torch.load(model_path, map_location="cpu"))
-# net.eval()
+net = NeuralNetwork(config=config)
+net.load_state_dict(torch.load(model_path, map_location="cpu"))
+net.eval()
+# net = NeuralNetwork(config)
 
-# load config.json
-with open("config.json") as f:
-    config = json.load(f)
+config = get_config()
 
-net = NeuralNetwork(config)
 
 env = Env(
     config["env"]["R"],
@@ -70,10 +70,35 @@ env = Env(
     take_first_action=True,
     strict_mask=True,
 )
-env.reset()
-
+env.reset_to_transportation(
+    np.array(
+        [
+            [0, 2, 4, 0],
+            [0, 0, 0, 2],
+            [0, 0, 0, 4],
+            [0, 0, 0, 0],
+        ],
+        dtype=np.int32,
+    )
+)
+env.step(0)
+env.step(0)
+env.step(1)
+env.step(0)
+env.step(0)
+# env.step(2)
+# env.step(1)
+# env.step(0)
+# env.step(0)
+# episode_data = play_episode(env, net, config, "cpu", deterministic=True)
+# print(episode_data)
+# for e in episode_data[0]:
+#     print(e[0][0])
+#     print(e[1])
+#     print(e[2])
+#     print()
 for i in range(1, 100):
-    np.random.seed(11)
+    np.random.seed(13)
     root, probs, transposition_table = alpha_zero_search(
         env,
         net,
@@ -84,7 +109,6 @@ for i in range(1, 100):
         config["mcts"]["dirichlet_alpha"],
         device="cpu",
     )
-    print(probs)
     draw_tree(root)
 
 env.close()

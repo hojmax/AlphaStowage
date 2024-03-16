@@ -9,7 +9,7 @@ import json
 import argparse
 from tqdm import tqdm
 from MPSPEnv import Env
-from Node import remove_all_pruning, get_torch_obs, close_envs_in_tree, draw_tree
+from Node import remove_all_pruning, get_torch_obs, close_envs_in_tree
 
 
 def loss_fn(pred_value, value, pred_prob, prob, value_scaling):
@@ -133,7 +133,7 @@ def play_episode(env, net, config, device, deterministic=False):
     if reused_tree:
         close_envs_in_tree(reused_tree)
     output_data = []
-    real_value = -(env.containers_placed + env.containers_left)
+    real_value = -env.moves_to_solve
     for i, (state, probabilities) in enumerate(episode_data):
         output_data.append((state, probabilities, real_value + i))
 

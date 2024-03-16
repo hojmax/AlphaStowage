@@ -225,7 +225,6 @@ def alpha_zero_search(
 ):
     root_node = reused_tree if reused_tree else Node(root_env)
     best_score = float("-inf")
-    # print("started search")
 
     for _ in range(num_simulations):
         node = find_leaf(root_node, cpuct, best_score)
@@ -242,9 +241,6 @@ def alpha_zero_search(
         backup(node, state_value)
 
         if node.env.terminal:
-            # print("Terminal node reached")
-            # print(node)
             best_score = max(best_score, state_value)
-            # print("best", best_score)
 
     return root_node, get_tree_probs(root_node, temperature), transposition_table
