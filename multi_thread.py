@@ -16,7 +16,6 @@ import numpy as np
 import wandb
 from Node import TruncatedEpisodeError
 import time
-from linetimer import CodeTimer
 
 
 class ReplayBuffer:
