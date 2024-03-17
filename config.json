@@ -8,15 +8,15 @@
     "train_for_n_batches": 1e5,
     "max_data": 6000,
     "value_scaling": 0.1,
-    "batches_before_swap": 1000,
-    "batches_before_eval": 20000
+    "batches_before_swap": 400,
+    "batches_before_eval": 2500
   },
   "mcts": {
-    "c_puct": 10,
+    "c_puct": 5,
     "temperature": 1,
-    "search_iterations": 30,
+    "search_iterations": 100,
     "dirichlet_weight": 0.25,
-    "dirichlet_alpha": 0.6
+    "dirichlet_alpha": 1
   },
   "env": {
     "R": 6,

@@ -110,27 +110,22 @@ def play_episode(env, net, config, device, deterministic=False):
         if config["use_baseline_policy"]:
             action, probabilities = baseline_policy(env)
         else:
-            try:
-                reused_tree, probabilities, transposition_table = (
-                    Node.alpha_zero_search(
-                        env,
-                        net,
-                        config["mcts"]["search_iterations"],
-                        config["mcts"]["c_puct"],
-                        config["mcts"]["temperature"],
-                        config["mcts"]["dirichlet_weight"],
-                        config["mcts"]["dirichlet_alpha"],
-                        device,
-                        reused_tree,
-                        transposition_table,
-                    )
-                )
-                if deterministic:
-                    action = torch.argmax(probabilities).item()
-                else:
-                    action = np.random.choice(2 * env.C, p=probabilities)
-            except TruncatedEpisodeError:
-                action, probabilities = baseline_policy(env)
+            reused_tree, probabilities, transposition_table = Node.alpha_zero_search(
+                env,
+                net,
+                config["mcts"]["search_iterations"],
+                config["mcts"]["c_puct"],
+                config["mcts"]["temperature"],
+                config["mcts"]["dirichlet_weight"],
+                config["mcts"]["dirichlet_alpha"],
+                device,
+                reused_tree,
+                transposition_table,
+            )
+            if deterministic:
+                action = torch.argmax(probabilities).item()
+            else:
+                action = np.random.choice(2 * env.C, p=probabilities)
 
         episode_data.append((get_torch_obs(env), probabilities))
         env.step(action)
@@ -181,9 +176,15 @@ def test_network(net, testset, config, device):
 
         for env in testset:
             copy_env = env.copy()
-            _, value = play_episode(copy_env, net, config, device, deterministic=True)
+            try:
+                _, value = play_episode(
+                    copy_env, net, config, device, deterministic=True
+                )
+                avg_error += value
+            except TruncatedEpisodeError:
+                avg_error += -env.N * env.R * env.C
+
             copy_env.close()
-            avg_error += value
 
         avg_error /= len(testset)
         net.train()

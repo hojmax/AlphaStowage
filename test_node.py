@@ -46,8 +46,8 @@ def draw_tree(node):
     plt.show()
 
 
-run_path = "hojmax/multi-thread/32kirnc9"
-model_path = "model26000.pt"
+run_path = "hojmax/multi-thread/91dndzah"
+model_path = "model10000.pt"
 api = wandb.Api()
 run = api.run(run_path)
 file = run.file(model_path)
@@ -57,7 +57,6 @@ config = run.config
 net = NeuralNetwork(config=config)
 net.load_state_dict(torch.load(model_path, map_location="cpu"))
 net.eval()
-# net = NeuralNetwork(config)
 
 config = get_config()
 
@@ -73,30 +72,17 @@ env = Env(
 env.reset_to_transportation(
     np.array(
         [
-            [0, 2, 4, 0],
-            [0, 0, 0, 2],
-            [0, 0, 0, 4],
-            [0, 0, 0, 0],
+            [0, 10, 0, 0, 0, 2],
+            [0, 0, 5, 5, 0, 0],
+            [0, 0, 0, 0, 5, 0],
+            [0, 0, 0, 0, 0, 5],
+            [0, 0, 0, 0, 0, 2],
+            [0, 0, 0, 0, 0, 0],
         ],
         dtype=np.int32,
     )
 )
-env.step(0)
-env.step(0)
-env.step(1)
-env.step(0)
-env.step(0)
-# env.step(2)
-# env.step(1)
-# env.step(0)
-# env.step(0)
-# episode_data = play_episode(env, net, config, "cpu", deterministic=True)
-# print(episode_data)
-# for e in episode_data[0]:
-#     print(e[0][0])
-#     print(e[1])
-#     print(e[2])
-#     print()
+
 for i in range(1, 100):
     np.random.seed(13)
     root, probs, transposition_table = alpha_zero_search(
