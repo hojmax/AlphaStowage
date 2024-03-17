@@ -145,15 +145,21 @@ if __name__ == "__main__":
     buffer = ReplayBuffer(config["train"]["max_data"])
     stop_event = threading.Event()
     training_device = torch.device("cuda:0") if torch.cuda.is_available() else "cpu"
-    inference_device = torch.device("cuda:1") if torch.cuda.is_available() else "cpu"
+    inference_device1 = torch.device("cuda:1") if torch.cuda.is_available() else "cpu"
+    inference_device2 = torch.device("cuda:2") if torch.cuda.is_available() else "cpu"
 
     training_model = NeuralNetwork(config).to(training_device)
-    inference_model = NeuralNetwork(config).to(inference_device)
+    inference_model = NeuralNetwork(config).to(inference_device1)
 
-    inference_thread = threading.Thread(
+    inference_thread1 = threading.Thread(
         target=inference_function,
-        args=(inference_model, inference_device, buffer, stop_event),
+        args=(inference_model, inference_device1, buffer, stop_event),
     )
+    inference_thread2 = threading.Thread(
+        target=inference_function,
+        args=(inference_model, inference_device2, buffer, stop_event),
+    )
+
     training_thread = threading.Thread(
         target=training_function,
         args=(
@@ -166,11 +172,13 @@ if __name__ == "__main__":
     )
     wandb.init(project="multi-thread", config=config)
 
-    inference_thread.start()
+    inference_thread1.start()
+    inference_thread2.start()
     training_thread.start()
 
     training_thread.join()
-    inference_thread.join()
+    inference_thread2.join()
+    inference_thread1.join()
 
     torch.save(training_model.state_dict(), "final_model.pt")
     wandb.save("final_model.pt")
