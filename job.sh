@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=diffusion
-#SBATCH --output=res_%j.txt  # Use %j to denote the job ID
+#SBATCH --output=%.txt  # Use %j to denote the job ID
 #SBATCH --gres=gpu:2
 #SBATCH --time=10:00:00
 
