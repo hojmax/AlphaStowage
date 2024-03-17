@@ -67,7 +67,7 @@ class BaselinePolicy:
         return j, {}
 
 
-def  train_batch(
+def train_batch(
     network, buffer, batch_size, optimizer, scheduler, value_scaling, device
 ):
     bay, flat_T, mask, prob, value = buffer.sample(batch_size)
@@ -171,7 +171,8 @@ def create_testset(config):
 
 def test_network(net, testset, config, device):
     with torch.no_grad():
-        net.eval()
+        # Think these makes the loss spike
+        # net.eval()
         avg_error = 0
 
         for env in testset:
@@ -187,7 +188,7 @@ def test_network(net, testset, config, device):
             copy_env.close()
 
         avg_error /= len(testset)
-        net.train()
+        # net.train()
         return avg_error
 
 
