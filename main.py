@@ -83,9 +83,10 @@ def inference_function(model, device, buffer, stop_event):
         i += 1
 
 
-def update_inference_params(model, inference_model, config):
+def update_inference_params(model, inference_models, config):
     config["use_baseline_policy"] = False
-    inference_model.load_state_dict(model.state_dict())
+    for inference_model in inference_models:
+        inference_model.load_state_dict(model.state_dict())
 
 
 def log_model(model, test_set, config, device, i):
@@ -99,7 +100,7 @@ def log_model(model, test_set, config, device, i):
     wandb.save(f"model{i}.pt")
 
 
-def training_function(model, device, inference_model, buffer, stop_event):
+def training_function(model, device, inference_models, buffer, stop_event):
     while len(buffer.buffer) == 0:
         time.sleep(1)
 
@@ -110,7 +111,7 @@ def training_function(model, device, inference_model, buffer, stop_event):
     model.train()
     for i in tqdm(range(1, int(config["train"]["train_for_n_batches"]) + 1)):
         if i % config["train"]["batches_before_swap"] == 0:
-            update_inference_params(model, inference_model, config)
+            update_inference_params(model, inference_models, config)
         if i % config["train"]["batches_before_eval"] == 0:
             log_model(model, test_set, config, device, i)
 
@@ -149,15 +150,16 @@ if __name__ == "__main__":
     inference_device2 = torch.device("cuda:2") if torch.cuda.is_available() else "cpu"
 
     training_model = NeuralNetwork(config).to(training_device)
-    inference_model = NeuralNetwork(config).to(inference_device1)
+    inference_model1 = NeuralNetwork(config).to(inference_device1)
+    inference_model2 = NeuralNetwork(config).to(inference_device2)
 
     inference_thread1 = threading.Thread(
         target=inference_function,
-        args=(inference_model, inference_device1, buffer, stop_event),
+        args=(inference_model1, inference_device1, buffer, stop_event),
     )
     inference_thread2 = threading.Thread(
         target=inference_function,
-        args=(inference_model, inference_device2, buffer, stop_event),
+        args=(inference_model2, inference_device2, buffer, stop_event),
     )
 
     training_thread = threading.Thread(
@@ -165,7 +167,7 @@ if __name__ == "__main__":
         args=(
             training_model,
             training_device,
-            inference_model,
+            [inference_model1, inference_model2],
             buffer,
             stop_event,
         ),
