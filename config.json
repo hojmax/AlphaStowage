@@ -3,17 +3,17 @@
     "l2_weight_reg": 0.0001,
     "batch_size": 128,
     "learning_rate": 0.001,
-    "scheduler_step_size_in_batches": 4e4,
+    "scheduler_step_size_in_batches": 7.5e4,
     "scheduler_gamma": 0.1,
-    "train_for_n_batches": 1e5,
+    "train_for_n_batches": 1.5e5,
     "max_data": 6000,
     "value_scaling": 0.1,
     "batches_before_swap": 400,
-    "batches_before_eval": 200
+    "batches_before_eval": 5000
   },
   "mcts": {
     "c_puct": 5,
-    "temperature": 1,
+    "temperature": 0.6,
     "search_iterations": 100,
     "dirichlet_weight": 0.25,
     "dirichlet_alpha": 1

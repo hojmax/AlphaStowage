@@ -157,11 +157,7 @@ def evaluate(
 
 
 def add_children(probabilities, state_value, node, cpuct):
-    # THIS IS THE ORIGINAL CODE
-    # for action in range(2 * node.env.C):
-
-    # now only adding, no remove
-    for action in range(node.env.C):
+    for action in range(2 * node.env.C):
         is_legal = node.env.action_masks()[action]
         if not is_legal:
             continue
