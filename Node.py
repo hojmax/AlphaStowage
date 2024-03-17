@@ -7,7 +7,9 @@ class TruncatedEpisodeError(Exception):
 
 
 class Node:
-    def __init__(self, env, prior_prob=None, estimated_value=0, parent=None, depth=0):
+    def __init__(
+        self, env, prior_prob=None, estimated_value=0, parent=None, depth=0, cpuct=1
+    ):
         self.env = env
         self.pruned = False
         self.visit_count = 0
@@ -18,7 +20,9 @@ class Node:
         self.children = {}
         self.parent = parent
         self.depth = depth
+        self.cpuct = cpuct
 
+    @property
     def Q(self):
         return (
             self.mean_action_value
@@ -26,9 +30,10 @@ class Node:
             else self.estimated_value
         )
 
-    def U(self, cpuct):
+    @property
+    def U(self):
         return (
-            cpuct
+            self.cpuct
             * self.prior_prob
             * np.sqrt(self.parent.visit_count)
             / (1 + self.visit_count)
@@ -39,13 +44,14 @@ class Node:
         self.visit_count += 1
         self.mean_action_value = self.total_action_value / self.visit_count
 
-    def uct(self, cpuct):
-        return self.Q() + self.U(cpuct)
+    @property
+    def uct(self):
+        return self.Q + self.U
 
     def __str__(self):
-        output = f"{self.env.bay}\n{self.env.T}\nN={self.visit_count}, Q={self.Q():.2f}, Moves={self.env.moves_to_solve}"
+        output = f"{self.env.bay}\n{self.env.T}\nN={self.visit_count}, Q={self.Q:.2f}, Moves={self.env.moves_to_solve}"
         if self.prior_prob is not None:
-            output += f" P={self.prior_prob:.2f}, Q+U={self.uct(1):.2f}"
+            output += f" P={self.prior_prob:.2f}, Q+U={self.uct:.2f}"
         if self.pruned:
             output = "pruned\n" + output
         return output
@@ -54,7 +60,7 @@ class Node:
 def select(node, cpuct):
     valid_children = [child for child in node.children.values() if not child.pruned]
 
-    return max(valid_children, key=lambda x: x.uct(cpuct))
+    return max(valid_children, key=lambda x: x.uct)
 
 
 def get_torch_obs(env):
@@ -97,7 +103,13 @@ def is_root(node):
 
 
 def expand_node(
-    node, neural_network, dirichlet_weight, dirichlet_alpha, device, transposition_table
+    node,
+    neural_network,
+    dirichlet_weight,
+    dirichlet_alpha,
+    device,
+    transposition_table,
+    cpuct,
 ):
     probabilities, state_value = get_prob_and_value(
         node, neural_network, device, transposition_table
@@ -108,7 +120,7 @@ def expand_node(
             probabilities, dirichlet_weight, dirichlet_alpha
         )
 
-    add_children(probabilities, state_value, node)
+    add_children(probabilities, state_value, node, cpuct)
 
     return state_value
 
@@ -121,7 +133,13 @@ def close_envs_in_tree(node):
 
 
 def evaluate(
-    node, neural_network, dirichlet_weight, dirichlet_alpha, device, transposition_table
+    node,
+    neural_network,
+    dirichlet_weight,
+    dirichlet_alpha,
+    device,
+    transposition_table,
+    cpuct,
 ):
     if node.env.terminal:
         return -node.env.moves_to_solve
@@ -133,11 +151,12 @@ def evaluate(
             dirichlet_alpha,
             device,
             transposition_table,
+            cpuct,
         )
         return state_value
 
 
-def add_children(probabilities, state_value, node):
+def add_children(probabilities, state_value, node, cpuct):
     # THIS IS THE ORIGINAL CODE
     # for action in range(2 * node.env.C):
 
@@ -154,6 +173,7 @@ def add_children(probabilities, state_value, node):
             estimated_value=state_value,
             parent=node,
             depth=node.depth + 1,
+            cpuct=cpuct,
         )
 
 
@@ -240,6 +260,7 @@ def alpha_zero_search(
             dirichlet_alpha,
             device,
             transposition_table,
+            cpuct,
         )
 
         backup(node, state_value)
