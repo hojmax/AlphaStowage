@@ -93,7 +93,7 @@ def update_inference_params(model, inference_models, config):
 def log_model(model, test_set, config, device, i):
     wandb.log(
         {
-            "eval_score": 5,  # test_network(model, test_set, config, device)
+            "eval_score": test_network(model, test_set, config, device),
             "batch": i,
         }
     )
