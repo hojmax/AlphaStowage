@@ -6,7 +6,7 @@ import networkx as nx
 from networkx.drawing.nx_pydot import graphviz_layout
 from NeuralNetwork import NeuralNetwork
 from MPSPEnv import Env
-from Node import alpha_zero_search
+from Node import alpha_zero_search, get_torch_obs
 from Train import get_config
 import wandb
 
@@ -83,7 +83,24 @@ env.reset_to_transportation(
     )
 )
 
-for i in range(1, 100):
+root, probs, transposition_table = alpha_zero_search(
+    env,
+    net,
+    100,
+    config["mcts"]["c_puct"],
+    config["mcts"]["temperature"],
+    config["mcts"]["dirichlet_weight"],
+    config["mcts"]["dirichlet_alpha"],
+    device="cpu",
+)
+env.print()
+torch.set_printoptions(precision=3, sci_mode=False)
+bay, flat_t, mask = get_torch_obs(env)
+probabilities, state_value = net(bay, flat_t, mask)
+print("Net Probs:", probabilities)
+print("MCTS Probs:", probs)
+
+for i in range(99, 100):
     np.random.seed(13)
     root, probs, transposition_table = alpha_zero_search(
         env,

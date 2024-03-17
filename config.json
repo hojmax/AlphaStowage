@@ -9,7 +9,7 @@
     "max_data": 6000,
     "value_scaling": 0.1,
     "batches_before_swap": 400,
-    "batches_before_eval": 2500
+    "batches_before_eval": 200
   },
   "mcts": {
     "c_puct": 5,

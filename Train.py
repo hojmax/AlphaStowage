@@ -67,7 +67,7 @@ class BaselinePolicy:
         return j, {}
 
 
-def train_batch(
+def  train_batch(
     network, buffer, batch_size, optimizer, scheduler, value_scaling, device
 ):
     bay, flat_T, mask, prob, value = buffer.sample(batch_size)
