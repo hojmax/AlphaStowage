@@ -24,8 +24,8 @@
     "N": 6
   },
   "nn": {
-    "blocks": 3,
-    "hidden_channels": 3,
+    "blocks": 16,
+    "hidden_channels": 32,
     "hidden_kernel_size": 3,
     "hidden_stride": 1,
     "policy_channels": 2,
@@ -37,7 +37,6 @@
     "value_hidden": 256
   },
   "eval": {
-    "n_lookahead": 4,
     "testset_size": 50
   }
 }
