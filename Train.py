@@ -1,15 +1,17 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from NeuralNetwork import NeuralNetwork
 import Node
 import numpy as np
 import wandb
 import json
-import argparse
-from tqdm import tqdm
 from MPSPEnv import Env
-from Node import remove_all_pruning, get_torch_obs, close_envs_in_tree
+from Node import (
+    remove_all_pruning,
+    get_torch_obs,
+    close_envs_in_tree,
+    TruncatedEpisodeError,
+)
 
 
 def loss_fn(pred_value, value, pred_prob, prob, value_scaling):
@@ -91,6 +93,14 @@ def train_batch(
     )
 
 
+def baseline_policy(env):
+    policy = BaselinePolicy(env.C, env.N)
+    action, _ = policy.predict(env.one_hot_bay)
+    probabilities = torch.zeros(2 * env.C) + 0.1 / (2 * env.C - 1)
+    probabilities[action] = 0.9
+    return action, probabilities
+
+
 def play_episode(env, net, config, device, deterministic=False):
     episode_data = []
     reused_tree = None
@@ -98,28 +108,29 @@ def play_episode(env, net, config, device, deterministic=False):
 
     while not env.terminal:
         if config["use_baseline_policy"]:
-            policy = BaselinePolicy(env.C, env.N)
-            action, _ = policy.predict(env.one_hot_bay)
-            probabilities = torch.zeros(2 * env.C) + 0.1 / (2 * env.C - 1)
-            probabilities[action] = 0.9
+            action, probabilities = baseline_policy(env)
         else:
-            reused_tree, probabilities, transposition_table = Node.alpha_zero_search(
-                env,
-                net,
-                config["mcts"]["search_iterations"],
-                config["mcts"]["c_puct"],
-                config["mcts"]["temperature"],
-                config["mcts"]["dirichlet_weight"],
-                config["mcts"]["dirichlet_alpha"],
-                device,
-                reused_tree,
-                transposition_table,
-            )
-
-            if deterministic:
-                action = torch.argmax(probabilities).item()
-            else:
-                action = np.random.choice(2 * env.C, p=probabilities)
+            try:
+                reused_tree, probabilities, transposition_table = (
+                    Node.alpha_zero_search(
+                        env,
+                        net,
+                        config["mcts"]["search_iterations"],
+                        config["mcts"]["c_puct"],
+                        config["mcts"]["temperature"],
+                        config["mcts"]["dirichlet_weight"],
+                        config["mcts"]["dirichlet_alpha"],
+                        device,
+                        reused_tree,
+                        transposition_table,
+                    )
+                )
+                if deterministic:
+                    action = torch.argmax(probabilities).item()
+                else:
+                    action = np.random.choice(2 * env.C, p=probabilities)
+            except TruncatedEpisodeError:
+                action, probabilities = baseline_policy(env)
 
         episode_data.append((get_torch_obs(env), probabilities))
         env.step(action)

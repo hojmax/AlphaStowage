@@ -18,8 +18,6 @@ from Node import TruncatedEpisodeError
 import time
 import logging
 
-logger = logging.getLogger(__name__)
-
 
 class ReplayBuffer:
     def __init__(self, capacity):
@@ -56,17 +54,14 @@ class ReplayBuffer:
 
 
 def inference_function(model, device, buffer, stop_event):
-    logger.info("Starting inference thread...")
     i = 1
     while not stop_event.is_set():
         if (
             config["use_baseline_policy"]
             and len(buffer.buffer) >= config["train"]["max_data"]
         ):
-            logger.info("Waiting for swap")
             time.sleep(1)
             continue
-        logger.info("I1")
         env = Env(
             config["env"]["R"],
             config["env"]["C"],
@@ -75,22 +70,15 @@ def inference_function(model, device, buffer, stop_event):
             take_first_action=True,
             strict_mask=True,
         )
-        logger.info("I2")
         env.reset()
-        logger.info("I3")
         try:
             episode_data, value = play_episode(
                 env, model, config, device, deterministic=False
             )
-            logger.info("I4")
             buffer.extend(episode_data)
-            logger.info("I5")
         except TruncatedEpisodeError:
-            logger.info("Truncated episode")
             pass
-        logger.info("I6")
         env.close()
-        logger.info("I7")
         wandb.log({"episode": i, "value": value})
         i += 1
 
@@ -112,22 +100,15 @@ def log_model(model, test_set, config, device, i):
 
 
 def training_function(model, device, inference_model, buffer, stop_event):
-    logger.info("Starting training thread...")
     while len(buffer.buffer) == 0:
-        logger.info("Waiting for buffer to fill")
         time.sleep(1)
 
-    logger.info("A")
     test_set = create_testset(config)
-    logger.info("B")
     optimizer = get_optimizer(model, config)
-    logger.info("C")
     scheduler = get_scheduler(optimizer, config)
-    logger.info("D")
 
     model.train()
     for i in tqdm(range(1, int(config["train"]["train_for_n_batches"]) + 1)):
-        logger.info("E")
         if i % config["train"]["batches_before_swap"] == 0:
             update_inference_params(model, inference_model, config)
         if i % config["train"]["batches_before_eval"] == 0:
@@ -142,7 +123,6 @@ def training_function(model, device, inference_model, buffer, stop_event):
             config["train"]["value_scaling"],
             device,
         )
-        logger.info("F")
         wandb.log(
             {
                 "loss": avg_loss,
@@ -161,7 +141,6 @@ def training_function(model, device, inference_model, buffer, stop_event):
 
 if __name__ == "__main__":
     logging.basicConfig(filename="main.log", level=logging.INFO)
-    logger.info("Loading...")
     config = get_config()
     buffer = ReplayBuffer(config["train"]["max_data"])
     stop_event = threading.Event()
