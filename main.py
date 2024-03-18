@@ -73,14 +73,14 @@ def inference_function(model, device, buffer, stop_event):
         )
         env.reset()
         try:
-            episode_data, value = play_episode(
+            episode_data, value, reshuffles = play_episode(
                 env, model, config, device, deterministic=False
             )
             buffer.extend(episode_data)
         except TruncatedEpisodeError:
             pass
         env.close()
-        wandb.log({"episode": i, "value": value})
+        wandb.log({"episode": i, "value": value, "reshuffles": reshuffles})
         i += 1
 
 
@@ -91,9 +91,11 @@ def update_inference_params(model, inference_models, config):
 
 
 def log_model(model, test_set, config, device, i):
+    avg_error, avg_reshuffles = test_network(model, test_set, config, device)
     wandb.log(
         {
-            "eval_score": test_network(model, test_set, config, device),
+            "eval_moves": avg_error,
+            "eval_reshuffles": avg_reshuffles,
             "batch": i,
         }
     )

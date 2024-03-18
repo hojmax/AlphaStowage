@@ -146,16 +146,18 @@ def play_episode(env, net, config, device, deterministic=False):
         close_envs_in_tree(reused_tree)
     output_data = []
     real_value = -env.moves_to_solve
+    reshuffles = env.total_reward
     for i, (state, probabilities) in enumerate(episode_data):
         output_data.append((state, probabilities, real_value + i))
 
-    return output_data, real_value
+    return output_data, real_value, reshuffles
 
 
 def create_testset(config):
     testset = []
     for i in range(config["eval"]["testset_size"]):
         np.random.seed(i)
+        seed = np.random.randint(0, 2**32 - 1)
         env = Env(
             config["env"]["R"],
             config["env"]["C"],
@@ -164,32 +166,35 @@ def create_testset(config):
             take_first_action=True,
             strict_mask=True,
         )
-        env.reset()
+        env.reset(seed)
         testset.append(env)
     return testset
 
 
 def test_network(net, testset, config, device):
     with torch.no_grad():
-        # Think these makes the loss spike
-        # net.eval()
+        net.eval()
         avg_error = 0
+        avg_reshuffles = 0
 
         for env in testset:
             copy_env = env.copy()
             try:
-                _, value = play_episode(
+                _, value, reshuffles = play_episode(
                     copy_env, net, config, device, deterministic=True
                 )
                 avg_error += value
+                avg_reshuffles += reshuffles
             except TruncatedEpisodeError:
                 avg_error += -env.N * env.R * env.C
+                avg_reshuffles += -1e9
 
             copy_env.close()
 
         avg_error /= len(testset)
-        # net.train()
-        return avg_error
+        avg_reshuffles /= len(testset)
+        net.train()
+        return avg_error, avg_reshuffles
 
 
 def get_device():
