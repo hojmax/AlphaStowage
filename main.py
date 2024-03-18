@@ -16,7 +16,6 @@ import numpy as np
 import wandb
 from Node import TruncatedEpisodeError
 import time
-import logging
 
 
 class ReplayBuffer:
@@ -143,9 +142,22 @@ def training_function(model, device, inference_models, buffer, stop_event):
     stop_event.set()
 
 
+def get_model_weights_path(wandb_run, wandb_model):
+    api = wandb.Api()
+    run = api.run(wandb_run)
+    file = run.file(wandb_model)
+    file.download(replace=True)
+
+    return wandb_model
+
+
 if __name__ == "__main__":
-    logging.basicConfig(filename="main.log", level=logging.INFO)
+    use_prev_model = {
+        "wandb_run": "hojmax/multi-thread/q10bt63b",
+        "wandb_model": "model150000.pt",
+    }
     config = get_config()
+    config["use_baseline_policy"] = False
     buffer = ReplayBuffer(config["train"]["max_data"])
     stop_event = threading.Event()
     training_device = torch.device("cuda:0") if torch.cuda.is_available() else "cpu"
@@ -155,6 +167,20 @@ if __name__ == "__main__":
     training_model = NeuralNetwork(config).to(training_device)
     inference_model1 = NeuralNetwork(config).to(inference_device1)
     inference_model2 = NeuralNetwork(config).to(inference_device2)
+
+    if use_prev_model:
+        model_weights_path = get_model_weights_path(
+            use_prev_model["wandb_run"], use_prev_model["wandb_model"]
+        )
+        training_model.load_state_dict(
+            torch.load(model_weights_path, map_location=training_device)
+        )
+        inference_model1.load_state_dict(
+            torch.load(model_weights_path, map_location=inference_device1)
+        )
+        inference_model2.load_state_dict(
+            torch.load(model_weights_path, map_location=inference_device2)
+        )
 
     inference_thread1 = threading.Thread(
         target=inference_function,

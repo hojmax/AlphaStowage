@@ -156,8 +156,6 @@ def play_episode(env, net, config, device, deterministic=False):
 def create_testset(config):
     testset = []
     for i in range(config["eval"]["testset_size"]):
-        np.random.seed(i)
-        seed = np.random.randint(0, 2**32 - 1)
         env = Env(
             config["env"]["R"],
             config["env"]["C"],
@@ -166,7 +164,7 @@ def create_testset(config):
             take_first_action=True,
             strict_mask=True,
         )
-        env.reset(seed)
+        env.reset(i)
         testset.append(env)
     return testset
 
