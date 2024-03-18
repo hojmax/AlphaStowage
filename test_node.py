@@ -9,6 +9,8 @@ from MPSPEnv import Env
 from Node import alpha_zero_search, get_torch_obs
 from Train import get_config, test_network, create_testset
 import wandb
+import os
+import pandas as pd
 
 
 def _draw_tree_recursive(graph, node):
@@ -46,8 +48,66 @@ def draw_tree(node):
     plt.show()
 
 
-run_path = "hojmax/multi-thread/q10bt63b"
-model_path = "model150000.pt"
+def get_benchmarking_data(path):
+    """Go through all files in the directory and return a list of dictionaries with:
+    N, R, C, seed, transportation_matrix, paper_result"""
+
+    output = []
+    df = pd.read_excel(
+        os.path.join(path, "paper_results.xlsx"),
+    )
+
+    for file in os.listdir(path):
+        if file.endswith(".txt"):
+            with open(os.path.join(path, file), "r") as f:
+                lines = f.readlines()
+                N = int(lines[0].split(": ")[1])
+                R = int(lines[1].split(": ")[1])
+                C = int(lines[2].split(": ")[1])
+                seed = int(lines[3].split(": ")[1])
+
+                paper_result = df[
+                    (df["N"] == N)
+                    & (df["R"] == R)
+                    & (df["C"] == C)
+                    & (df["seed"] == seed)
+                ]["res"].values
+
+                assert len(paper_result) == 1
+                paper_result = paper_result[0]
+
+                output.append(
+                    {
+                        "N": N,
+                        "R": R,
+                        "C": C,
+                        "seed": seed,
+                        "transportation_matrix": np.loadtxt(lines[4:], dtype=np.int32),
+                        "paper_result": paper_result,
+                    }
+                )
+
+    return output
+
+
+def transform_benchmarking_data(data):
+    testset = []
+    for instance in data:
+        env = Env(
+            instance["R"],
+            instance["C"],
+            instance["N"],
+            skip_last_port=True,
+            take_first_action=True,
+            strict_mask=True,
+        )
+        env.reset_to_transportation(instance["transportation_matrix"])
+        testset.append(env)
+    return testset
+
+
+run_path = "hojmax/multi-thread/2gqbl328"
+model_path = "model130000.pt"
 api = wandb.Api()
 run = api.run(run_path)
 file = run.file(model_path)
@@ -61,6 +121,22 @@ config = get_config()
 config["use_baseline_policy"] = False
 test_set = create_testset(config)
 avg_error, avg_reshuffles = test_network(net, test_set, config, "cpu")
+print("Random testset:")
+print("Eval Moves:", avg_error, "Eval Reshuffles:", avg_reshuffles)
+
+
+data = get_benchmarking_data("/Users/axelhojmark/Desktop/rl-mpsp-benchmark/set_2")
+data = [
+    e
+    for e in data
+    if e["N"] == config["env"]["N"]
+    and e["R"] == config["env"]["R"]
+    and e["C"] == config["env"]["C"]
+]
+data = transform_benchmarking_data(data)
+
+avg_error, avg_reshuffles = test_network(net, data, config, "cpu")
+print("Benchmarking testset:")
 print("Eval Moves:", avg_error, "Eval Reshuffles:", avg_reshuffles)
 
 # env = Env(
