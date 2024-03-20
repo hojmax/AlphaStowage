@@ -24,7 +24,7 @@ echo "*** Installing requirements ***"
 
 
 # Install the requirements
-python -m pip install --upgrade pip
+python3 -m pip install --upgrade pip
 pip install -r requirements.txt --quiet
 
 echo "*** Running script: ${1:-main.py} ***"
