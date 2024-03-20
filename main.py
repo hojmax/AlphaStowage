@@ -107,7 +107,7 @@ def training_function(model, device, inference_models, buffer, stop_event):
     test_set = create_testset(config)
     optimizer = get_optimizer(model, config)
     scheduler = get_scheduler(optimizer, config)
-    best_model_score = -30  # float("-inf")
+    best_model_score, _ = test_network(model, test_set, config, device)
 
     model.train()
     for i in tqdm(range(1, int(config["train"]["train_for_n_batches"]) + 1)):

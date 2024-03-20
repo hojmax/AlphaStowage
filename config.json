@@ -37,6 +37,6 @@
     "value_hidden": 256
   },
   "eval": {
-    "testset_size": 50
+    "testset_size": 100
   }
 }
