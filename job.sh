@@ -22,10 +22,8 @@ source activate $ENV_NAME
 
 echo "*** Installing requirements ***"
 
-
 # Install the requirements
-python3 -m pip install --upgrade pip
-pip install -r requirements.txt --quiet
+pip install -r requirements.txt
 
 echo "*** Running script: ${1:-main.py} ***"
 
