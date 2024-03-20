@@ -106,8 +106,8 @@ def transform_benchmarking_data(data):
     return testset
 
 
-run_path = "hojmax/multi-thread/2gqbl328"
-model_path = "model130000.pt"
+run_path = "alphastowage/AlphaStowage/2gqbl328"
+model_path = "model360000.pt"
 api = wandb.Api()
 run = api.run(run_path)
 file = run.file(model_path)

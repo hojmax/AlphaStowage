@@ -89,8 +89,7 @@ def update_inference_params(model, inference_models, config):
         inference_model.load_state_dict(model.state_dict())
 
 
-def log_model(model, test_set, config, device, i):
-    avg_error, avg_reshuffles = test_network(model, test_set, config, device)
+def log_eval(avg_error, avg_reshuffles, i):
     wandb.log(
         {
             "eval_moves": avg_error,
@@ -98,24 +97,28 @@ def log_model(model, test_set, config, device, i):
             "batch": i,
         }
     )
-    torch.save(model.state_dict(), f"model{i}.pt")
-    wandb.save(f"model{i}.pt")
 
 
 def training_function(model, device, inference_models, buffer, stop_event):
-    while len(buffer.buffer) == 0:
+    while len(buffer.buffer) < config["train"]["batch_size"]:
+        print("Waiting for buffer to fill up")
         time.sleep(1)
 
     test_set = create_testset(config)
     optimizer = get_optimizer(model, config)
     scheduler = get_scheduler(optimizer, config)
+    best_model_score = -30  # float("-inf")
 
     model.train()
     for i in tqdm(range(1, int(config["train"]["train_for_n_batches"]) + 1)):
-        if i % config["train"]["batches_before_swap"] == 0:
-            update_inference_params(model, inference_models, config)
         if i % config["train"]["batches_before_eval"] == 0:
-            log_model(model, test_set, config, device, i)
+            avg_error, avg_reshuffles = test_network(model, test_set, config, device)
+            log_eval(avg_error, avg_reshuffles, i)
+            if avg_error > best_model_score:
+                best_model_score = avg_error
+                update_inference_params(model, inference_models, config)
+                torch.save(model.state_dict(), f"model{i}.pt")
+                wandb.save(f"model{i}.pt")
 
         avg_loss, avg_value_loss, avg_cross_entropy = train_batch(
             model,
@@ -153,8 +156,8 @@ def get_model_weights_path(wandb_run, wandb_model):
 
 if __name__ == "__main__":
     use_prev_model = {
-        "wandb_run": "hojmax/multi-thread/q10bt63b",
-        "wandb_model": "model150000.pt",
+        "wandb_run": "alphastowage/AlphaStowage/2gqbl328",
+        "wandb_model": "model360000.pt",
     }
     config = get_config()
     config["use_baseline_policy"] = False
@@ -182,6 +185,10 @@ if __name__ == "__main__":
             torch.load(model_weights_path, map_location=inference_device2)
         )
 
+    wandb.init(
+        entity="alphastowage", project="AlphaStowage", config=config, save_code=True
+    )
+
     inference_thread1 = threading.Thread(
         target=inference_function,
         args=(inference_model1, inference_device1, buffer, stop_event),
@@ -201,7 +208,6 @@ if __name__ == "__main__":
             stop_event,
         ),
     )
-    wandb.init(project="multi-thread", config=config)
 
     inference_thread1.start()
     inference_thread2.start()

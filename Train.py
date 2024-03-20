@@ -102,6 +102,9 @@ def baseline_policy(env):
 
 
 def play_episode(env, net, config, device, deterministic=False):
+    if deterministic:
+        np.random.seed(13)
+
     episode_data = []
     reused_tree = None
     transposition_table = {}
