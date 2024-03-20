@@ -23,7 +23,7 @@ source activate $ENV_NAME
 echo "*** Installing requirements ***"
 
 # Install the requirements
-pip install -r requirements.txt
+pip install -r requirements.txt --quiet
 
 echo "*** Running script: ${1:-main.py} ***"
 
