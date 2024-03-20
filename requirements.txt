@@ -3,3 +3,4 @@ tqdm
 pygame
 networkx
 MPSPEnv==0.0.19
+torch
