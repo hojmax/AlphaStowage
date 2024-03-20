@@ -23,11 +23,14 @@ class ReplayBuffer:
         self.capacity = capacity
         self.buffer = []
         self.lock = threading.Lock()
+        self.episode = 0
 
     def extend(self, items):
         with self.lock:
             self.buffer.extend(items)
             self.buffer = self.buffer[-self.capacity :]
+            self.episode += 1
+            return self.episode
 
     def sample(self, batch_size):
         batch_size = min(len(self.buffer), batch_size)
@@ -53,8 +56,8 @@ class ReplayBuffer:
 
 
 def inference_function(model, device, buffer, stop_event):
-    # model.eval()
-    i = 1
+    model.eval()
+
     while not stop_event.is_set():
         if (
             config["use_baseline_policy"]
@@ -75,12 +78,11 @@ def inference_function(model, device, buffer, stop_event):
             episode_data, value, reshuffles = play_episode(
                 env, model, config, device, deterministic=False
             )
-            buffer.extend(episode_data)
+            episode = buffer.extend(episode_data)
         except TruncatedEpisodeError:
             pass
         env.close()
-        wandb.log({"episode": i, "value": value, "reshuffles": reshuffles})
-        i += 1
+        wandb.log({"episode": episode, "value": value, "reshuffles": reshuffles})
 
 
 def update_inference_params(model, inference_models, config):
@@ -100,7 +102,7 @@ def log_eval(avg_error, avg_reshuffles, i):
 
 
 def training_function(model, device, inference_models, buffer, stop_event):
-    while len(buffer.buffer) < config["train"]["batch_size"]:
+    while len(buffer) < config["train"]["batch_size"]:
         print("Waiting for buffer to fill up")
         time.sleep(1)
 
