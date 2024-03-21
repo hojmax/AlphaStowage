@@ -7,7 +7,7 @@ from networkx.drawing.nx_pydot import graphviz_layout
 from NeuralNetwork import NeuralNetwork
 from MPSPEnv import Env
 from Node import alpha_zero_search, get_torch_obs
-from Train import get_config, test_network, create_testset
+from Train import get_config, test_network, create_testset, play_episode
 import wandb
 import os
 import pandas as pd
@@ -119,64 +119,80 @@ net.load_state_dict(torch.load(model_path, map_location="cpu"))
 
 config = get_config()
 config["use_baseline_policy"] = False
-test_set = create_testset(config)
-avg_error, avg_reshuffles = test_network(net, test_set, config, "cpu")
-print("Random testset:")
-print("Eval Moves:", avg_error, "Eval Reshuffles:", avg_reshuffles)
+# test_set = create_testset(config)
+# avg_error, avg_reshuffles = test_network(net, test_set, config, "cpu")
+# print("Random testset:")
+# print("Eval Moves:", avg_error, "Eval Reshuffles:", avg_reshuffles)
 
 
-data = get_benchmarking_data("/Users/axelhojmark/Desktop/rl-mpsp-benchmark/set_2")
-data = [
-    e
-    for e in data
-    if e["N"] == config["env"]["N"]
-    and e["R"] == config["env"]["R"]
-    and e["C"] == config["env"]["C"]
-]
-data = transform_benchmarking_data(data)
+# data = get_benchmarking_data("/Users/axelhojmark/Desktop/rl-mpsp-benchmark/set_2")
+# data = [
+#     e
+#     for e in data
+#     if e["N"] == config["env"]["N"]
+#     and e["R"] == config["env"]["R"]
+#     and e["C"] == config["env"]["C"]
+# ]
+# data = transform_benchmarking_data(data)
 
-avg_error, avg_reshuffles = test_network(net, data, config, "cpu")
-print("Benchmarking testset:")
-print("Eval Moves:", avg_error, "Eval Reshuffles:", avg_reshuffles)
+# avg_error, avg_reshuffles = test_network(net, data, config, "cpu")
+# print("Benchmarking testset:")
+# print("Eval Moves:", avg_error, "Eval Reshuffles:", avg_reshuffles)
 
-# env = Env(
-#     config["env"]["R"],
-#     config["env"]["C"],
-#     config["env"]["N"],
-#     skip_last_port=True,
-#     take_first_action=True,
-#     strict_mask=True,
-# )
-# env.reset_to_transportation(
-#     np.array(
-#         [
-#             [0, 10, 0, 0, 0, 2],
-#             [0, 0, 5, 5, 0, 0],
-#             [0, 0, 0, 0, 5, 0],
-#             [0, 0, 0, 0, 0, 5],
-#             [0, 0, 0, 0, 0, 2],
-#             [0, 0, 0, 0, 0, 0],
-#         ],
-#         dtype=np.int32,
-#     )
-# )
+env = Env(
+    config["env"]["R"],
+    config["env"]["C"],
+    config["env"]["N"],
+    skip_last_port=True,
+    take_first_action=True,
+    strict_mask=True,
+)
+env.reset_to_transportation(
+    np.array(
+        [
+            [0, 10, 0, 0, 0, 2],
+            [0, 0, 5, 5, 0, 0],
+            [0, 0, 0, 0, 5, 0],
+            [0, 0, 0, 0, 0, 5],
+            [0, 0, 0, 0, 0, 5],
+            [0, 0, 0, 0, 0, 0],
+        ],
+        dtype=np.int32,
+    )
+)
 
-# root, probs, transposition_table = alpha_zero_search(
-#     env,
-#     net,
-#     100,
-#     config["mcts"]["c_puct"],
-#     config["mcts"]["temperature"],
-#     config["mcts"]["dirichlet_weight"],
-#     config["mcts"]["dirichlet_alpha"],
-#     device="cpu",
-# )
-# env.print()
-# torch.set_printoptions(precision=3, sci_mode=False)
-# bay, flat_t, mask = get_torch_obs(env)
-# probabilities, state_value = net(bay, flat_t, mask)
-# print("Net Probs:", probabilities, "Net Value:", state_value)
-# print("MCTS Probs:", probs)
+root, probs, transposition_table = alpha_zero_search(
+    env,
+    net,
+    100,
+    config["mcts"]["c_puct"],
+    config["mcts"]["temperature"],
+    config["mcts"]["dirichlet_weight"],
+    config["mcts"]["dirichlet_alpha"],
+    device="cpu",
+)
+env.print()
+torch.set_printoptions(precision=3, sci_mode=False)
+bay, flat_t, mask = get_torch_obs(env)
+probabilities, state_value = net(bay, flat_t, mask)
+print("Net Probs:", probabilities, "Net Value:", state_value)
+print("MCTS Probs:", probs)
+
+
+output_data, real_value, reshuffles = play_episode(
+    env, net, config, "cpu", deterministic=True
+)
+
+print("Real Value:", real_value, "Reshuffles:", reshuffles)
+for e in output_data:
+    with open("test.txt", "a") as f:
+        f.write(str(e[0][0].numpy()))
+        f.write("\n")
+        f.write(str(e[0][1].numpy()))
+        f.write("\n")
+        f.write(str(e[1].numpy()))
+        f.write("\n")
+        f.write("\n")
 
 # for i in range(99, 100):
 #     np.random.seed(13)
