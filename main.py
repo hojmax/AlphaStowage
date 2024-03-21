@@ -102,10 +102,6 @@ def log_eval(avg_error, avg_reshuffles, i):
 
 
 def training_function(model, device, inference_models, buffer, stop_event):
-    while len(buffer) < config["train"]["batch_size"]:
-        print("Waiting for buffer to fill up")
-        time.sleep(1)
-
     test_set = create_testset(config)
     optimizer = get_optimizer(model, config)
     scheduler = get_scheduler(optimizer, config)
@@ -117,6 +113,10 @@ def training_function(model, device, inference_models, buffer, stop_event):
             "batch": 0,
         }
     )
+
+    while len(buffer) < config["train"]["batch_size"]:
+        print("Waiting for buffer to fill up")
+        time.sleep(1)
 
     model.train()
     for i in tqdm(range(1, int(config["train"]["train_for_n_batches"]) + 1)):
