@@ -109,7 +109,14 @@ def training_function(model, device, inference_models, buffer, stop_event):
     test_set = create_testset(config)
     optimizer = get_optimizer(model, config)
     scheduler = get_scheduler(optimizer, config)
-    best_model_score, _ = test_network(model, test_set, config, device)
+    best_model_score, initial_reshuffles = test_network(model, test_set, config, device)
+    wandb.log(
+        {
+            "eval_moves": best_model_score,
+            "eval_reshuffles": initial_reshuffles,
+            "batch": 0,
+        }
+    )
 
     model.train()
     for i in tqdm(range(1, int(config["train"]["train_for_n_batches"]) + 1)):
