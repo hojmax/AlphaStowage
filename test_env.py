@@ -35,22 +35,6 @@ import numpy as np
 # noise = np.random.dirichlet(np.zeros_like(probabilities) + dirichlet_alpha)
 # print(noise)
 
-"""
-[[0 0]
- [0 0]
- [0 0]
- [0 0]
- [0 0]
- [0 0]]
-[[0 10  0  0  2  0]
- [0  0  5  5  0  0]
- [0  0  0  0  5  0]
- [0  0  0  0  0  5]
- [0  0  0  0  0  0]
- [0  0  0  0  0  0]]
-"""
-
-
 env = Env(R=6, C=2, N=6, skip_last_port=True)
 env.reset_to_transportation(
     np.array(
