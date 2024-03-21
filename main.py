@@ -165,8 +165,8 @@ def get_model_weights_path(wandb_run, wandb_model):
 
 if __name__ == "__main__":
     use_prev_model = {
-        "wandb_run": "alphastowage/AlphaStowage/2gqbl328",
-        "wandb_model": "model360000.pt",
+        "wandb_run": "alphastowage/AlphaStowage/camwudzo",
+        "wandb_model": "model20000.pt",
     }
     config = get_config()
     config["use_baseline_policy"] = False
