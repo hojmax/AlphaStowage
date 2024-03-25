@@ -65,6 +65,8 @@ def select(node, cpuct):
 
 def get_torch_obs(env):
     bay = torch.from_numpy(env.one_hot_bay).unsqueeze(0).float()
+    summed_over_ports = bay.sum(dim=1, keepdim=True)
+    bay = summed_over_ports / bay.size(1)
     flat_t = torch.from_numpy(env.flat_T).unsqueeze(0).float()
     mask = torch.from_numpy(env.action_masks()).unsqueeze(0).float()
     return bay, flat_t, mask

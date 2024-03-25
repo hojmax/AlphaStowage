@@ -1,7 +1,7 @@
 {
   "train": {
     "l2_weight_reg": 0.0001,
-    "batch_size": 512,
+    "batch_size": 32,
     "learning_rate": 0.001,
     "scheduler_step_size_in_batches": 1e5,
     "scheduler_gamma": 0.5,
@@ -13,7 +13,7 @@
   "mcts": {
     "c_puct": 5,
     "temperature": 0.6,
-    "search_iterations": 100,
+    "search_iterations": 5,
     "dirichlet_weight": 0.25,
     "dirichlet_alpha": 1
   },
@@ -23,6 +23,7 @@
     "N": 6
   },
   "nn": {
+    "action_space": 4,
     "blocks": 16,
     "hidden_channels": 32,
     "hidden_kernel_size": 3,
@@ -33,9 +34,10 @@
     "value_channels": 1,
     "value_kernel_size": 1,
     "value_stride": 1,
-    "value_hidden": 256
+    "value_hidden": 256,
+    "embedding_dim": 256
   },
   "eval": {
-    "testset_size": 100
+    "testset_size": 1
   }
 }
