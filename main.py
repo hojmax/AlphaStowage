@@ -17,6 +17,8 @@ import wandb
 from Node import TruncatedEpisodeError
 import time
 
+log_wandb = False
+
 
 class ReplayBuffer:
     def __init__(self, capacity):
@@ -82,7 +84,8 @@ def inference_function(model, device, buffer, stop_event):
         except TruncatedEpisodeError:
             pass
         env.close()
-        wandb.log({"episode": episode, "value": value, "reshuffles": reshuffles})
+        if log_wandb:
+            wandb.log({"episode": episode, "value": value, "reshuffles": reshuffles})
 
 
 def update_inference_params(model, inference_models, config):
@@ -106,13 +109,14 @@ def training_function(model, device, inference_models, buffer, stop_event):
     optimizer = get_optimizer(model, config)
     scheduler = get_scheduler(optimizer, config)
     best_model_score, initial_reshuffles = test_network(model, test_set, config, device)
-    wandb.log(
-        {
-            "eval_moves": best_model_score,
-            "eval_reshuffles": initial_reshuffles,
-            "batch": 0,
-        }
-    )
+    if log_wandb:
+        wandb.log(
+            {
+                "eval_moves": best_model_score,
+                "eval_reshuffles": initial_reshuffles,
+                "batch": 0,
+            }
+        )
 
     while len(buffer) < config["train"]["batch_size"]:
         print("Waiting for buffer to fill up")
@@ -122,12 +126,16 @@ def training_function(model, device, inference_models, buffer, stop_event):
     for i in tqdm(range(1, int(config["train"]["train_for_n_batches"]) + 1)):
         if i % config["train"]["batches_before_eval"] == 0:
             avg_error, avg_reshuffles = test_network(model, test_set, config, device)
-            log_eval(avg_error, avg_reshuffles, i)
+            if log_wandb:
+                log_eval(avg_error, avg_reshuffles, i)
+            else:
+                print(f"Eval moves: {avg_error}, Eval reshuffles: {avg_reshuffles}")
             if avg_error > best_model_score:
                 best_model_score = avg_error
                 update_inference_params(model, inference_models, config)
-                torch.save(model.state_dict(), f"model{i}.pt")
-                wandb.save(f"model{i}.pt")
+                if log_wandb:
+                    torch.save(model.state_dict(), f"model{i}.pt")
+                    wandb.save(f"model{i}.pt")
 
         avg_loss, avg_value_loss, avg_cross_entropy = train_batch(
             model,
@@ -138,15 +146,20 @@ def training_function(model, device, inference_models, buffer, stop_event):
             config["train"]["value_scaling"],
             device,
         )
-        wandb.log(
-            {
-                "loss": avg_loss,
-                "value_loss": avg_value_loss,
-                "cross_entropy": avg_cross_entropy,
-                "batch": i,
-                "lr": optimizer.param_groups[0]["lr"],
-            }
-        )
+        if log_wandb:
+            wandb.log(
+                {
+                    "loss": avg_loss,
+                    "value_loss": avg_value_loss,
+                    "cross_entropy": avg_cross_entropy,
+                    "batch": i,
+                    "lr": optimizer.param_groups[0]["lr"],
+                }
+            )
+        else:
+            print(
+                f"Batch: {i}, Loss: {avg_loss}, Value Loss: {avg_value_loss}, Cross Entropy: {avg_cross_entropy}, LR: {optimizer.param_groups[0]['lr']}"
+            )
 
     for env in test_set:
         env.close()
@@ -164,10 +177,11 @@ def get_model_weights_path(wandb_run, wandb_model):
 
 
 if __name__ == "__main__":
-    use_prev_model = {
-        "wandb_run": "alphastowage/AlphaStowage/camwudzo",
-        "wandb_model": "model20000.pt",
-    }
+    # use_prev_model = {
+    #     "wandb_run": "alphastowage/AlphaStowage/camwudzo",
+    #     "wandb_model": "model20000.pt",
+    # }
+    use_prev_model = None
     config = get_config()
     config["use_baseline_policy"] = False
     buffer = ReplayBuffer(config["train"]["max_data"])
@@ -194,9 +208,10 @@ if __name__ == "__main__":
             torch.load(model_weights_path, map_location=inference_device2)
         )
 
-    wandb.init(
-        entity="alphastowage", project="AlphaStowage", config=config, save_code=True
-    )
+    if log_wandb:
+        wandb.init(
+            entity="alphastowage", project="AlphaStowage", config=config, save_code=True
+        )
 
     inference_thread1 = threading.Thread(
         target=inference_function,
@@ -226,5 +241,6 @@ if __name__ == "__main__":
     inference_thread2.join()
     inference_thread1.join()
 
-    torch.save(training_model.state_dict(), "final_model.pt")
-    wandb.save("final_model.pt")
+    if log_wandb:
+        torch.save(training_model.state_dict(), "final_model.pt")
+        wandb.save("final_model.pt")
