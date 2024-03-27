@@ -59,7 +59,7 @@ class NeuralNetwork(nn.Module):
         super().__init__()
         self.env_config = config["env"]
         nn_config = config["nn"]
-        input_channels = self.env_config["N"]
+        input_channels = 2
 
         layers = []
         layers.append(

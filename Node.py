@@ -63,16 +63,55 @@ def select(node, cpuct):
     return max(valid_children, key=lambda x: x.uct)
 
 
-def get_torch_obs(env):
-    bay = torch.from_numpy(env.one_hot_bay).unsqueeze(0).float()
-    flat_t = torch.from_numpy(env.flat_T).unsqueeze(0).float()
+def find_last_nonzero_row(array):
+    if array.ndim != 2:
+        raise ValueError("Input must be a 2D array.")
+    non_zero_rows = np.any(array != 0, axis=1)
+    non_zero_row_indices = np.where(non_zero_rows)[0]
+
+    # Return the last index if exists, otherwise return number of rows
+    return non_zero_row_indices[-1] if non_zero_row_indices.size > 0 else array.shape[0]
+
+
+def get_torch_obs(env, config):
+    remaining_ports = find_last_nonzero_row(env.T) + 1
+
+    bay = torch.from_numpy(env.bay).unsqueeze(0).unsqueeze(0).float()
+    bay = bay / (
+        remaining_ports + 1
+    )  # Normalize the bay (+1 to allow dummy containers)
+
+    # Pad the bay with 1s from the right and bottom to have a fixed size
+    max_R = config["env"]["R"]
+    max_C = config["env"]["C"]
+    desired_shape = (max_R, max_C)
+    bay = torch.nn.functional.pad(
+        bay,
+        (0, desired_shape[1] - bay.shape[3], 0, desired_shape[0] - bay.shape[2]),
+        value=1,
+    )
+
+    flat_t = env.flat_T / (env.R * env.C)  # Normalize the flat_T
+
+    # Pad the flat_T with zeros to have a fixed size
+    max_N = config["env"]["N"]
+    desired_length = max_N * (max_N - 1) // 2
+    flat_t = np.pad(
+        flat_t, (0, desired_length - flat_t.shape[0]), "constant", constant_values=0
+    )
+
+    flat_t = torch.from_numpy(flat_t).unsqueeze(0).float()
     mask = torch.from_numpy(env.action_masks()).unsqueeze(0).float()
+
+    # Pad mask with zeros to have a fixed size (2*max_C)
+    mask = torch.nn.functional.pad(mask, (0, 2 * max_C - mask.shape[1]), value=0)
+
     return bay, flat_t, mask
 
 
-def run_network(node, neural_network, device):
+def run_network(node, neural_network, device, config):
     with torch.no_grad():
-        bay, flat_t, mask = get_torch_obs(node.env)
+        bay, flat_t, mask = get_torch_obs(node.env, config)
         probabilities, state_value = neural_network(
             bay.to(device), flat_t.to(device), mask.to(device)
         )
@@ -81,11 +120,11 @@ def run_network(node, neural_network, device):
     return probabilities, state_value
 
 
-def get_prob_and_value(node, neural_network, device, transposition_table):
+def get_prob_and_value(node, neural_network, device, transposition_table, config):
     if node.env in transposition_table:
         probabilities, state_value = transposition_table[node.env]
     else:
-        probabilities, state_value = run_network(node, neural_network, device)
+        probabilities, state_value = run_network(node, neural_network, device, config)
         transposition_table[node.env] = (probabilities, state_value)
 
     return probabilities, state_value - node.depth  # Counting the already made moves
@@ -110,9 +149,10 @@ def expand_node(
     device,
     transposition_table,
     cpuct,
+    config,
 ):
     probabilities, state_value = get_prob_and_value(
-        node, neural_network, device, transposition_table
+        node, neural_network, device, transposition_table, config
     )
 
     if is_root(node):
@@ -140,6 +180,7 @@ def evaluate(
     device,
     transposition_table,
     cpuct,
+    config,
 ):
     if node.env.terminal:
         return -node.env.moves_to_solve
@@ -152,6 +193,7 @@ def evaluate(
             device,
             transposition_table,
             cpuct,
+            config,
         )
         return state_value
 
@@ -240,6 +282,7 @@ def alpha_zero_search(
     dirichlet_weight,
     dirichlet_alpha,
     device,
+    config,
     reused_tree=None,
     transposition_table={},
 ):
@@ -257,6 +300,7 @@ def alpha_zero_search(
             device,
             transposition_table,
             cpuct,
+            config,
         )
 
         backup(node, state_value)

@@ -16,6 +16,7 @@ import numpy as np
 import wandb
 from Node import TruncatedEpisodeError
 import time
+import random
 
 log_wandb = False
 
@@ -68,9 +69,12 @@ def inference_function(model, device, buffer, stop_event):
             time.sleep(1)
             continue
         env = Env(
-            config["env"]["R"],
-            config["env"]["C"],
-            config["env"]["N"],
+            # config["env"]["R"],
+            # config["env"]["C"],
+            # config["env"]["N"],
+            random.choice(range(2, config["env"]["R"] + 1, 2)),
+            random.choice(range(2, config["env"]["C"] + 1, 2)),
+            random.choice(range(4, config["env"]["N"] + 1, 2)),
             skip_last_port=True,
             take_first_action=True,
             strict_mask=True,

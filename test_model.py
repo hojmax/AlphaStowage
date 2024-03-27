@@ -170,6 +170,7 @@ print("Eval Moves:", avg_error, "Eval Reshuffles:", avg_reshuffles)
 #     config["mcts"]["dirichlet_weight"],
 #     config["mcts"]["dirichlet_alpha"],
 #     device="cpu",
+#     config=config,
 # )
 # env.print()
 # torch.set_printoptions(precision=3, sci_mode=False)
@@ -207,6 +208,7 @@ print("Eval Moves:", avg_error, "Eval Reshuffles:", avg_reshuffles)
 #         config["mcts"]["dirichlet_weight"],
 #         config["mcts"]["dirichlet_alpha"],
 #         device="cpu",
+#         config=config,
 #     )
 #     draw_tree(root)
 

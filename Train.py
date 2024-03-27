@@ -1,9 +1,7 @@
 import torch
-import torch.nn as nn
 import torch.optim as optim
 import Node
 import numpy as np
-import wandb
 import json
 from MPSPEnv import Env
 from Node import (
@@ -12,6 +10,7 @@ from Node import (
     close_envs_in_tree,
     TruncatedEpisodeError,
 )
+import random
 
 
 def loss_fn(pred_value, value, pred_prob, prob, value_scaling):
@@ -122,6 +121,7 @@ def play_episode(env, net, config, device, deterministic=False):
                 config["mcts"]["dirichlet_weight"],
                 config["mcts"]["dirichlet_alpha"],
                 device,
+                config,
                 reused_tree,
                 transposition_table,
             )
@@ -130,7 +130,7 @@ def play_episode(env, net, config, device, deterministic=False):
             else:
                 action = np.random.choice(2 * env.C, p=probabilities)
 
-        episode_data.append((get_torch_obs(env), probabilities))
+        episode_data.append((get_torch_obs(env, config), probabilities))
         env.step(action)
 
         if reused_tree != None:
@@ -160,9 +160,12 @@ def create_testset(config):
     testset = []
     for i in range(config["eval"]["testset_size"]):
         env = Env(
-            config["env"]["R"],
-            config["env"]["C"],
-            config["env"]["N"],
+            # config["env"]["R"],
+            # config["env"]["C"],
+            # config["env"]["N"],
+            random.choice(range(2, config["env"]["R"] + 1, 2)),
+            random.choice(range(2, config["env"]["C"] + 1, 2)),
+            random.choice(range(4, config["env"]["N"] + 1, 2)),
             skip_last_port=True,
             take_first_action=True,
             strict_mask=True,
