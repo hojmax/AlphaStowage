@@ -19,7 +19,7 @@ from Node import TruncatedEpisodeError
 import time
 import random
 
-log_wandb = False
+log_wandb = True
 
 
 class ReplayBuffer:
