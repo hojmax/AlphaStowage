@@ -106,38 +106,45 @@ def transform_benchmarking_data(data):
     return testset
 
 
-run_path = "alphastowage/AlphaStowage/yutq5gbe"
-model_path = "model15000.pt"
-api = wandb.Api()
-run = api.run(run_path)
-file = run.file(model_path)
-file.download(replace=True)
-config = run.config
+if __name__ == "__main__":
+    run_path = "alphastowage/AlphaStowage/yutq5gbe"
+    model_path = "model15000.pt"
+    api = wandb.Api()
+    run = api.run(run_path)
+    file = run.file(model_path)
+    file.download(replace=True)
+    config = run.config
 
-net = NeuralNetwork(config=config)
-net.load_state_dict(torch.load(model_path, map_location="cpu"))
+    net = NeuralNetwork(config=config)
+    net.load_state_dict(torch.load(model_path, map_location="cpu"))
 
-config = get_config()
-config["use_baseline_policy"] = False
-test_set = create_testset(config)
-avg_error, avg_reshuffles = test_network(net, test_set, config, "cpu")
-print("Random testset:")
-print("Eval Moves:", avg_error, "Eval Reshuffles:", avg_reshuffles)
+    config = get_config()
+    config["use_baseline_policy"] = False
+    test_set = create_testset(config)
+    avg_error, avg_reshuffles = test_network(net, test_set, config, "cpu")
+    print("Random testset:")
+    print("Eval Moves:", avg_error, "Eval Reshuffles:", avg_reshuffles)
 
+    # (R, C, N)
+    combinations = [
+        (6, 2, 6),
+        (6, 4, 8),
+    ]
 
-data = get_benchmarking_data("/Users/axelhojmark/Desktop/rl-mpsp-benchmark/set_2")
-data = [
-    e
-    for e in data
-    if e["N"] == config["env"]["N"]
-    and e["R"] == config["env"]["R"]
-    and e["C"] == config["env"]["C"]
-]
-data = transform_benchmarking_data(data)
+    data = get_benchmarking_data("benchmark/set_2")
+    data = [
+        e
+        for combination in combinations
+        for e in data
+        if e["N"] == combination[2]
+        and e["R"] == combination[0]
+        and e["C"] == combination[1]
+    ]
+    data = transform_benchmarking_data(data)
 
-avg_error, avg_reshuffles = test_network(net, data, config, "cpu")
-print("Benchmarking testset:")
-print("Eval Moves:", avg_error, "Eval Reshuffles:", avg_reshuffles)
+    avg_error, avg_reshuffles = test_network(net, data, config, "cpu")
+    print("Benchmarking testset:")
+    print("Eval Moves:", avg_error, "Eval Reshuffles:", avg_reshuffles)
 
 # env = Env(
 #     config["env"]["R"],

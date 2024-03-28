@@ -8,6 +8,7 @@ from Train import (
     get_scheduler,
     train_batch,
 )
+from test_model import transform_benchmarking_data, get_benchmarking_data
 import torch
 from NeuralNetwork import NeuralNetwork
 from MPSPEnv import Env
@@ -18,7 +19,7 @@ from Node import TruncatedEpisodeError
 import time
 import random
 
-log_wandb = False
+log_wandb = True
 
 
 class ReplayBuffer:
@@ -72,7 +73,7 @@ def inference_function(model, device, buffer, stop_event):
             # config["env"]["R"],
             # config["env"]["C"],
             # config["env"]["N"],
-            random.choice(range(2, config["env"]["R"] + 1, 2)),
+            random.choice(range(6, config["env"]["R"] + 1, 2)),
             random.choice(range(2, config["env"]["C"] + 1, 2)),
             random.choice(range(4, config["env"]["N"] + 1, 2)),
             skip_last_port=True,
@@ -109,7 +110,22 @@ def log_eval(avg_error, avg_reshuffles, i):
 
 
 def training_function(model, device, inference_models, buffer, stop_event):
-    test_set = create_testset(config)
+    # test_set = create_testset(config)
+    combinations = [
+        (6, 2, 6),
+        (6, 4, 8),
+    ]
+
+    test_set = get_benchmarking_data("benchmark/set_2")
+    test_set = [
+        e
+        for combination in combinations
+        for e in test_set
+        if e["N"] == combination[2]
+        and e["R"] == combination[0]
+        and e["C"] == combination[1]
+    ]
+    test_set = transform_benchmarking_data(test_set)
     optimizer = get_optimizer(model, config)
     scheduler = get_scheduler(optimizer, config)
     best_model_score, initial_reshuffles = test_network(model, test_set, config, device)
