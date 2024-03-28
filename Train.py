@@ -92,10 +92,12 @@ def train_batch(
     )
 
 
-def baseline_policy(env):
+def baseline_policy(env, config):
     policy = BaselinePolicy(env.C, env.N)
     action, _ = policy.predict(env.one_hot_bay)
-    probabilities = torch.zeros(2 * env.C) + 0.1 / (2 * env.C - 1)
+    probabilities = torch.zeros(2 * config["env"]["C"]) + 0.1 / (
+        2 * config["env"]["C"] - 1
+    )
     probabilities[action] = 0.9
     return action, probabilities
 
@@ -110,7 +112,7 @@ def play_episode(env, net, config, device, deterministic=False):
 
     while not env.terminal:
         if config["use_baseline_policy"]:
-            action, probabilities = baseline_policy(env)
+            action, probabilities = baseline_policy(env, config)
         else:
             reused_tree, probabilities, transposition_table = Node.alpha_zero_search(
                 env,
