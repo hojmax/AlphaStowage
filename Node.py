@@ -228,14 +228,14 @@ def remove_all_pruning(node):
         remove_all_pruning(child)
 
 
-def get_tree_probs(node, temperature):
+def get_tree_probs(node, temperature, config):
     action_probs = [
         (
             np.power(node.children[i].visit_count, 1 / temperature)
             if i in node.children
             else 0
         )
-        for i in range(2 * node.env.C)
+        for i in range(2 * config["env"]["C"])
     ]
     return torch.tensor(action_probs) / sum(action_probs)
 
@@ -308,4 +308,8 @@ def alpha_zero_search(
         if node.env.terminal:
             best_score = max(best_score, state_value)
 
-    return root_node, get_tree_probs(root_node, temperature), transposition_table
+    return (
+        root_node,
+        get_tree_probs(root_node, temperature, config),
+        transposition_table,
+    )

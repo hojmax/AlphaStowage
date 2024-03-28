@@ -128,7 +128,7 @@ def play_episode(env, net, config, device, deterministic=False):
             if deterministic:
                 action = torch.argmax(probabilities).item()
             else:
-                action = np.random.choice(2 * env.C, p=probabilities)
+                action = np.random.choice(2 * config["env"]["C"], p=probabilities)
 
         episode_data.append((get_torch_obs(env, config), probabilities))
         env.step(action)
