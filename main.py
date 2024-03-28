@@ -203,7 +203,6 @@ if __name__ == "__main__":
     # }
     use_prev_model = None
     config = get_config()
-    config["use_baseline_policy"] = False
     buffer = ReplayBuffer(config["train"]["max_data"])
     stop_event = threading.Event()
     training_device = torch.device("cuda:0") if torch.cuda.is_available() else "cpu"
@@ -215,6 +214,7 @@ if __name__ == "__main__":
     inference_model2 = NeuralNetwork(config).to(inference_device2)
 
     if use_prev_model:
+        config["use_baseline_policy"] = False
         model_weights_path = get_model_weights_path(
             use_prev_model["wandb_run"], use_prev_model["wandb_model"]
         )

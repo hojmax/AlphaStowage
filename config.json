@@ -6,9 +6,9 @@
     "scheduler_step_size_in_batches": 1e5,
     "scheduler_gamma": 0.5,
     "train_for_n_batches": 5e5,
-    "max_data": 210000,
+    "max_data": 300000,
     "value_scaling": 0.1,
-    "batches_before_eval": 5000
+    "batches_before_eval": 1000
   },
   "mcts": {
     "c_puct": 5,
