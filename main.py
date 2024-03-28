@@ -63,12 +63,12 @@ def inference_function(model, device, buffer, stop_event):
     model.eval()
 
     while not stop_event.is_set():
-        # if (
-        #     config["use_baseline_policy"]
-        #     and len(buffer.buffer) >= config["train"]["max_data"]
-        # ):
-        #     time.sleep(1)
-        #     continue
+        if (
+            config["use_baseline_policy"]
+            and len(buffer.buffer) >= config["train"]["max_data"]
+        ):
+            time.sleep(1)
+            continue
         env = Env(
             # config["env"]["R"],
             # config["env"]["C"],
@@ -214,7 +214,7 @@ if __name__ == "__main__":
     inference_model2 = NeuralNetwork(config).to(inference_device2)
 
     if use_prev_model:
-        # config["use_baseline_policy"] = False
+        config["use_baseline_policy"] = False
         model_weights_path = get_model_weights_path(
             use_prev_model["wandb_run"], use_prev_model["wandb_model"]
         )
