@@ -55,8 +55,9 @@ class Residual_Block(nn.Module):
 
 
 class NeuralNetwork(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, device):
         super().__init__()
+        self.device = device
         self.env_config = config["env"]
         nn_config = config["nn"]
         input_channels = 2
@@ -82,12 +83,13 @@ class NeuralNetwork(nn.Module):
 
         self.layers = nn.Sequential(*layers)
 
-        self.flat_T_reshaper = nn.Linear(
-            self.env_config["N"] * (self.env_config["N"] - 1) // 2,
-            self.env_config["R"] * self.env_config["C"],
+        self.flat_T_reshaper = nn.Sequential(
+            nn.Linear(
+                self.env_config["N"] * (self.env_config["N"] - 1) // 2,
+                self.env_config["R"] * self.env_config["C"],
+            ),
+            nn.Sigmoid(),
         )
-
-        self.sigmoid = nn.Sigmoid()
 
         self.policy_head = nn.Sequential(
             nn.Conv2d(
@@ -105,6 +107,7 @@ class NeuralNetwork(nn.Module):
                 * self.env_config["C"],
                 2 * self.env_config["C"],
             ),
+            nn.Softmax(dim=1),
         )
 
         self.value_head = nn.Sequential(
@@ -127,14 +130,12 @@ class NeuralNetwork(nn.Module):
             nn.Linear(nn_config["value_hidden"], 1),
         )
 
-    def forward(self, bay, flat_T, mask):
+    def forward(self, bay, flat_T):
         flat_T = self.flat_T_reshaper(flat_T)
-        flat_T = self.sigmoid(flat_T)
         flat_T = flat_T.view(-1, 1, self.env_config["R"], self.env_config["C"])
+        bay = bay.view(-1, 1, self.env_config["R"], self.env_config["C"])
         x = torch.cat([bay, flat_T], dim=1)
         out = self.layers(x)
         policy = self.policy_head(out)
-        # policy = policy - (1 - mask) * 1e9
-        policy = torch.softmax(policy, dim=-1)
         value = self.value_head(out)
         return policy, value

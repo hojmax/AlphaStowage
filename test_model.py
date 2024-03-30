@@ -119,7 +119,7 @@ if __name__ == "__main__":
     net.load_state_dict(torch.load(model_path, map_location="cpu"))
 
     config = get_config()
-    config["use_baseline_policy"] = False
+    config["train"]["use_baseline_policy"] = False
     test_set = create_testset(config)
     avg_error, avg_reshuffles = test_network(net, test_set, config, "cpu")
     print("Random testset:")
@@ -181,8 +181,8 @@ if __name__ == "__main__":
 # )
 # env.print()
 # torch.set_printoptions(precision=3, sci_mode=False)
-# bay, flat_t, mask = get_torch_obs(env)
-# probabilities, state_value = net(bay, flat_t, mask)
+# bay, flat_t = get_torch_obs(env)
+# probabilities, state_value = net(bay, flat_t)
 # print("Net Probs:", probabilities, "Net Value:", state_value)
 # print("MCTS Probs:", probs)
 

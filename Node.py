@@ -101,20 +101,14 @@ def get_torch_obs(env, config):
     )
 
     flat_t = torch.from_numpy(flat_t).unsqueeze(0).float()
-    mask = torch.from_numpy(env.action_masks()).unsqueeze(0).float()
 
-    # Pad mask with zeros to have a fixed size (2*max_C)
-    mask = torch.nn.functional.pad(mask, (0, 2 * max_C - mask.shape[1]), value=0)
-
-    return bay, flat_t, mask
+    return bay, flat_t
 
 
 def run_network(node, neural_network, device, config):
     with torch.no_grad():
-        bay, flat_t, mask = get_torch_obs(node.env, config)
-        probabilities, state_value = neural_network(
-            bay.to(device), flat_t.to(device), mask.to(device)
-        )
+        bay, flat_t = get_torch_obs(node.env, config)
+        probabilities, state_value = neural_network(bay.to(device), flat_t.to(device))
         probabilities = probabilities.detach().cpu().numpy().squeeze()
         state_value = state_value.detach().cpu().numpy().squeeze()
     return probabilities, state_value

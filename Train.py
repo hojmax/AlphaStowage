@@ -16,10 +16,7 @@ import random
 def loss_fn(pred_value, value, pred_prob, prob, value_scaling):
     value_error = torch.mean(torch.square(value - pred_value))
     cross_entropy = (
-        -torch.sum(
-            prob.flatten() * torch.log(pred_prob.flatten())
-        )  # add 1e-8 if mask is used
-        / prob.shape[0]
+        -torch.sum(prob.flatten() * torch.log(pred_prob.flatten())) / prob.shape[0]
     )
     loss = value_scaling * value_error + cross_entropy
     return loss, value_error, cross_entropy
@@ -69,13 +66,12 @@ class BaselinePolicy:
 def train_batch(
     network, buffer, batch_size, optimizer, scheduler, value_scaling, device
 ):
-    bay, flat_T, mask, prob, value = buffer.sample(batch_size)
+    bay, flat_T, prob, value = buffer.sample(batch_size)
     bay = bay.to(device)
     flat_T = flat_T.to(device)
-    mask = mask.to(device)
     prob = prob.to(device)
     value = value.to(device)
-    pred_prob, pred_value = network(bay, flat_T, mask)
+    pred_prob, pred_value = network(bay, flat_T)
     loss, value_loss, cross_entropy = optimize_network(
         pred_value=pred_value,
         value=value,
@@ -111,7 +107,7 @@ def play_episode(env, net, config, device, deterministic=False):
     transposition_table = {}
 
     while not env.terminal:
-        if config["use_baseline_policy"]:
+        if config["train"]["use_baseline_policy"]:
             action, probabilities = baseline_policy(env, config)
         else:
             reused_tree, probabilities, transposition_table = Node.alpha_zero_search(
@@ -132,7 +128,8 @@ def play_episode(env, net, config, device, deterministic=False):
             else:
                 action = np.random.choice(2 * config["env"]["C"], p=probabilities)
 
-        episode_data.append((get_torch_obs(env, config), probabilities))
+        bay, flat_T = get_torch_obs(env, config)
+        episode_data.append([bay, flat_T, probabilities])
         env.step(action)
 
         if reused_tree != None:
@@ -149,29 +146,29 @@ def play_episode(env, net, config, device, deterministic=False):
 
     if reused_tree:
         close_envs_in_tree(reused_tree)
-    output_data = []
-    real_value = -env.moves_to_solve
-    reshuffles = env.total_reward
-    for i, (state, probabilities) in enumerate(episode_data):
-        output_data.append((state, probabilities, real_value + i))
 
-    return output_data, real_value, reshuffles
+    output_data = []
+    for i, sample in enumerate(episode_data):
+        output_data.append(sample + [torch.tensor(-env.moves_to_solve + i)])
+
+    return output_data, -env.moves_to_solve, env.total_reward
+
+
+def get_env(config):
+    return Env(
+        random.choice(range(6, config["env"]["R"] + 1, 2)),
+        random.choice(range(2, config["env"]["C"] + 1, 2)),
+        random.choice(range(4, config["env"]["N"] + 1, 2)),
+        skip_last_port=True,
+        take_first_action=True,
+        strict_mask=True,
+    )
 
 
 def create_testset(config):
     testset = []
     for i in range(config["eval"]["testset_size"]):
-        env = Env(
-            # config["env"]["R"],
-            # config["env"]["C"],
-            # config["env"]["N"],
-            random.choice(range(6, config["env"]["R"] + 1, 2)),
-            random.choice(range(2, config["env"]["C"] + 1, 2)),
-            random.choice(range(4, config["env"]["N"] + 1, 2)),
-            skip_last_port=True,
-            take_first_action=True,
-            strict_mask=True,
-        )
+        env = get_env(config)
         env.reset(i)
         testset.append(env)
     return testset
@@ -214,8 +211,6 @@ def get_device():
 def get_config():
     with open("config.json", "r") as f:
         config = json.load(f)
-
-    config["use_baseline_policy"] = True
 
     return config
 

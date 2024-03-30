@@ -28,8 +28,6 @@ def count_possible_transportation(port, matrix):
 
 count = 0
 for matrix in count_possible_transportation(0, [[12, 0, 0, 0, 0, 0]]):
-    # print(matrix)
-    # time.sleep(0.4)
     count += 1
 
 print(count)
