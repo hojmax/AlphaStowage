@@ -1,6 +1,5 @@
 wandb
 tqdm
 pygame
-networkx
 MPSPEnv==0.0.20
 torch
