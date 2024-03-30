@@ -145,6 +145,7 @@ def get_env(config):
 def create_testset(config):
     testset = []
     for i in range(config["eval"]["testset_size"]):
+        np.random.seed(i)
         env = get_env(config)
         env.reset(i)
         testset.append(env)
