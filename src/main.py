@@ -106,7 +106,7 @@ def training_loop(
     evaluator = Evaluator(model, inference_models, config)
     model.train()
 
-    while len(buffer) == 0:
+    while len(buffer) < config["train"]["batch_size"]:
         print("Waiting for buffer to fill up...")
         time.sleep(1)
 

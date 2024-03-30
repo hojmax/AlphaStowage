@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 
-class Convulutional_Block(nn.Module):
+class Convolutional_Block(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride):
         super().__init__()
         self.conv1 = nn.Conv2d(
@@ -64,7 +64,7 @@ class NeuralNetwork(nn.Module):
 
         layers = []
         layers.append(
-            Convulutional_Block(
+            Convolutional_Block(
                 input_channels,
                 nn_config["hidden_channels"],
                 nn_config["hidden_kernel_size"],
