@@ -42,14 +42,16 @@ def log_batch(
         )
 
 
-def log_eval(avg_error: float, avg_reshuffles: float, i: int, config: dict):
+def log_eval(avg_error: float, avg_reshuffles: float, config: dict, batch: int):
     if config["train"]["log_wandb"]:
         wandb.log(
             {
                 "eval_moves": avg_error,
                 "eval_reshuffles": avg_reshuffles,
-                "batch": i,
+                "batch": batch,
             }
         )
     else:
-        print(f"*Eval {i}* Avg. Value: {avg_error}, Avg. Reshuffles: {avg_reshuffles}")
+        print(
+            f"*Eval {batch}* Avg. Value: {avg_error}, Avg. Reshuffles: {avg_reshuffles}"
+        )

@@ -121,7 +121,7 @@ if __name__ == "__main__":
     config = get_config()
     config["train"]["use_baseline_policy"] = False
     test_set = create_testset(config)
-    avg_error, avg_reshuffles = test_network(net, test_set, config, "cpu")
+    avg_error, avg_reshuffles = test_network(net, test_set, config)
     print("Random testset:")
     print("Eval Moves:", avg_error, "Eval Reshuffles:", avg_reshuffles)
 
@@ -142,7 +142,7 @@ if __name__ == "__main__":
     ]
     data = transform_benchmarking_data(data)
 
-    avg_error, avg_reshuffles = test_network(net, data, config, "cpu")
+    avg_error, avg_reshuffles = test_network(net, data, config)
     print("Benchmarking testset:")
     print("Eval Moves:", avg_error, "Eval Reshuffles:", avg_reshuffles)
 

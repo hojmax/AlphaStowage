@@ -11,6 +11,9 @@ from Node import (
     TruncatedEpisodeError,
 )
 import random
+import warnings
+import wandb
+from NeuralNetwork import NeuralNetwork
 
 
 def loss_fn(pred_value, value, pred_prob, prob, value_scaling):
@@ -174,9 +177,11 @@ def create_testset(config):
     return testset
 
 
-def test_network(net, testset, config, device):
+def test_network(model, testset, config):
+    was_training = model.training
+
     with torch.no_grad():
-        net.eval()
+        model.eval()
         avg_error = 0
         avg_reshuffles = 0
 
@@ -184,11 +189,12 @@ def test_network(net, testset, config, device):
             copy_env = env.copy()
             try:
                 _, value, reshuffles = play_episode(
-                    copy_env, net, config, device, deterministic=True
+                    copy_env, model, config, model.device, deterministic=True
                 )
                 avg_error += value
                 avg_reshuffles += reshuffles
             except TruncatedEpisodeError:
+                warnings.warn("Episode was truncated during evaluation.")
                 avg_error += -env.N * env.R * env.C
                 avg_reshuffles += -1e9
 
@@ -196,8 +202,18 @@ def test_network(net, testset, config, device):
 
         avg_error /= len(testset)
         avg_reshuffles /= len(testset)
-        net.train()
-        return avg_error, avg_reshuffles
+
+    model.train(mode=was_training)
+
+    return avg_error, avg_reshuffles
+
+
+def save_model(model: NeuralNetwork, config: dict, i: int) -> None:
+    model_path = f"model{i}.pt"
+    torch.save(model.state_dict(), model_path)
+
+    if config["train"]["log_wandb"]:
+        wandb.save(model_path)
 
 
 def get_device():

@@ -8,6 +8,7 @@ from Train import (
     get_scheduler,
     train_batch,
     get_env,
+    save_model,
 )
 import torch
 from NeuralNetwork import NeuralNetwork
@@ -32,20 +33,30 @@ class PretrainedModel(TypedDict):
     wandb_model: str = None
 
 
-def update_inference_params(
-    model: NeuralNetwork, inference_models: list, config: dict
-) -> None:
-    config["train"]["use_baseline_policy"] = False
-    for inference_model in inference_models:
-        inference_model.load_state_dict(model.state_dict())
+class Evaluator:
+    def __init__(
+        self, model: NeuralNetwork, inference_models: list[NeuralNetwork], config: dict
+    ):
+        self.model = model
+        self.inference_models = inference_models
+        self.config = config
+        self.test_set = create_testset(config)
+        avg_value, avg_reshuffles = test_network(self.model, self.test_set, self.config)
+        log_eval(avg_value, avg_reshuffles, config, batch=0)
+        self.best_avg_value = avg_value
 
+    def update_inference_params(self) -> None:
+        for inference_model in self.inference_models:
+            inference_model.load_state_dict(self.model.state_dict())
 
-def save_model(model: NeuralNetwork, config: dict, i: int) -> None:
-    model_path = f"model{i}.pt"
-    torch.save(model.state_dict(), model_path)
+    def run(self, batch: int) -> None:
+        avg_value, avg_reshuffles = test_network(self.model, self.test_set, self.config)
+        log_eval(avg_value, avg_reshuffles, config, batch)
 
-    if config["train"]["log_wandb"]:
-        wandb.save(model_path)
+        if avg_value > self.best_avg_value:
+            self.best_avg_value = avg_value
+            self.update_inference_params()
+            save_model(self.model, config, batch)
 
 
 def inference_function(
@@ -66,7 +77,7 @@ def inference_function(
             )
             env.close()
         except TruncatedEpisodeError:
-            warnings.warn("Episode was truncated.")
+            warnings.warn("Episode was truncated in training.")
             env.close()
             continue
 
@@ -83,29 +94,19 @@ def training_function(
     stop_event: threading.Event,
     config: dict,
 ) -> None:
-    test_set = create_testset(config)
+
     optimizer = get_optimizer(model, config)
     scheduler = get_scheduler(optimizer, config)
-    best_model_score, initial_reshuffles = test_network(
-        model, test_set, config, model.device
-    )
-    log_eval(best_model_score, initial_reshuffles, 0, config)
+    evaluator = Evaluator(model, inference_models, config)
 
     while len(buffer) < config["train"]["batch_size"]:
         print("Waiting for buffer to fill up")
         time.sleep(1)
 
     model.train()
-    for i in tqdm(range(1, int(config["train"]["train_for_n_batches"]) + 1)):
-        if i % config["train"]["batches_before_eval"] == 0:
-            avg_error, avg_reshuffles = test_network(
-                model, test_set, config, model.device
-            )
-            log_eval(avg_error, avg_reshuffles, i, config)
-            if avg_error > best_model_score:
-                best_model_score = avg_error
-                update_inference_params(model, inference_models, config)
-                save_model(model, config, i)
+    for batch in tqdm(range(1, int(config["train"]["train_for_n_batches"]) + 1)):
+        if batch % config["train"]["batches_before_eval"] == 0:
+            evaluator.run(batch)
 
         avg_loss, avg_value_loss, avg_cross_entropy = train_batch(
             model,
@@ -117,7 +118,9 @@ def training_function(
             model.device,
         )
         current_lr = scheduler.get_last_lr()[0]
-        log_batch(i, avg_loss, avg_value_loss, avg_cross_entropy, current_lr, config)
+        log_batch(
+            batch, avg_loss, avg_value_loss, avg_cross_entropy, current_lr, config
+        )
 
     for env in test_set:
         env.close()
