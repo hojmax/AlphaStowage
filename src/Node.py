@@ -213,7 +213,7 @@ def remove_all_pruning(node):
 
 
 def get_tree_probs(node, config):
-    action_probs = torch.zeros(2 * config["env"]["C"])
+    action_probs = torch.zeros(2 * config["env"]["C"], dtype=torch.float64)
 
     for i in node.children:
         value = np.power(
@@ -222,9 +222,7 @@ def get_tree_probs(node, config):
         index = i if i < node.env.C else i + config["env"]["C"] - node.env.C
         action_probs[index] = value
 
-    print(action_probs)
-    exit()
-    return torch.tensor(action_probs) / sum(action_probs)
+    return action_probs / torch.sum(action_probs)
 
 
 def prune_and_move_back_up(node):

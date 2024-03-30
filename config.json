@@ -2,14 +2,14 @@
   "train": {
     "log_wandb": false,
     "l2_weight_reg": 0.0001,
-    "batch_size": 10,
+    "batch_size": 512,
     "learning_rate": 0.001,
     "scheduler_step_size_in_batches": 1e5,
     "scheduler_gamma": 0.5,
     "train_for_n_batches": 5e5,
-    "buffer_size": 1000,
+    "buffer_size": 400000,
     "value_scaling": 0.1,
-    "batches_before_eval": 10,
+    "batches_before_eval": 1000,
     "can_only_add": true
   },
   "mcts": {
@@ -25,8 +25,8 @@
     "N": 10
   },
   "nn": {
-    "blocks": 2,
-    "hidden_channels": 2,
+    "blocks": 16,
+    "hidden_channels": 32,
     "hidden_kernel_size": 3,
     "hidden_stride": 1,
     "policy_channels": 2,

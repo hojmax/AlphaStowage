@@ -66,12 +66,41 @@ def train_batch(model, buffer, optimizer, scheduler, config):
     )
 
 
+def get_action(probabilities: torch.Tensor, deterministic: bool, config: dict) -> int:
+    if deterministic:
+        return torch.argmax(probabilities).item()
+    else:
+        return np.random.choice(2 * config["env"]["C"], p=probabilities)
+
+
+def update_tree(reused_tree: Node, action: int, env: Env) -> None:
+    # close the other branches
+    for a in range(2 * env.C):
+        if a != action and a in reused_tree.children:
+            close_envs_in_tree(reused_tree.children[a])
+    reused_tree.env.close()
+
+    reused_tree = reused_tree.children[action]
+    reused_tree.parent = None
+    reused_tree.prior_prob = None
+    remove_all_pruning(reused_tree)
+    return reused_tree
+
+
+def add_value_to_observations(observations, final_value):
+    output = []
+
+    for i, sample in enumerate(observations):
+        output.append(sample + [torch.tensor(final_value + i)])
+
+    return output
+
+
 def play_episode(env, net, config, device, deterministic=False):
     if deterministic:
-        # Seed the Dirichlet noise
         np.random.seed(0)
 
-    episode_data = []
+    observations = []
     reused_tree = None
     transposition_table = {}
 
@@ -84,35 +113,22 @@ def play_episode(env, net, config, device, deterministic=False):
             reused_tree,
             transposition_table,
         )
-        if deterministic:
-            action = torch.argmax(probabilities).item()
-        else:
-            action = np.random.choice(2 * config["env"]["C"], p=probabilities)
+        action = get_action(probabilities, deterministic, config)
 
         bay, flat_T = get_torch_obs(env, config)
-        episode_data.append([bay, flat_T, probabilities])
+        observations.append([bay, flat_T, probabilities])
         env.step(action)
 
-        if reused_tree != None:
-            # close the other branches
-            for a in range(2 * env.C):
-                if a != action and a in reused_tree.children:
-                    close_envs_in_tree(reused_tree.children[a])
-            reused_tree.env.close()
-
-            reused_tree = reused_tree.children[action]
-            reused_tree.parent = None
-            reused_tree.prior_prob = None
-            remove_all_pruning(reused_tree)
+        reused_tree = update_tree(reused_tree, action, env)
 
     if reused_tree:
         close_envs_in_tree(reused_tree)
 
-    output_data = []
-    for i, sample in enumerate(episode_data):
-        output_data.append(sample + [torch.tensor(-env.moves_to_solve + i)])
+    final_value = -env.moves_to_solve
+    reshuffles = env.total_reward
+    observations = add_value_to_observations(observations, final_value)
 
-    return output_data, -env.moves_to_solve, env.total_reward
+    return observations, final_value, reshuffles
 
 
 def get_env(config):
