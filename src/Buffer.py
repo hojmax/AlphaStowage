@@ -11,7 +11,7 @@ class ReplayBuffer:
         self.ptr = 0
         self.size = 0
 
-        bay_size = (self.max_size, config["env"]["R"], config["env"]["C"])
+        bay_size = (self.max_size, 1, config["env"]["R"], config["env"]["C"])
         flat_T_size = (
             self.max_size,
             config["env"]["N"] * (config["env"]["N"] - 1) // 2,

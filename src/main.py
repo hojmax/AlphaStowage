@@ -45,11 +45,14 @@ class Evaluator:
         log_eval(avg_value, avg_reshuffles, config, batch=0)
         self.best_avg_value = avg_value
 
+    def should_eval(self, batch: int) -> bool:
+        return batch % self.config["train"]["batches_before_eval"] == 0
+
     def update_inference_params(self) -> None:
         for inference_model in self.inference_models:
             inference_model.load_state_dict(self.model.state_dict())
 
-    def run(self, batch: int) -> None:
+    def run_eval(self, batch: int) -> None:
         avg_value, avg_reshuffles = test_network(self.model, self.test_set, self.config)
         log_eval(avg_value, avg_reshuffles, config, batch)
 
@@ -58,8 +61,12 @@ class Evaluator:
             self.update_inference_params()
             save_model(self.model, config, batch)
 
+    def close(self) -> None:
+        for env in self.test_set:
+            env.close()
 
-def inference_function(
+
+def inference_loop(
     model: NeuralNetwork,
     buffer: ReplayBuffer,
     stop_event: threading.Event,
@@ -87,44 +94,37 @@ def inference_function(
         log_episode(buffer.increment_episode(), final_value, final_reshuffles, config)
 
 
-def training_function(
+def training_loop(
     model: NeuralNetwork,
     inference_models: list[NeuralNetwork],
     buffer: ReplayBuffer,
     stop_event: threading.Event,
     config: dict,
 ) -> None:
-
     optimizer = get_optimizer(model, config)
     scheduler = get_scheduler(optimizer, config)
     evaluator = Evaluator(model, inference_models, config)
+    model.train()
 
-    while len(buffer) < config["train"]["batch_size"]:
-        print("Waiting for buffer to fill up")
+    while len(buffer) == 0:
+        print("Waiting for buffer to fill up...")
         time.sleep(1)
 
-    model.train()
-    for batch in tqdm(range(1, int(config["train"]["train_for_n_batches"]) + 1)):
-        if batch % config["train"]["batches_before_eval"] == 0:
-            evaluator.run(batch)
+    batches = tqdm(range(1, int(config["train"]["train_for_n_batches"]) + 1))
+
+    for batch in batches:
+        if evaluator.should_eval(batch):
+            evaluator.run_eval(batch)
 
         avg_loss, avg_value_loss, avg_cross_entropy = train_batch(
-            model,
-            buffer,
-            config["train"]["batch_size"],
-            optimizer,
-            scheduler,
-            config["train"]["value_scaling"],
-            model.device,
+            model, buffer, optimizer, scheduler, config
         )
         current_lr = scheduler.get_last_lr()[0]
         log_batch(
             batch, avg_loss, avg_value_loss, avg_cross_entropy, current_lr, config
         )
 
-    for env in test_set:
-        env.close()
-
+    evaluator.close()
     stop_event.set()
 
 
@@ -150,7 +150,7 @@ def init_model(
 
 
 def create_threads(config: dict, pretrained: PretrainedModel) -> list[threading.Thread]:
-    """Creates N threads. First thread is for training the model, the rest are for inference."""
+    """Creates N threads for N available GPUs. First thread is for training the model, the rest are for inference."""
     buffer = ReplayBuffer(config)
     stop_event = threading.Event()
     devices = (
@@ -162,19 +162,19 @@ def create_threads(config: dict, pretrained: PretrainedModel) -> list[threading.
 
     return [
         threading.Thread(
-            target=training_function,
+            target=training_loop,
             args=(models[0], models[1:], buffer, stop_event, config),
         )
     ] + [
         threading.Thread(
-            target=inference_function,
+            target=inference_loop,
             args=(model, buffer, stop_event, config),
         )
         for model in models[1:]
     ]
 
 
-def start_threads(threads: list[threading.Thread]) -> None:
+def run_threads(threads: list[threading.Thread]) -> None:
     for thread in threads:
         thread.start()
 
@@ -190,10 +190,10 @@ def init_wandb(config: dict) -> None:
 
 if __name__ == "__main__":
     pretrained = PretrainedModel(wandb_model=None, wandb_run=None)
-    config = get_config()
+    config = get_config("config.json")
 
     if config["train"]["log_wandb"]:
         init_wandb(config)
 
     threads = create_threads(config, pretrained)
-    start_threads(threads)
+    run_threads(threads)

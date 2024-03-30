@@ -16,24 +16,22 @@ import wandb
 from NeuralNetwork import NeuralNetwork
 
 
-def loss_fn(pred_value, value, pred_prob, prob, value_scaling):
+def loss_fn(pred_value, value, pred_prob, prob, config):
     value_error = torch.mean(torch.square(value - pred_value))
     cross_entropy = (
         -torch.sum(prob.flatten() * torch.log(pred_prob.flatten())) / prob.shape[0]
     )
-    loss = value_scaling * value_error + cross_entropy
+    loss = config["train"]["value_scaling"] * value_error + cross_entropy
     return loss, value_error, cross_entropy
 
 
-def optimize_network(
-    pred_value, value, pred_prob, prob, optimizer, scheduler, value_scaling
-):
+def optimize_model(pred_value, value, pred_prob, prob, optimizer, scheduler, config):
     loss, value_loss, cross_entropy = loss_fn(
         pred_value=pred_value,
         value=value,
         pred_prob=pred_prob,
         prob=prob,
-        value_scaling=value_scaling,
+        config=config,
     )
     optimizer.zero_grad()
     loss.backward()
@@ -44,45 +42,22 @@ def optimize_network(
     return loss.item(), value_loss.item(), cross_entropy.item()
 
 
-class BaselinePolicy:
-    def __init__(self, C, N):
-        self.C = C
-        self.N = N
+def train_batch(model, buffer, optimizer, scheduler, config):
+    bay, flat_T, prob, value = buffer.sample(config["train"]["batch_size"])
+    bay = bay.to(model.device)
+    flat_T = flat_T.to(model.device)
+    prob = prob.to(model.device)
+    value = value.to(model.device)
 
-    def predict(self, one_hot_bay, deterministic=True):
-        """Place the container in the rightmost non-filled column."""
-        j = self.C - 1
-
-        while j >= 1:
-            can_drop = True
-            for h in range(self.N - 1):
-                if one_hot_bay[h, 0, j] != 0:
-                    can_drop = False
-                    break
-            if can_drop:
-                break
-            j -= 1
-
-        return j, {}
-
-
-def train_batch(
-    network, buffer, batch_size, optimizer, scheduler, value_scaling, device
-):
-    bay, flat_T, prob, value = buffer.sample(batch_size)
-    bay = bay.to(device)
-    flat_T = flat_T.to(device)
-    prob = prob.to(device)
-    value = value.to(device)
-    pred_prob, pred_value = network(bay, flat_T)
-    loss, value_loss, cross_entropy = optimize_network(
+    pred_prob, pred_value = model(bay, flat_T)
+    loss, value_loss, cross_entropy = optimize_model(
         pred_value=pred_value,
         value=value,
         pred_prob=pred_prob,
         prob=prob,
         optimizer=optimizer,
         scheduler=scheduler,
-        value_scaling=value_scaling,
+        config=config,
     )
     return (
         loss,
@@ -91,45 +66,28 @@ def train_batch(
     )
 
 
-def baseline_policy(env, config):
-    policy = BaselinePolicy(env.C, env.N)
-    action, _ = policy.predict(env.one_hot_bay)
-    probabilities = torch.zeros(2 * config["env"]["C"]) + 0.1 / (
-        2 * config["env"]["C"] - 1
-    )
-    probabilities[action] = 0.9
-    return action, probabilities
-
-
 def play_episode(env, net, config, device, deterministic=False):
     if deterministic:
-        np.random.seed(13)
+        # Seed the Dirichlet noise
+        np.random.seed(0)
 
     episode_data = []
     reused_tree = None
     transposition_table = {}
 
     while not env.terminal:
-        if config["train"]["use_baseline_policy"]:
-            action, probabilities = baseline_policy(env, config)
+        reused_tree, probabilities, transposition_table = Node.alpha_zero_search(
+            env,
+            net,
+            device,
+            config,
+            reused_tree,
+            transposition_table,
+        )
+        if deterministic:
+            action = torch.argmax(probabilities).item()
         else:
-            reused_tree, probabilities, transposition_table = Node.alpha_zero_search(
-                env,
-                net,
-                config["mcts"]["search_iterations"],
-                config["mcts"]["c_puct"],
-                config["mcts"]["temperature"],
-                config["mcts"]["dirichlet_weight"],
-                config["mcts"]["dirichlet_alpha"],
-                device,
-                config,
-                reused_tree,
-                transposition_table,
-            )
-            if deterministic:
-                action = torch.argmax(probabilities).item()
-            else:
-                action = np.random.choice(2 * config["env"]["C"], p=probabilities)
+            action = np.random.choice(2 * config["env"]["C"], p=probabilities)
 
         bay, flat_T = get_torch_obs(env, config)
         episode_data.append([bay, flat_T, probabilities])
@@ -224,8 +182,8 @@ def get_device():
     )
 
 
-def get_config():
-    with open("config.json", "r") as f:
+def get_config(file_path):
+    with open(file_path, "r") as f:
         config = json.load(f)
 
     return config

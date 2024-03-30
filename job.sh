@@ -25,7 +25,7 @@ echo "*** Installing requirements ***"
 # Install the requirements
 pip install -r requirements.txt --quiet
 
-echo "*** Running script: ${1:-main.py} ***"
+echo "*** Running script: ${1:-src/main.py} ***"
 
 # Run the specified Python script, defaulting to main.py if none is provided
-python3 ${1:-main.py}
+python3 ${1:-src/main.py}

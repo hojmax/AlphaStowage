@@ -133,7 +133,6 @@ class NeuralNetwork(nn.Module):
     def forward(self, bay, flat_T):
         flat_T = self.flat_T_reshaper(flat_T)
         flat_T = flat_T.view(-1, 1, self.env_config["R"], self.env_config["C"])
-        bay = bay.view(-1, 1, self.env_config["R"], self.env_config["C"])
         x = torch.cat([bay, flat_T], dim=1)
         out = self.layers(x)
         policy = self.policy_head(out)
