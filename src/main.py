@@ -186,6 +186,9 @@ def run_processes(config, pretrained):
         if torch.cuda.is_available()
         else ["cpu"] * mp.cpu_count()
     )
+    print(
+        "CPUs available:", mp.cpu_count(), "GPUs available:", torch.cuda.device_count()
+    )
     update_events = [mp.Event() for _ in devices[1:]]
 
     processes = [

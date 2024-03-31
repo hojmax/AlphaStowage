@@ -74,13 +74,13 @@ class Node:
 
 def get_torch_bay(env: Env, config: dict) -> torch.Tensor:
     bay = env.bay
-    bay = bay / env.remaining_ports
     bay = np.pad(
         bay,
         ((0, config["env"]["R"] - env.R), (0, config["env"]["C"] - env.C)),
         mode="constant",
         constant_values=-1,
     )
+    bay = bay / env.remaining_ports
     bay = torch.from_numpy(bay).unsqueeze(0).unsqueeze(0).float()
     return bay
 
@@ -89,7 +89,7 @@ def get_torch_flat_T(env: Env, config: dict) -> torch.Tensor:
     T = env.T
     T = np.pad(
         T,
-        ((0, config["env"]["N"] - env.N), (0, config["env"]["N"] - env.N)),
+        ((config["env"]["N"] - env.N, 0), (0, config["env"]["N"] - env.N)),
         mode="constant",
         constant_values=0,
     )
@@ -208,9 +208,14 @@ def add_children(
             continue
         new_env = node.env.copy()
         new_env.step(action)
+        prior = (
+            probabilities[action]
+            if action < node.env.C
+            else probabilities[action + config["env"]["C"] - node.env.C]
+        )
         node.children[action] = Node(
             env=new_env,
-            prior_prob=probabilities[action],
+            prior_prob=prior,
             estimated_value=state_value,
             parent=node,
             depth=node.depth + 1,
@@ -227,6 +232,7 @@ def backup(node: Node, value: float) -> None:
 
 def remove_all_pruning(node: Node) -> None:
     node.pruned = False
+
     for child in node.children.values():
         remove_all_pruning(child)
 
