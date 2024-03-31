@@ -19,8 +19,8 @@ from typing import TypedDict
 import warnings
 from Buffer import ReplayBuffer
 from Logging import log_batch, log_eval, log_episode, init_wandb_run, init_wandb_group
-import multiprocessing as mp
-from multiprocessing import Process
+import torch.multiprocessing as mp
+from torch.multiprocessing import Process
 import numpy as np
 
 
@@ -209,6 +209,7 @@ def run_processes(config, pretrained):
 
 
 if __name__ == "__main__":
+    mp.set_start_method("spawn")
     pretrained = PretrainedModel(wandb_model=None, wandb_run=None)
     config = get_config("config.json")
     if config["train"]["log_wandb"]:
