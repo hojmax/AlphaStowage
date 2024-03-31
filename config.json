@@ -13,7 +13,7 @@
     "can_only_add": true
   },
   "mcts": {
-    "c_puct": 5,
+    "c_puct": 10,
     "temperature": 1,
     "search_iterations": 100,
     "dirichlet_weight": 0.25,
