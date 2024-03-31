@@ -7,7 +7,7 @@
 echo "*** Installing requirements ***"
 
 # Install the requirements
-pip install -r requirements.txt --quiet
+pip3 install -r requirements.txt --quiet
 
 echo "*** Running script: ${1:-src/main.py} ***"
 
