@@ -4,7 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
 
-source /opt/conda/condabin/conda
+source /opt/conda/etc/profile.d/conda.sh
 conda activate myenv
 
 echo "*** Installing requirements ***"
