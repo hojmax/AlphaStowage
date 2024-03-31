@@ -66,11 +66,17 @@ def train_batch(model, buffer, optimizer, scheduler, config):
     )
 
 
-def get_action(probabilities: torch.Tensor, deterministic: bool, config: dict) -> int:
+def get_action(
+    probabilities: torch.Tensor, deterministic: bool, config: dict, env: Env
+) -> int:
     if deterministic:
-        return torch.argmax(probabilities).item()
+        action = torch.argmax(probabilities).item()
     else:
-        return np.random.choice(2 * config["env"]["C"], p=probabilities)
+        action = np.random.choice(2 * config["env"]["C"], p=probabilities)
+
+    action = action if action < env.C else action + env.C - config["env"]["C"]
+
+    return action
 
 
 def update_tree(reused_tree: Node, action: int, env: Env) -> None:
@@ -116,7 +122,7 @@ def play_episode(env, net, config, device, deterministic=False):
         bay, flat_T = get_torch_obs(env, config)
         observations.append([bay, flat_T, probabilities])
 
-        action = get_action(probabilities, deterministic, config)
+        action = get_action(probabilities, deterministic, config, env)
         env.step(action)
 
         reused_tree = update_tree(reused_tree, action, env)
