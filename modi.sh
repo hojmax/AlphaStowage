@@ -4,12 +4,10 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
 
-ls -l /opt/conda/etc/profile.d/
-source /opt/conda/etc/profile.d/conda.sh
-conda activate myenv
-
 export PATH="/opt/conda/condabin:$PATH"
 conda activate myenv
+
+conda install -c conda-forge -y --file requirements.txt
 
 echo "*** Installing requirements ***"
 
