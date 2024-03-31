@@ -4,21 +4,8 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
 
-echo "*** Loading modules ***"
-
-# module load anaconda3/2023.03-py3.10
-# module load python/3.9.16
-
-echo "*** Loading environment ***"
-
-# Define your conda environment name
-ENV_NAME="alphastowage"
-
-# Check if the environment exists, and create it if it doesn't
-conda info --envs | grep $ENV_NAME &> /dev/null || conda create --name $ENV_NAME --yes
-
-# Activate the environment
-source activate $ENV_NAME
+source /opt/conda/condabin/conda
+conda activate myenv
 
 echo "*** Installing requirements ***"
 
