@@ -4,10 +4,22 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
 
-export PATH="/opt/conda/condabin:$PATH"
-conda activate myenv
+# Define the directory where Conda packages will be stored
+export CONDA_PKGS_DIRS=~/modi_mount/conda_dir
 
-conda install -c conda-forge -y --file requirements.txt
+# Define the Conda directory (adjust if necessary)
+export CONDA_DIR=/opt/conda
+
+# Initialize Conda
+source $CONDA_DIR/etc/profile.d/conda.sh
+
+# Activate the environment, or create it if it doesn't exist
+conda activate myenv
+if [ $? -ne 0 ]; then
+    conda create -n myenv -y python=3.8
+    conda activate myenv
+fi
+
 
 echo "*** Installing requirements ***"
 
