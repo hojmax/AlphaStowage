@@ -279,7 +279,7 @@ def alpha_zero_search(
     neural_network: NeuralNetwork,
     device: torch.device,
     config: dict,
-    reused_tree: Node | None = None,
+    reused_tree: Node = None,
     transposition_table: dict[Env, tuple[np.ndarray, np.ndarray]] = {},
 ) -> tuple[Node, torch.Tensor, dict[Env, tuple[np.ndarray, np.ndarray]]]:
     root_node = (
