@@ -4,18 +4,18 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
 
-# Define the directory where Conda packages will be stored
-export CONDA_PKGS_DIRS=~/modi_mount/conda_dir
+# Create a virtual environment in your user space
+python3 -m venv ~/torch_env
 
-# Add Conda's condabin to PATH
-export PATH="/opt/conda/condabin:$PATH"
+# Activate the virtual environment
+source ~/torch_env/bin/activate
 
-# Attempt to activate the environment, or create it if it doesn't exist
-conda activate myenv
-if [ $? -ne 0 ]; then
-    conda create -n myenv -y python=3.8
-    conda activate myenv
-fi
+# Upgrade pip and install wheel for better package handling
+pip install --upgrade pip wheel
+
+# Install PyTorch
+# Specify the correct version if needed, or use this for the latest version
+pip install torch
 
 echo "*** Installing requirements ***"
 
