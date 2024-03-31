@@ -181,11 +181,13 @@ def init_model(
 def run_processes(config, pretrained):
     buffer = ReplayBuffer(config)
     stop_event = mp.Event()
-    devices = (
-        [f"cuda:{i}" for i in range(torch.cuda.device_count())]
-        if torch.cuda.is_available()
-        else ["cpu"] * mp.cpu_count()
-    )
+    # devices = (
+    #     [f"cuda:{i}" for i in range(torch.cuda.device_count())]
+    #     if torch.cuda.is_available()
+    #     else ["cpu"] * mp.cpu_count()
+    # )
+    print("CPU", mp.cpu_count())
+    devices = ["cuda:0", "cpu", "cpu", "cpu", "cpu", "cpu", "cpu", "cpu"]
     update_events = [mp.Event() for _ in devices[1:]]
 
     processes = [

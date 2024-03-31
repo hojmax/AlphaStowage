@@ -38,6 +38,6 @@
     "value_hidden": 256
   },
   "eval": {
-    "testset_size": 30
+    "testset_size": 15
   }
 }
