@@ -58,12 +58,12 @@ class Evaluator:
 
     def run_eval(self, batch: int) -> None:
         avg_value, avg_reshuffles = test_network(self.model, self.test_set, self.config)
-        log_eval(avg_value, avg_reshuffles, config, batch)
+        log_eval(avg_value, avg_reshuffles, self.config, batch)
 
         if avg_value > self.best_avg_value:
             self.best_avg_value = avg_value
             self.update_inference_params()
-            save_model(self.model, config, batch)
+            save_model(self.model, self.config, batch)
 
     def close(self) -> None:
         for env in self.test_set:
@@ -72,13 +72,17 @@ class Evaluator:
 
 def inference_loop(
     id: int,
-    model: NeuralNetwork,
+    device: torch.device,
+    pretrained: PretrainedModel,
     buffer: ReplayBuffer,
     stop_event: mp.Event,
     update_event: mp.Event,
     config: dict,
 ) -> None:
+    torch.manual_seed(id)
     np.random.seed(id)
+
+    model = init_model(config, device, pretrained)
 
     if config["train"]["log_wandb"]:
         init_wandb_run(config)
@@ -111,12 +115,18 @@ def inference_loop(
 
 
 def training_loop(
-    model: NeuralNetwork,
+    device: torch.device,
+    pretrained: PretrainedModel,
     buffer: ReplayBuffer,
     stop_event: mp.Event,
     update_events: list[mp.Event],
     config: dict,
 ) -> None:
+    torch.manual_seed(0)
+    np.random.seed(0)
+
+    model = init_model(config, device, pretrained)
+
     if config["train"]["log_wandb"]:
         init_wandb_run(config)
 
@@ -169,27 +179,26 @@ def init_model(
 
 
 def run_processes(config, pretrained):
-    buffer = ReplayBuffer(config)  # Ensure this is adapted for multiprocessing
+    buffer = ReplayBuffer(config)
     stop_event = mp.Event()
     devices = (
         [f"cuda:{i}" for i in range(torch.cuda.device_count())]
         if torch.cuda.is_available()
         else ["cpu"] * mp.cpu_count()
     )
-    models = [init_model(config, device, pretrained) for device in devices]
-    update_events = [mp.Event() for _ in models[1:]]
+    update_events = [mp.Event() for _ in devices[1:]]
 
     processes = [
         Process(
             target=training_loop,
-            args=(models[0], buffer, stop_event, update_events, config),
+            args=(devices[0], pretrained, buffer, stop_event, update_events, config),
         )
     ] + [
         Process(
             target=inference_loop,
-            args=(id, model, buffer, stop_event, update_event, config),
+            args=(id + 1, device, pretrained, buffer, stop_event, update_event, config),
         )
-        for id, (model, update_event) in enumerate(zip(models[1:], update_events))
+        for id, (device, update_event) in enumerate(zip(devices[1:], update_events))
     ]
 
     for process in processes:
