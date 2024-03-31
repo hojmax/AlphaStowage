@@ -113,16 +113,15 @@ def play_episode(env, net, config, device, deterministic=False):
             reused_tree,
             transposition_table,
         )
-        action = get_action(probabilities, deterministic, config)
-
         bay, flat_T = get_torch_obs(env, config)
         observations.append([bay, flat_T, probabilities])
+
+        action = get_action(probabilities, deterministic, config)
         env.step(action)
 
         reused_tree = update_tree(reused_tree, action, env)
 
-    if reused_tree:
-        close_envs_in_tree(reused_tree)
+    close_envs_in_tree(reused_tree)
 
     final_value = -env.moves_to_solve
     reshuffles = env.total_reward
@@ -170,7 +169,7 @@ def test_network(model, testset, config):
                 avg_reshuffles += reshuffles
             except TruncatedEpisodeError:
                 warnings.warn("Episode was truncated during evaluation.")
-                avg_error += -env.N * env.R * env.C
+                avg_error += -1e9
                 avg_reshuffles += -1e9
 
             copy_env.close()

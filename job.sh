@@ -1,8 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=diffusion
 #SBATCH --output=%j.txt  # Use %j to denote the job ID
-#SBATCH --gres=gpu:4
+#SBATCH --gres=gpu:1
 #SBATCH --time=20:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
 
 echo "*** Loading modules ***"
 

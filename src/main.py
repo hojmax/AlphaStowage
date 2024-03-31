@@ -1,4 +1,3 @@
-import threading
 from Train import (
     get_config,
     create_testset,
@@ -20,6 +19,8 @@ from typing import TypedDict
 import warnings
 from Buffer import ReplayBuffer
 from Logging import log_batch, log_eval, log_episode
+import multiprocessing as mp
+from multiprocessing import Process
 
 
 class PretrainedModel(TypedDict):
@@ -35,10 +36,10 @@ class PretrainedModel(TypedDict):
 
 class Evaluator:
     def __init__(
-        self, model: NeuralNetwork, inference_models: list[NeuralNetwork], config: dict
+        self, model: NeuralNetwork, update_events: list[mp.Event], config: dict
     ):
         self.model = model
-        self.inference_models = inference_models
+        self.update_events = update_events
         self.config = config
         self.test_set = create_testset(config)
         avg_value, avg_reshuffles = test_network(self.model, self.test_set, self.config)
@@ -49,8 +50,10 @@ class Evaluator:
         return batch % self.config["train"]["batches_before_eval"] == 0
 
     def update_inference_params(self) -> None:
-        for inference_model in self.inference_models:
-            inference_model.load_state_dict(self.model.state_dict())
+        torch.save(self.model.state_dict(), "shared_model.pt")
+
+        for event in self.update_events:
+            event.set()
 
     def run_eval(self, batch: int) -> None:
         avg_value, avg_reshuffles = test_network(self.model, self.test_set, self.config)
@@ -69,12 +72,19 @@ class Evaluator:
 def inference_loop(
     model: NeuralNetwork,
     buffer: ReplayBuffer,
-    stop_event: threading.Event,
+    stop_event: mp.Event,
+    update_event: mp.Event,
     config: dict,
 ) -> None:
     model.eval()
 
     while not stop_event.is_set():
+        if update_event.is_set():
+            model.load_state_dict(
+                torch.load("shared_model.pt", map_location=model.device)
+            )
+            update_event.clear()
+
         env = get_env(config)
         env.reset()
 
@@ -96,14 +106,14 @@ def inference_loop(
 
 def training_loop(
     model: NeuralNetwork,
-    inference_models: list[NeuralNetwork],
     buffer: ReplayBuffer,
-    stop_event: threading.Event,
+    stop_event: mp.Event,
+    update_events: list[mp.Event],
     config: dict,
 ) -> None:
     optimizer = get_optimizer(model, config)
     scheduler = get_scheduler(optimizer, config)
-    evaluator = Evaluator(model, inference_models, config)
+    evaluator = Evaluator(model, update_events, config)
     model.train()
 
     while len(buffer) < config["train"]["batch_size"]:
@@ -149,37 +159,38 @@ def init_model(
     return model
 
 
-def create_threads(config: dict, pretrained: PretrainedModel) -> list[threading.Thread]:
-    """Creates N threads for N available GPUs. First thread is for training the model, the rest are for inference."""
-    buffer = ReplayBuffer(config)
-    stop_event = threading.Event()
+def create_processes(config, pretrained):
+    buffer = ReplayBuffer(config)  # Ensure this is adapted for multiprocessing
+    stop_event = mp.Event()
     devices = (
         [f"cuda:{i}" for i in range(torch.cuda.device_count())]
         if torch.cuda.is_available()
-        else ["cpu", "cpu"]  # For local testing
+        else ["cpu", "cpu", "cpu"]
     )
     models = [init_model(config, device, pretrained) for device in devices]
+    update_events = [mp.Event() for _ in models[1:]]
 
-    return [
-        threading.Thread(
+    processes = [
+        Process(
             target=training_loop,
-            args=(models[0], models[1:], buffer, stop_event, config),
+            args=(models[0], buffer, stop_event, update_events, config),
         )
     ] + [
-        threading.Thread(
+        Process(
             target=inference_loop,
-            args=(model, buffer, stop_event, config),
+            args=(model, buffer, stop_event, update_event, config),
         )
-        for model in models[1:]
+        for model, update_event in zip(models[1:], update_events)
     ]
+    return processes
 
 
-def run_threads(threads: list[threading.Thread]) -> None:
-    for thread in threads:
-        thread.start()
+def run_processes(processes):
+    for process in processes:
+        process.start()
 
-    for thread in threads:
-        thread.join()
+    for process in processes:
+        process.join()
 
 
 def init_wandb(config: dict) -> None:
@@ -189,11 +200,12 @@ def init_wandb(config: dict) -> None:
 
 
 if __name__ == "__main__":
+    mp.set_start_method("fork")
     pretrained = PretrainedModel(wandb_model=None, wandb_run=None)
     config = get_config("config.json")
 
     if config["train"]["log_wandb"]:
         init_wandb(config)
 
-    threads = create_threads(config, pretrained)
-    run_threads(threads)
+    processes = create_processes(config, pretrained)
+    run_processes(processes)

@@ -1,15 +1,16 @@
-import threading
 import numpy as np
 import torch
+import torch.multiprocessing as mp
+import time
 
 
 class ReplayBuffer:
     def __init__(self, config):
         self.max_size = config["train"]["buffer_size"]
-        self.lock = threading.Lock()
-        self.episode = 0
-        self.ptr = 0
-        self.size = 0
+        self.lock = mp.Lock()
+        self.episode = mp.Value("i", 0)  # Shared memory integer
+        self.ptr = mp.Value("i", 0)  # Shared memory integer
+        self.size = mp.Value("i", 0)  # Shared memory integer
 
         bay_size = (self.max_size, 1, config["env"]["R"], config["env"]["C"])
         flat_T_size = (
@@ -18,15 +19,22 @@ class ReplayBuffer:
         )
         prob_size = (self.max_size, 2 * config["env"]["C"])
         value_size = (self.max_size, 1)
-        self.bay = torch.zeros(bay_size, dtype=torch.float32)
-        self.flat_T = torch.zeros(flat_T_size, dtype=torch.float32)
-        self.prob = torch.zeros(prob_size, dtype=torch.float32)
-        self.value = torch.zeros(value_size, dtype=torch.float32)
+
+        # Tensors need to be in shared memory for multiprocessing
+        self.bay = torch.zeros(bay_size, dtype=torch.float32).share_memory_()
+        self.flat_T = torch.zeros(flat_T_size, dtype=torch.float32).share_memory_()
+        self.prob = torch.zeros(prob_size, dtype=torch.float32).share_memory_()
+        self.value = torch.zeros(value_size, dtype=torch.float32).share_memory_()
+
+        self.start_time = time.time()
 
     def increment_episode(self) -> int:
         with self.lock:
-            self.episode += 1
-            return self.episode
+            self.episode.value += 1
+            print(
+                f"Episode {self.episode.value}, {time.time() - self.start_time:.2f} seconds, {self.size.value} samples in buffer."
+            )
+            return self.episode.value
 
     def extend(
         self,
@@ -36,16 +44,16 @@ class ReplayBuffer:
         value: torch.Tensor,
     ) -> None:
         with self.lock:
-            self.bay[self.ptr] = bay
-            self.flat_T[self.ptr] = flat_T
-            self.prob[self.ptr] = prob
-            self.value[self.ptr] = value
-            self.ptr = (self.ptr + 1) % self.max_size
-            self.size = min(self.size + 1, self.max_size)
+            self.bay[self.ptr.value] = bay
+            self.flat_T[self.ptr.value] = flat_T
+            self.prob[self.ptr.value] = prob
+            self.value[self.ptr.value] = value
+            self.ptr.value = (self.ptr.value + 1) % self.max_size
+            self.size.value = min(self.size.value + 1, self.max_size)
 
     def sample(self, batch_size: int) -> tuple:
         with self.lock:
-            indices = np.random.choice(self.size, batch_size, replace=False)
+            indices = np.random.choice(self.size.value, batch_size, replace=False)
             return (
                 self.bay[indices],
                 self.flat_T[indices],
@@ -54,4 +62,4 @@ class ReplayBuffer:
             )
 
     def __len__(self):
-        return self.size
+        return self.size.value
