@@ -2,7 +2,7 @@
 #SBATCH --job-name=diffusion
 #SBATCH --output=%j.txt
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=6
+#SBATCH --cpus-per-task=1
 
 # Create a virtual environment in your user space
 python3 -m venv ~/torch_env
@@ -12,10 +12,6 @@ source ~/torch_env/bin/activate
 
 # Upgrade pip and install wheel for better package handling
 pip install --upgrade pip wheel
-
-# Install PyTorch
-# Specify the correct version if needed, or use this for the latest version
-pip install torch
 
 echo "*** Installing requirements ***"
 
