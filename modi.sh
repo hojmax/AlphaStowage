@@ -5,8 +5,12 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=8G
 
+
 echo "*** Loading modules ***"
 
+export PATH=/usr/bin:$PATH
+which git
+git --version
 # Create a virtual environment in your user space
 python3 -m venv ~/torch_env
 
