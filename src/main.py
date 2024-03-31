@@ -210,7 +210,9 @@ def run_processes(config, pretrained):
 
 if __name__ == "__main__":
     mp.set_start_method("spawn")
-    pretrained = PretrainedModel(wandb_model=None, wandb_run=None)
+    pretrained = PretrainedModel(
+        wandb_run="alphastowage/AlphaStowage/krbstfu2", wandb_model="model40000.pt"
+    )
     config = get_config("config.json")
     if config["train"]["log_wandb"]:
         init_wandb_group()
