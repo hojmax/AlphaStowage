@@ -4,23 +4,21 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
 
+echo "*** Loading modules ***"
 
-# Defines where the package should be installed.
-# Since the modi_mount directory content is
-# available on each node, we define the package(s) to be installed
-# here so that the node can find it once the job is being executed.
-export CONDA_PKGS_DIRS=~/modi_mount/conda_dir
-# Activate conda in your PATH
-# This ensures that we discover every conda environment
-# before we try to activate it.
-source $CONDA_DIR/etc/profile.d/conda.sh
-# Either activate the existing environment
-# or create a new one
-conda activate DLC
-if [ $? != 0 ]; then
-    conda create -n DLC -y python=3.8
-    conda activate DLC
-fi
+# module load anaconda3/2023.03-py3.10
+# module load python/3.9.16
+
+echo "*** Loading environment ***"
+
+# Define your conda environment name
+ENV_NAME="alphastowage"
+
+# Check if the environment exists, and create it if it doesn't
+conda info --envs | grep $ENV_NAME &> /dev/null || conda create --name $ENV_NAME --yes
+
+# Activate the environment
+source activate $ENV_NAME
 
 echo "*** Installing requirements ***"
 
