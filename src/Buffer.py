@@ -31,9 +31,6 @@ class ReplayBuffer:
     def increment_episode(self) -> int:
         with self.lock:
             self.episode.value += 1
-            print(
-                f"Episode {self.episode.value}, {time.time() - self.start_time:.2f} seconds, {self.size.value} samples in buffer."
-            )
             return self.episode.value
 
     def extend(

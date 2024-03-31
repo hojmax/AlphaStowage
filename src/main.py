@@ -18,9 +18,10 @@ import time
 from typing import TypedDict
 import warnings
 from Buffer import ReplayBuffer
-from Logging import log_batch, log_eval, log_episode
+from Logging import log_batch, log_eval, log_episode, init_wandb_run, init_wandb_group
 import multiprocessing as mp
 from multiprocessing import Process
+import numpy as np
 
 
 class PretrainedModel(TypedDict):
@@ -70,14 +71,19 @@ class Evaluator:
 
 
 def inference_loop(
+    id: int,
     model: NeuralNetwork,
     buffer: ReplayBuffer,
     stop_event: mp.Event,
     update_event: mp.Event,
     config: dict,
 ) -> None:
-    model.eval()
+    np.random.seed(id)
 
+    if config["train"]["log_wandb"]:
+        init_wandb_run(config)
+
+    model.eval()
     while not stop_event.is_set():
         if update_event.is_set():
             model.load_state_dict(
@@ -86,7 +92,7 @@ def inference_loop(
             update_event.clear()
 
         env = get_env(config)
-        env.reset()
+        env.reset(np.random.randint(1e9))
 
         try:
             observations, final_value, final_reshuffles = play_episode(
@@ -111,6 +117,9 @@ def training_loop(
     update_events: list[mp.Event],
     config: dict,
 ) -> None:
+    if config["train"]["log_wandb"]:
+        init_wandb_run(config)
+
     optimizer = get_optimizer(model, config)
     scheduler = get_scheduler(optimizer, config)
     evaluator = Evaluator(model, update_events, config)
@@ -159,13 +168,13 @@ def init_model(
     return model
 
 
-def create_processes(config, pretrained):
+def run_processes(config, pretrained):
     buffer = ReplayBuffer(config)  # Ensure this is adapted for multiprocessing
     stop_event = mp.Event()
     devices = (
         [f"cuda:{i}" for i in range(torch.cuda.device_count())]
         if torch.cuda.is_available()
-        else ["cpu", "cpu", "cpu"]
+        else ["cpu"] * mp.cpu_count()
     )
     models = [init_model(config, device, pretrained) for device in devices]
     update_events = [mp.Event() for _ in models[1:]]
@@ -178,14 +187,11 @@ def create_processes(config, pretrained):
     ] + [
         Process(
             target=inference_loop,
-            args=(model, buffer, stop_event, update_event, config),
+            args=(id, model, buffer, stop_event, update_event, config),
         )
-        for model, update_event in zip(models[1:], update_events)
+        for id, (model, update_event) in enumerate(zip(models[1:], update_events))
     ]
-    return processes
 
-
-def run_processes(processes):
     for process in processes:
         process.start()
 
@@ -193,19 +199,9 @@ def run_processes(processes):
         process.join()
 
 
-def init_wandb(config: dict) -> None:
-    wandb.init(
-        entity="alphastowage", project="AlphaStowage", config=config, save_code=True
-    )
-
-
 if __name__ == "__main__":
-    mp.set_start_method("fork")
     pretrained = PretrainedModel(wandb_model=None, wandb_run=None)
     config = get_config("config.json")
-
     if config["train"]["log_wandb"]:
-        init_wandb(config)
-
-    processes = create_processes(config, pretrained)
-    run_processes(processes)
+        init_wandb_group()
+    run_processes(config, pretrained)
