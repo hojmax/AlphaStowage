@@ -3,6 +3,9 @@
 #SBATCH --output=%j.txt
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
+#SBATCH --mem=8G
+
+echo "*** Loading modules ***"
 
 # Create a virtual environment in your user space
 python3 -m venv ~/torch_env
