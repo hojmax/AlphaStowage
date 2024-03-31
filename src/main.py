@@ -184,7 +184,7 @@ def run_processes(config, pretrained):
     devices = (
         [f"cuda:{i}" for i in range(torch.cuda.device_count())]
         if torch.cuda.is_available()
-        else ["cpu"] * mp.cpu_count()
+        else ["cpu"] * min(mp.cpu_count(), 32)
     )
     print(
         "CPUs available:", mp.cpu_count(), "GPUs available:", torch.cuda.device_count()
