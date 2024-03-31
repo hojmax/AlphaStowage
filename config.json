@@ -9,7 +9,7 @@
     "train_for_n_batches": 5e5,
     "buffer_size": 400000,
     "value_scaling": 0.1,
-    "batches_before_eval": 1000,
+    "batches_before_eval": 10000,
     "can_only_add": true
   },
   "mcts": {
