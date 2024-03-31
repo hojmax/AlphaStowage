@@ -184,10 +184,7 @@ def run_processes(config, pretrained):
     devices = (
         [f"cuda:{i}" for i in range(torch.cuda.device_count())]
         if torch.cuda.is_available()
-        else ["cpu"] * min(mp.cpu_count(), 32)
-    )
-    print(
-        "CPUs available:", mp.cpu_count(), "GPUs available:", torch.cuda.device_count()
+        else ["cpu"] * mp.cpu_count()
     )
     update_events = [mp.Event() for _ in devices[1:]]
 
@@ -214,7 +211,7 @@ def run_processes(config, pretrained):
 if __name__ == "__main__":
     mp.set_start_method("spawn")
     pretrained = PretrainedModel(
-        wandb_run="alphastowage/AlphaStowage/krbstfu2", wandb_model="model40000.pt"
+        wandb_run="alphastowage/AlphaStowage/ivfzoe6b", wandb_model="model90000.pt"
     )
     config = get_config("config.json")
     if config["train"]["log_wandb"]:

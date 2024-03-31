@@ -89,7 +89,7 @@ def get_torch_flat_T(env: Env, config: dict) -> torch.Tensor:
     T = env.T
     T = np.pad(
         T,
-        ((config["env"]["N"] - env.N, 0), (0, config["env"]["N"] - env.N)),
+        ((0, config["env"]["N"] - env.N), (0, config["env"]["N"] - env.N)),
         mode="constant",
         constant_values=0,
     )

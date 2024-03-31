@@ -107,44 +107,44 @@ def transform_benchmarking_data(data):
 
 
 if __name__ == "__main__":
-    run_path = "alphastowage/AlphaStowage/yutq5gbe"
-    model_path = "model15000.pt"
+    run_path = "alphastowage/AlphaStowage/ivfzoe6b"
+    model_path = "model90000.pt"
     api = wandb.Api()
     run = api.run(run_path)
     file = run.file(model_path)
     file.download(replace=True)
     config = run.config
 
-    net = NeuralNetwork(config=config)
+    net = NeuralNetwork(config=config, device="cpu")
     net.load_state_dict(torch.load(model_path, map_location="cpu"))
 
-    config = get_config()
-    config["train"]["use_baseline_policy"] = False
-    test_set = create_testset(config)
-    avg_error, avg_reshuffles = test_network(net, test_set, config)
-    print("Random testset:")
-    print("Eval Moves:", avg_error, "Eval Reshuffles:", avg_reshuffles)
+    config = get_config("config.json")
 
-    # (R, C, N)
-    combinations = [
-        (6, 2, 6),
-        (6, 4, 8),
-    ]
-
-    data = get_benchmarking_data("benchmark/set_2")
-    data = [
-        e
-        for combination in combinations
-        for e in data
-        if e["N"] == combination[2]
-        and e["R"] == combination[0]
-        and e["C"] == combination[1]
-    ]
-    data = transform_benchmarking_data(data)
-
-    avg_error, avg_reshuffles = test_network(net, data, config)
-    print("Benchmarking testset:")
-    print("Eval Moves:", avg_error, "Eval Reshuffles:", avg_reshuffles)
+    env = Env(
+        6,
+        2,
+        6,
+        skip_last_port=True,
+        take_first_action=True,
+        strict_mask=True,
+    )
+    env.reset_to_transportation(
+        np.array(
+            [
+                [0, 10, 0, 0, 0, 2],
+                [0, 0, 5, 5, 0, 0],
+                [0, 0, 0, 0, 5, 0],
+                [0, 0, 0, 0, 0, 5],
+                [0, 0, 0, 0, 0, 5],
+                [0, 0, 0, 0, 0, 0],
+            ],
+            dtype=np.int32,
+        )
+    )
+    bay, flat_t = get_torch_obs(env, config)
+    print("Bay:", bay, "Flat T:", flat_t)
+    probabilities, state_value = net(bay, flat_t)
+    print("Net Probs:", probabilities, "Net Value:", state_value)
 
 # env = Env(
 #     config["env"]["R"],
