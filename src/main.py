@@ -51,6 +51,8 @@ class Evaluator:
         return batch % self.config["train"]["batches_before_eval"] == 0
 
     def update_inference_params(self) -> None:
+        self.config["train"]["can_only_add"] = False
+
         torch.save(self.model.state_dict(), "shared_model.pt")
 
         for event in self.update_events:
@@ -184,7 +186,7 @@ def run_processes(config, pretrained):
     devices = (
         [f"cuda:{i}" for i in range(torch.cuda.device_count())]
         if torch.cuda.is_available()
-        else ["cpu"] * mp.cpu_count()
+        else ["mps", "cpu", "cpu", "cpu", "cpu", "cpu", "cpu", "cpu"]
     )
     update_events = [mp.Event() for _ in devices[1:]]
 
@@ -210,9 +212,7 @@ def run_processes(config, pretrained):
 
 if __name__ == "__main__":
     mp.set_start_method("spawn")
-    pretrained = PretrainedModel(
-        wandb_run="alphastowage/AlphaStowage/ivfzoe6b", wandb_model="model90000.pt"
-    )
+    pretrained = PretrainedModel(wandb_run=None, wandb_model=None)
     config = get_config("config.json")
     if config["train"]["log_wandb"]:
         init_wandb_group()

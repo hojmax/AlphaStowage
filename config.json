@@ -7,10 +7,10 @@
     "scheduler_step_size_in_batches": 1e5,
     "scheduler_gamma": 0.5,
     "train_for_n_batches": 5e5,
-    "buffer_size": 400000,
+    "buffer_size": 300000,
     "value_scaling": 0.1,
     "batches_before_eval": 10000,
-    "can_only_add": false
+    "can_only_add": true
   },
   "mcts": {
     "c_puct": 10,
@@ -21,8 +21,8 @@
   },
   "env": {
     "R": 8,
-    "C": 8,
-    "N": 10
+    "C": 4,
+    "N": 6
   },
   "nn": {
     "blocks": 16,

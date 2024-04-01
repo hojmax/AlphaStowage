@@ -64,9 +64,9 @@ class Node:
         return max(self.valid_children, key=lambda x: x.uct)
 
     def __str__(self) -> str:
-        output = f"{self.env.bay}\n{self.env.T}\nN={self.visit_count}, Q={self.Q:.2f}, Moves={self.env.moves_to_solve}"
+        output = f"{self.env.bay}\n{self.env.T}\nN={self.visit_count}, Q={self.Q:.2f}\nMoves={self.env.moves_to_solve}"
         if self.prior_prob is not None:
-            output += f" P={self.prior_prob:.2f}, Q+U={self.uct:.2f}"
+            output += f" P={self.prior_prob:.2f}\nQ+U={self.uct:.2f}"
         if self.pruned:
             output = "pruned\n" + output
         return output
@@ -74,13 +74,13 @@ class Node:
 
 def get_torch_bay(env: Env, config: dict) -> torch.Tensor:
     bay = env.bay
+    bay = bay / env.remaining_ports
     bay = np.pad(
         bay,
         ((0, config["env"]["R"] - env.R), (0, config["env"]["C"] - env.C)),
         mode="constant",
         constant_values=-1,
     )
-    bay = bay / env.remaining_ports
     bay = torch.from_numpy(bay).unsqueeze(0).unsqueeze(0).float()
     return bay
 

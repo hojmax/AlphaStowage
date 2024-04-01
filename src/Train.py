@@ -79,13 +79,16 @@ def get_action(
     return action
 
 
-def update_tree(reused_tree: Node, action: int, env: Env) -> None:
-    # close the other branches
+def close_other_branches(reused_tree: Node, action: int, env: Env) -> None:
     for a in range(2 * env.C):
         if a != action and a in reused_tree.children:
             close_envs_in_tree(reused_tree.children[a])
-    reused_tree.env.close()
 
+
+def update_tree(reused_tree: Node, action: int, env: Env) -> None:
+    close_other_branches(reused_tree, action, env)
+
+    reused_tree.env.close()
     reused_tree = reused_tree.children[action]
     reused_tree.parent = None
     reused_tree.prior_prob = None
