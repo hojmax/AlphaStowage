@@ -131,7 +131,7 @@ def get_pretrained_model(pretrained: PretrainedModel):
 
 if __name__ == "__main__":
     pretrained = PretrainedModel(
-        wandb_run="alphastowage/AlphaStowage/3q3js6l9", wandb_model="model12000.pt"
+        wandb_run="alphastowage/AlphaStowage/3q3js6l9", wandb_model="model46000.pt"
     )
     config = get_config("config.json")
     model = get_pretrained_model(pretrained)

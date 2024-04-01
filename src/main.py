@@ -62,7 +62,7 @@ class Evaluator:
         avg_value, avg_reshuffles = test_network(self.model, self.test_set, self.config)
         log_eval(avg_value, avg_reshuffles, self.config, batch)
 
-        if avg_value > self.best_avg_value:
+        if avg_value >= self.best_avg_value:
             self.best_avg_value = avg_value
             self.update_inference_params()
             save_model(self.model, self.config, batch)

@@ -292,7 +292,6 @@ def alpha_zero_search(
         reused_tree if reused_tree else Node(root_env.copy(), config["mcts"]["c_puct"])
     )
     best_score = float("-inf")
-
     for _ in range(config["mcts"]["search_iterations"]):
         node = find_leaf(root_node, best_score)
 
