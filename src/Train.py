@@ -141,9 +141,12 @@ def play_episode(env, net, config, device, deterministic=False):
 
 def get_env(config):
     return Env(
-        random.choice(range(6, config["env"]["R"] + 1, 2)),
-        random.choice(range(2, config["env"]["C"] + 1, 2)),
-        random.choice(range(4, config["env"]["N"] + 1, 2)),
+        config["env"]["R"],
+        config["env"]["C"],
+        config["env"]["N"],
+        # random.choice(range(6, config["env"]["R"] + 1, 2)),
+        # random.choice(range(2, config["env"]["C"] + 1, 2)),
+        # random.choice(range(4, config["env"]["N"] + 1, 2)),
         skip_last_port=True,
         take_first_action=True,
         strict_mask=True,

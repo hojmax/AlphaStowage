@@ -184,8 +184,7 @@ def run_processes(config, pretrained):
     buffer = ReplayBuffer(config)
     stop_event = mp.Event()
     devices = (
-        # [f"cuda:{i}" for i in range(torch.cuda.device_count())]
-        ["cuda:0", "cpu", "cpu", "cpu", "cpu", "cpu", "cpu", "cpu"]
+        [f"cuda:{i}" for i in range(torch.cuda.device_count())]
         if torch.cuda.is_available()
         else ["mps", "cpu", "cpu", "cpu", "cpu", "cpu", "cpu", "cpu"]
     )

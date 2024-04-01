@@ -1,16 +1,15 @@
 import numpy as np
 import torch
 import torch.multiprocessing as mp
-import time
 
 
 class ReplayBuffer:
     def __init__(self, config):
         self.max_size = config["train"]["buffer_size"]
         self.lock = mp.Lock()
-        self.episode = mp.Value("i", 0)  # Shared memory integer
-        self.ptr = mp.Value("i", 0)  # Shared memory integer
-        self.size = mp.Value("i", 0)  # Shared memory integer
+        self.episode = mp.Value("i", 0)
+        self.ptr = mp.Value("i", 0)
+        self.size = mp.Value("i", 0)
 
         bay_size = (self.max_size, 1, config["env"]["R"], config["env"]["C"])
         flat_T_size = (
@@ -20,13 +19,10 @@ class ReplayBuffer:
         prob_size = (self.max_size, 2 * config["env"]["C"])
         value_size = (self.max_size, 1)
 
-        # Tensors need to be in shared memory for multiprocessing
         self.bay = torch.zeros(bay_size, dtype=torch.float32).share_memory_()
         self.flat_T = torch.zeros(flat_T_size, dtype=torch.float32).share_memory_()
         self.prob = torch.zeros(prob_size, dtype=torch.float32).share_memory_()
         self.value = torch.zeros(value_size, dtype=torch.float32).share_memory_()
-
-        self.start_time = time.time()
 
     def increment_episode(self) -> int:
         with self.lock:

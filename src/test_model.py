@@ -11,6 +11,7 @@ from Train import get_config, test_network, create_testset, play_episode, get_ac
 import wandb
 import os
 import pandas as pd
+from main import PretrainedModel
 
 
 def _draw_tree_recursive(graph, node):
@@ -106,49 +107,67 @@ def transform_benchmarking_data(data):
     return testset
 
 
-if __name__ == "__main__":
-    run_path = "alphastowage/AlphaStowage/ivfzoe6b"
-    model_path = "model90000.pt"
+def test_on_benchmark(model, config):
+    testset = get_benchmarking_data("benchmark/set_2")
+    testset = [e for e in testset if e["N"] == 6 and e["R"] == 6 and e["C"] == 2]
+    testset = transform_benchmarking_data(testset)
+    avg_error, avg_reshuffles = test_network(model, testset, config)
+    print("Average Error:", avg_error, "Average Reshuffles:", avg_reshuffles)
+
+
+def get_pretrained_model(pretrained: PretrainedModel):
     api = wandb.Api()
-    run = api.run(run_path)
-    file = run.file(model_path)
+    run = api.run(pretrained["wandb_run"])
+    file = run.file(pretrained["wandb_model"])
     file.download(replace=True)
     config = run.config
+    config["train"]["can_only_add"] = False
 
-    net = NeuralNetwork(config=config, device="cpu")
-    net.load_state_dict(torch.load(model_path, map_location="cpu"))
+    model = NeuralNetwork(config=config, device="cpu")
+    model.load_state_dict(torch.load(pretrained["wandb_model"], map_location="cpu"))
 
-    config = get_config("config.json")
+    return model
 
-    env = Env(
-        6,
-        2,
-        6,
-        skip_last_port=True,
-        take_first_action=True,
-        strict_mask=True,
+
+if __name__ == "__main__":
+    pretrained = PretrainedModel(
+        wandb_run="alphastowage/AlphaStowage/3q3js6l9", wandb_model="model12000.pt"
     )
-    env.reset()
-    env.step(0)
-    env.step(0)
-    env.step(0)
-    env.step(0)
-    env.step(0)
-    config["mcts"]["search_iterations"] = 100
-    root, probs, transposition_table = alpha_zero_search(env, net, "cpu", config)
+    config = get_config("config.json")
+    model = get_pretrained_model(pretrained)
+    test_on_benchmark(model, config)
 
-    for _ in range(10):
-        print(get_action(probs, False, config, env))
-    # bay, flat_t = get_torch_obs(env, config)
-    # probabilities, state_value = net(bay, flat_t)
-    # print("Bay:", env.bay, "Flat T:", flat_t)
-    # print("Net Probs:", probabilities, "Net Value:", state_value)
-    print("MCTS Probs:", probs)
-    draw_tree(root)
+    # env = Env(
+    #     6,
+    #     4,
+    #     4,
+    #     skip_last_port=True,
+    #     take_first_action=True,
+    #     strict_mask=True,
+    # )
+    # env.reset()
+    # env.step(0)
+    # env.step(0)
+    # env.step(0)
+    # env.step(0)
+    # env.step(0)
     # config["mcts"]["search_iterations"] = 100
     # root, probs, transposition_table = alpha_zero_search(env, net, "cpu", config)
-    # print("MCTS Probs 2:", probs)
-    env.close()
+
+    # for _ in range(1000):
+    #     print(get_action(probs, False, config, env), end=" ")
+    # print()
+    # bay, flat_t = get_torch_obs(env, config)
+    # probabilities, state_value = net(bay, flat_t)
+    # print("Bay:", bay, "Flat T:", flat_t)
+    # print("Bay:", env.bay, "T:", env.T)
+    # print("Net Probs:", probabilities, "Net Value:", state_value)
+    # print("MCTS Probs:", probs)
+    # draw_tree(root)
+    # # config["mcts"]["search_iterations"] = 100
+    # # root, probs, transposition_table = alpha_zero_search(env, net, "cpu", config)
+    # # print("MCTS Probs 2:", probs)
+    # env.close()
 
 # env = Env(
 #     config["env"]["R"],
