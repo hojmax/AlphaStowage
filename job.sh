@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --time=20:00:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=64
+#SBATCH --cpus-per-task=1025
 
 echo "*** Loading modules ***"
 
@@ -30,4 +30,4 @@ pip install -r requirements.txt --quiet
 echo "*** Running script: ${1:-src/main.py} ***"
 
 # Run the specified Python script, defaulting to main.py if none is provided
-python3 ${1:-src/main.py}
+python3 ${1:-src/main.py} 
