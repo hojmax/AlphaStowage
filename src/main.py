@@ -15,24 +15,14 @@ from tqdm import tqdm
 import wandb
 from Node import TruncatedEpisodeError
 import time
-from typing import TypedDict
 import warnings
 from Buffer import ReplayBuffer
 from Logging import log_batch, log_eval, log_episode, init_wandb_run, init_wandb_group
 import torch.multiprocessing as mp
 from torch.multiprocessing import Process
 import numpy as np
-
-
-class PretrainedModel(TypedDict):
-    """Optional way of specifying models from previous runs (to continue training, testing etc.)
-    Example:
-    wandb_run: "alphastowage/AlphaStowage/camwudzo"
-    wandb_model: "model20000.pt"
-    """
-
-    wandb_run: str = None
-    wandb_model: str = None
+from checkpoint_config import CheckpointConfig
+from self_play import SelfPlay
 
 
 class Evaluator:
@@ -46,6 +36,13 @@ class Evaluator:
         avg_value, avg_reshuffles = test_network(self.model, self.test_set, self.config)
         log_eval(avg_value, avg_reshuffles, config, batch=0)
         self.best_avg_value = avg_value
+
+    def eval_loop(self, stop_event: mp.Event) -> None:
+        batch = 0
+        while not stop_event.is_set():
+            if self.should_eval(batch):
+                self.run_eval(batch)
+            batch += 1
 
     def should_eval(self, batch: int) -> bool:
         return batch % self.config["train"]["batches_before_eval"] == 0
@@ -72,60 +69,11 @@ class Evaluator:
             env.close()
 
 
-def inference_loop(
-    id: int,
-    device: torch.device,
-    pretrained: PretrainedModel,
-    buffer: ReplayBuffer,
-    stop_event: mp.Event,
-    update_event: mp.Event,
-    config: dict,
-) -> None:
-    torch.manual_seed(id)
-    np.random.seed(id)
-
-    model = init_model(config, device, pretrained)
-
-    if config["train"]["log_wandb"]:
-        init_wandb_run(config)
-
-    i = 0
-    model.eval()
-    while not stop_event.is_set():
-        if update_event.is_set():
-            model.load_state_dict(
-                torch.load("shared_model.pt", map_location=model.device)
-            )
-            update_event.clear()
-
-        env = get_env(config)
-        env.reset(np.random.randint(1e9))
-
-        try:
-            print("Thread", id, f"playing episode {i}...")
-            observations, final_value, final_reshuffles = play_episode(
-                env, model, config, model.device, deterministic=False
-            )
-            print("Thread", id, f"finished episode {i}.")
-            i += 1
-            env.close()
-        except TruncatedEpisodeError:
-            warnings.warn("Episode was truncated in training.")
-            env.close()
-            continue
-
-        for bay, flat_T, prob, value in observations:
-            buffer.extend(bay, flat_T, prob, value)
-
-        log_episode(buffer.increment_episode(), final_value, final_reshuffles, config)
-
-
 def training_loop(
     device: torch.device,
-    pretrained: PretrainedModel,
+    pretrained: CheckpointConfig,
     buffer: ReplayBuffer,
     stop_event: mp.Event,
-    update_events: list[mp.Event],
     config: dict,
 ) -> None:
     torch.manual_seed(0)
@@ -138,7 +86,6 @@ def training_loop(
 
     optimizer = get_optimizer(model, config)
     scheduler = get_scheduler(optimizer, config)
-    evaluator = Evaluator(model, update_events, config)
     model.train()
 
     while len(buffer) < config["train"]["batch_size"]:
@@ -148,9 +95,6 @@ def training_loop(
     batches = tqdm(range(1, int(config["train"]["train_for_n_batches"]) + 1))
 
     for batch in batches:
-        if evaluator.should_eval(batch):
-            evaluator.run_eval(batch)
-
         avg_loss, avg_value_loss, avg_cross_entropy = train_batch(
             model, buffer, optimizer, scheduler, config
         )
@@ -159,11 +103,10 @@ def training_loop(
             batch, avg_loss, avg_value_loss, avg_cross_entropy, current_lr, config
         )
 
-    evaluator.close()
     stop_event.set()
 
 
-def get_model_weights_path(pretrained: PretrainedModel):
+def get_model_weights_path(pretrained: CheckpointConfig):
     api = wandb.Api()
     run = api.run(pretrained["wandb_run"])
     file = run.file(pretrained["wandb_model"])
@@ -173,9 +116,9 @@ def get_model_weights_path(pretrained: PretrainedModel):
 
 
 def init_model(
-    config: dict, device: torch.device, pretrained: PretrainedModel
+    config: dict, device: torch.device, pretrained: CheckpointConfig
 ) -> NeuralNetwork:
-    model = NeuralNetwork(config, device).to(device)
+    model = NeuralNetwork(config).to(device)
 
     if pretrained["wandb_model"] and pretrained["wandb_run"]:
         model_weights_path = get_model_weights_path(pretrained)
@@ -187,27 +130,25 @@ def init_model(
 def run_processes(config, pretrained):
     buffer = ReplayBuffer(config)
     stop_event = mp.Event()
-    devices = (
-        # [f"cuda:{i}" for i in range(torch.cuda.device_count())]
-        ["cuda:0"] + ["cpu"] * 95
-        if torch.cuda.is_available()
-        else ["mps", "cpu", "cpu", "cpu", "cpu", "cpu", "cpu", "cpu"]
-    )
-    update_events = [mp.Event() for _ in devices[1:]]
+    device = "cuda:0" if torch.cuda.is_available() else "mps"
     print("GPUs:", torch.cuda.device_count(), "CPUs", mp.cpu_count())
+
+    update_events = [mp.Event() for _ in range(config["train"]["num_workers"])]
 
     processes = [
         Process(
             target=training_loop,
-            args=(devices[0], pretrained, buffer, stop_event, update_events, config),
+            args=(device, pretrained, buffer, stop_event, config),
         )
-    ] + [
-        Process(
-            target=inference_loop,
-            args=(id + 1, device, pretrained, buffer, stop_event, update_event, config),
-        )
-        for id, (device, update_event) in enumerate(zip(devices[1:], update_events))
     ]
+
+    for i in range(config["train"]["num_workers"]):
+        self_play_worker = SelfPlay(config, seed=i)
+        self_play_worker_process = Process(
+            target=self_play_worker.selfplay_loop,
+            args=(stop_event, update_events[i], buffer),
+        )
+        processes.append(self_play_worker_process)
 
     for process in processes:
         process.start()
@@ -218,7 +159,7 @@ def run_processes(config, pretrained):
 
 if __name__ == "__main__":
     mp.set_start_method("spawn")
-    pretrained = PretrainedModel(wandb_run=None, wandb_model=None)
+    pretrained = CheckpointConfig(wandb_run=None, wandb_model=None)
     config = get_config("config.json")
     if config["train"]["log_wandb"]:
         init_wandb_group()

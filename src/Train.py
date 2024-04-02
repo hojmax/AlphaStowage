@@ -172,7 +172,7 @@ def test_network(model, testset, config):
             copy_env = env.copy()
             try:
                 _, value, reshuffles = play_episode(
-                    copy_env, model, config, model.device, deterministic=True
+                    copy_env, model, config, "cpu", deterministic=True
                 )
                 avg_error += value
                 avg_reshuffles += reshuffles

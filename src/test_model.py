@@ -11,7 +11,7 @@ from Train import get_config, test_network, create_testset, play_episode, get_ac
 import wandb
 import os
 import pandas as pd
-from main import PretrainedModel
+from main import CheckpointConfig
 
 
 def _draw_tree_recursive(graph, node):
@@ -115,7 +115,7 @@ def test_on_benchmark(model, config):
     print("Average Error:", avg_error, "Average Reshuffles:", avg_reshuffles)
 
 
-def get_pretrained_model(pretrained: PretrainedModel):
+def get_pretrained_model(pretrained: CheckpointConfig):
     api = wandb.Api()
     run = api.run(pretrained["wandb_run"])
     file = run.file(pretrained["wandb_model"])
@@ -123,14 +123,14 @@ def get_pretrained_model(pretrained: PretrainedModel):
     config = run.config
     config["train"]["can_only_add"] = False
 
-    model = NeuralNetwork(config=config, device="cpu")
+    model = NeuralNetwork(config=config)
     model.load_state_dict(torch.load(pretrained["wandb_model"], map_location="cpu"))
 
     return model
 
 
 if __name__ == "__main__":
-    pretrained = PretrainedModel(
+    pretrained = CheckpointConfig(
         wandb_run="alphastowage/AlphaStowage/l3wodtt2", wandb_model="model116000.pt"
     )
     print("Pretrained Model:", pretrained)

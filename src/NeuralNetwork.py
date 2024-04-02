@@ -55,9 +55,8 @@ class Residual_Block(nn.Module):
 
 
 class NeuralNetwork(nn.Module):
-    def __init__(self, config, device):
+    def __init__(self, config):
         super().__init__()
-        self.device = device
         self.env_config = config["env"]
         nn_config = config["nn"]
         input_channels = 2
@@ -138,3 +137,6 @@ class NeuralNetwork(nn.Module):
         policy = self.policy_head(out)
         value = self.value_head(out)
         return policy, value
+
+    def set_weights(self, weights):
+        self.load_state_dict(weights)
