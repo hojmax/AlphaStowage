@@ -114,6 +114,9 @@ def run_network(
         probabilities, state_value = neural_network(bay.to(device), flat_t.to(device))
         probabilities = probabilities.detach().cpu().numpy().squeeze()
         state_value = state_value.detach().cpu().numpy().squeeze()
+        state_value = np.clip(
+            state_value, 0, (node.env.remaining_ports + 1) * node.env.C * node.env.R
+        )
     return probabilities, state_value
 
 
