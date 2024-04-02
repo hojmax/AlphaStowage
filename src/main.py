@@ -89,6 +89,7 @@ def inference_loop(
     if config["train"]["log_wandb"]:
         init_wandb_run(config)
 
+    i = 0
     model.eval()
     while not stop_event.is_set():
         if update_event.is_set():
@@ -101,9 +102,12 @@ def inference_loop(
         env.reset(np.random.randint(1e9))
 
         try:
+            print("Thread", id, f"playing episode {i}...")
             observations, final_value, final_reshuffles = play_episode(
                 env, model, config, model.device, deterministic=False
             )
+            print("Thread", id, f"finished episode {i}.")
+            i += 1
             env.close()
         except TruncatedEpisodeError:
             warnings.warn("Episode was truncated in training.")
@@ -190,6 +194,7 @@ def run_processes(config, pretrained):
         else ["mps", "cpu", "cpu", "cpu", "cpu", "cpu", "cpu", "cpu"]
     )
     update_events = [mp.Event() for _ in devices[1:]]
+    print("GPUs:", torch.cuda.device_count(), "CPUs", mp.cpu_count())
 
     processes = [
         Process(
