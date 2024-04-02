@@ -131,8 +131,9 @@ def get_pretrained_model(pretrained: PretrainedModel):
 
 if __name__ == "__main__":
     pretrained = PretrainedModel(
-        wandb_run="alphastowage/AlphaStowage/3q3js6l9", wandb_model="model46000.pt"
+        wandb_run="alphastowage/AlphaStowage/l3wodtt2", wandb_model="model116000.pt"
     )
+    print("Pretrained Model:", pretrained)
     config = get_config("config.json")
     model = get_pretrained_model(pretrained)
     test_on_benchmark(model, config)

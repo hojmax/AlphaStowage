@@ -7,7 +7,7 @@
     "scheduler_step_size_in_batches": 1e5,
     "scheduler_gamma": 0.5,
     "train_for_n_batches": 5e5,
-    "buffer_size": 300000,
+    "buffer_size": 450000,
     "value_scaling": 0.1,
     "batches_before_eval": 2000,
     "can_only_add": true
