@@ -107,11 +107,11 @@ def transform_benchmarking_data(data):
     return testset
 
 
-def test_on_benchmark(model, config):
+def test_on_benchmark(conn, config):
     testset = get_benchmarking_data("benchmark/set_2")
     testset = [e for e in testset if e["N"] == 6 and e["R"] == 6 and e["C"] == 2]
     testset = transform_benchmarking_data(testset)
-    avg_error, avg_reshuffles = test_network(model, testset, config)
+    avg_error, avg_reshuffles = test_network(conn, testset, config)
     print("Average Error:", avg_error, "Average Reshuffles:", avg_reshuffles)
 
 

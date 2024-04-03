@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from MPSPEnv import Env
-from NeuralNetwork import NeuralNetwork
+from multiprocessing.connection import Connection
 
 
 class TruncatedEpisodeError(Exception):
@@ -107,30 +107,30 @@ def get_torch_obs(env: Env, config: dict) -> tuple[torch.Tensor, torch.Tensor]:
 
 
 def run_network(
-    node: Node, neural_network: NeuralNetwork, device: torch.device, config: dict
+    node: Node, conn: Connection, config: dict
 ) -> tuple[np.ndarray, np.ndarray]:
     with torch.no_grad():
         bay, flat_t = get_torch_obs(node.env, config)
-        probabilities, state_value = neural_network(bay.to(device), flat_t.to(device))
-        probabilities = probabilities.detach().cpu().numpy().squeeze()
-        state_value = state_value.detach().cpu().numpy().squeeze()
-        state_value = np.clip(
-            state_value, 0, (node.env.remaining_ports + 1) * node.env.C * node.env.R
+        conn.send((bay, flat_t))
+        probabilities, state_value = conn.recv()
+        state_value = torch.clip(
+            state_value,
+            min=0,
+            max=node.env.R * node.env.C * (node.env.remaining_ports + 1),
         )
     return probabilities, state_value
 
 
 def get_prob_and_value(
     node: Node,
-    neural_network: NeuralNetwork,
-    device: torch.device,
+    conn: Connection,
     transposition_table: dict[Env, tuple[np.ndarray, np.ndarray]],
     config: dict,
 ) -> tuple[np.ndarray, np.ndarray]:
     if node.env in transposition_table:
         probabilities, state_value = transposition_table[node.env]
     else:
-        probabilities, state_value = run_network(node, neural_network, device, config)
+        probabilities, state_value = run_network(node, conn, config)
         transposition_table[node.env] = (probabilities, state_value)
 
     return probabilities, state_value - node.depth  # Counting the already made moves
@@ -151,13 +151,13 @@ def is_root(node: Node) -> bool:
 
 def expand_node(
     node: Node,
-    neural_network: NeuralNetwork,
-    device: torch.device,
+    conn: Connection,
     transposition_table: dict[Env, tuple[np.ndarray, np.ndarray]],
     config: dict,
 ) -> np.ndarray:
+
     probabilities, state_value = get_prob_and_value(
-        node, neural_network, device, transposition_table, config
+        node, conn, transposition_table, config
     )
 
     if is_root(node):
@@ -181,8 +181,7 @@ def close_envs_in_tree(node: Node) -> None:
 
 def evaluate(
     node: Node,
-    neural_network: NeuralNetwork,
-    device: torch.device,
+    conn: Connection,
     transposition_table: dict[Env, tuple[np.ndarray, np.ndarray]],
     config: dict,
 ) -> float:
@@ -191,8 +190,7 @@ def evaluate(
     else:
         state_value = expand_node(
             node,
-            neural_network,
-            device,
+            conn,
             transposition_table,
             config,
         )
@@ -285,8 +283,7 @@ def find_leaf(root_node: Node, best_score: float) -> Node:
 
 def alpha_zero_search(
     root_env: Env,
-    neural_network: NeuralNetwork,
-    device: torch.device,
+    conn: Connection,
     config: dict,
     reused_tree: Node = None,
     transposition_table: dict[Env, tuple[np.ndarray, np.ndarray]] = {},
@@ -300,8 +297,7 @@ def alpha_zero_search(
 
         state_value = evaluate(
             node,
-            neural_network,
-            device,
+            conn,
             transposition_table,
             config,
         )

@@ -105,7 +105,7 @@ def add_value_to_observations(observations, final_value):
     return output
 
 
-def play_episode(env, net, config, device, deterministic=False):
+def play_episode(env, conn, config, deterministic=False):
     if deterministic:
         np.random.seed(0)
 
@@ -116,8 +116,7 @@ def play_episode(env, net, config, device, deterministic=False):
     while not env.terminal:
         reused_tree, probabilities, transposition_table = Node.alpha_zero_search(
             env,
-            net,
-            device,
+            conn,
             config,
             reused_tree,
             transposition_table,
@@ -160,33 +159,27 @@ def create_testset(config):
     return testset
 
 
-def test_network(model, testset, config):
-    was_training = model.training
+def test_network(conn, testset, config):
+    avg_error = 0
+    avg_reshuffles = 0
 
-    with torch.no_grad():
-        model.eval()
-        avg_error = 0
-        avg_reshuffles = 0
+    for env in testset:
+        copy_env = env.copy()
+        try:
+            _, value, reshuffles = play_episode(
+                copy_env, conn, config, deterministic=True
+            )
+            avg_error += value
+            avg_reshuffles += reshuffles
+        except TruncatedEpisodeError:
+            warnings.warn("Episode was truncated during evaluation.")
+            avg_error += -1e9
+            avg_reshuffles += -1e9
 
-        for env in testset:
-            copy_env = env.copy()
-            try:
-                _, value, reshuffles = play_episode(
-                    copy_env, model, config, model.device, deterministic=True
-                )
-                avg_error += value
-                avg_reshuffles += reshuffles
-            except TruncatedEpisodeError:
-                warnings.warn("Episode was truncated during evaluation.")
-                avg_error += -1e9
-                avg_reshuffles += -1e9
+        copy_env.close()
 
-            copy_env.close()
-
-        avg_error /= len(testset)
-        avg_reshuffles /= len(testset)
-
-    model.train(mode=was_training)
+    avg_error /= len(testset)
+    avg_reshuffles /= len(testset)
 
     return avg_error, avg_reshuffles
 

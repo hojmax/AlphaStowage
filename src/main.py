@@ -22,6 +22,8 @@ from Logging import log_batch, log_eval, log_episode, init_wandb_run, init_wandb
 import torch.multiprocessing as mp
 from torch.multiprocessing import Process
 import numpy as np
+from multiprocessing.connection import Connection
+from GPUProcess import gpu_process
 
 
 class PretrainedModel(TypedDict):
@@ -36,14 +38,12 @@ class PretrainedModel(TypedDict):
 
 
 class Evaluator:
-    def __init__(
-        self, model: NeuralNetwork, update_events: list[mp.Event], config: dict
-    ):
-        self.model = model
+    def __init__(self, conn: Connection, update_events: list[mp.Event], config: dict):
+        self.conn = conn
         self.update_events = update_events
         self.config = config
         self.test_set = create_testset(config)
-        avg_value, avg_reshuffles = test_network(self.model, self.test_set, self.config)
+        avg_value, avg_reshuffles = test_network(self.conn, self.test_set, self.config)
         log_eval(avg_value, avg_reshuffles, config, batch=0)
         self.best_avg_value = avg_value
 
@@ -59,7 +59,7 @@ class Evaluator:
             event.set()
 
     def run_eval(self, batch: int) -> None:
-        avg_value, avg_reshuffles = test_network(self.model, self.test_set, self.config)
+        avg_value, avg_reshuffles = test_network(self.conn, self.test_set, self.config)
         log_eval(avg_value, avg_reshuffles, self.config, batch)
 
         if avg_value >= self.best_avg_value:
@@ -74,36 +74,27 @@ class Evaluator:
 
 def inference_loop(
     id: int,
-    device: torch.device,
-    pretrained: PretrainedModel,
     buffer: ReplayBuffer,
     stop_event: mp.Event,
-    update_event: mp.Event,
+    conn: Connection,
     config: dict,
 ) -> None:
     torch.manual_seed(id)
     np.random.seed(id)
 
-    model = init_model(config, device, pretrained)
-
     if config["train"]["log_wandb"]:
         init_wandb_run(config)
 
     i = 0
-    model.eval()
     while not stop_event.is_set():
-        if update_event.is_set():
-            model.load_state_dict(
-                torch.load("shared_model.pt", map_location=model.device)
-            )
-            update_event.clear()
 
         env = get_env(config)
         env.reset(np.random.randint(1e9))
 
         try:
+            print(f"{id}: Starting episode {i}...")
             observations, final_value, final_reshuffles = play_episode(
-                env, model, config, model.device, deterministic=False
+                env, conn, config, deterministic=False
             )
             i += 1
             env.close()
@@ -124,6 +115,7 @@ def training_loop(
     buffer: ReplayBuffer,
     stop_event: mp.Event,
     update_events: list[mp.Event],
+    conn: Connection,
     config: dict,
 ) -> None:
     torch.manual_seed(0)
@@ -136,7 +128,7 @@ def training_loop(
 
     optimizer = get_optimizer(model, config)
     scheduler = get_scheduler(optimizer, config)
-    evaluator = Evaluator(model, update_events, config)
+    evaluator = Evaluator(conn, update_events, config)
     model.train()
 
     while len(buffer) < config["train"]["batch_size"]:
@@ -185,33 +177,53 @@ def init_model(
 def run_processes(config, pretrained):
     buffer = ReplayBuffer(config)
     stop_event = mp.Event()
-    devices = (
-        [f"cuda:{i}" for i in range(torch.cuda.device_count())]
-        if torch.cuda.is_available()
-        else ["mps", "cpu", "cpu", "cpu", "cpu", "cpu", "cpu", "cpu"]
-    )
-    update_events = [mp.Event() for _ in devices[1:]]
-    print("GPUs:", torch.cuda.device_count(), "CPUs", mp.cpu_count())
+    # training_device = "mps"
+    # gpu_device = "mps"
+    # gpu_update_event = mp.Event()
+    # training_pipe = mp.Pipe()
+    # inference_pipes = [mp.Pipe() for _ in range(16)]
+    inference_processes = 40
+    # training_device = "cuda:0"
+    gpu_device = "cuda:0"
+    gpu_update_event = mp.Event()
+    training_pipe = mp.Pipe()
+    inference_pipes = [mp.Pipe() for _ in range(inference_processes)]
 
     processes = [
+        # Process(
+        #     target=training_loop,
+        #     args=(
+        #         training_device,
+        #         pretrained,
+        #         buffer,
+        #         stop_event,
+        #         gpu_update_event,
+        #         training_pipe[1],
+        #         config,
+        #     ),
+        # ),
         Process(
-            target=training_loop,
-            args=(devices[0], pretrained, buffer, stop_event, update_events, config),
-        )
+            target=gpu_process,
+            args=(
+                gpu_device,
+                stop_event,
+                gpu_update_event,
+                config,
+                inference_pipes + [training_pipe],
+            ),
+        ),
     ] + [
         Process(
             target=inference_loop,
             args=(
                 id + 1,
-                device,
-                pretrained,
                 buffer,
                 stop_event,
-                update_event,
+                conn,
                 config,
             ),
         )
-        for id, (device, update_event) in enumerate(zip(devices[1:], update_events))
+        for id, (_, conn) in enumerate(inference_pipes)
     ]
 
     for process in processes:
