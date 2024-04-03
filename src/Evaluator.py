@@ -11,6 +11,7 @@ from multiprocessing.connection import Connection
 import subprocess
 import time
 import wandb
+from Logging import init_wandb_run
 
 
 class Evaluator:
@@ -40,6 +41,8 @@ def evaluator_loop(
     stop_event: mp.Event,
     config: dict,
 ) -> None:
+    if config["train"]["log_wandb"]:
+        init_wandb_run(config)
 
     evaluator = Evaluator(conn, config)
     old_model_nr = model_nr.value

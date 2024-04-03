@@ -22,14 +22,14 @@
   },
   "eval": {
     "testset_size": 15,
-    "batch_interval": 2000
+    "batch_interval": 6000
   },
   "mcts": {
-    "c_puct": 10,
+    "c_puct": 5,
     "temperature": 0.6,
     "search_iterations": 100,
     "dirichlet_weight": 0.25,
-    "dirichlet_alpha": 0.2
+    "dirichlet_alpha": 1
   },
   "nn": {
     "blocks": 16,
