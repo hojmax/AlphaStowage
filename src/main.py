@@ -189,7 +189,7 @@ def run_processes(config, pretrained):
     stop_event = mp.Event()
     devices = (
         # [f"cuda:{i}" for i in range(torch.cuda.device_count())]
-        ["cuda:0"] + ["cpu"] * 95
+        ["cuda:0"] + ["cpu"] * 40
         if torch.cuda.is_available()
         else ["mps", "cpu", "cpu", "cpu", "cpu", "cpu", "cpu", "cpu"]
     )
