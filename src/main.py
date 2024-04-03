@@ -85,6 +85,9 @@ def inference_loop(
     if config["train"]["log_wandb"]:
         init_wandb_run(config)
 
+    avg_value = 0
+    avg_reshuffles = 0
+    avg_over = 10
     i = 0
     while not stop_event.is_set():
 
@@ -92,7 +95,6 @@ def inference_loop(
         env.reset(np.random.randint(1e9))
 
         try:
-            print(f"{id}: Starting episode {i}...")
             observations, final_value, final_reshuffles = play_episode(
                 env, conn, config, deterministic=False
             )
@@ -106,7 +108,20 @@ def inference_loop(
         for bay, flat_T, prob, value in observations:
             buffer.extend(bay, flat_T, prob, value)
 
-        log_episode(buffer.increment_episode(), final_value, final_reshuffles, config)
+        avg_value += final_value / avg_over
+        avg_reshuffles += final_reshuffles / avg_over
+
+        if i % avg_over == 0:
+            log_episode(
+                buffer.increment_episode(),
+                avg_value,
+                avg_reshuffles,
+                config,
+            )
+            avg_value = 0
+            avg_reshuffles = 0
+        else:
+            buffer.increment_episode()
 
 
 def training_loop(
@@ -182,7 +197,7 @@ def run_processes(config, pretrained):
     # gpu_update_event = mp.Event()
     # training_pipe = mp.Pipe()
     # inference_pipes = [mp.Pipe() for _ in range(16)]
-    inference_processes = 40
+    inference_processes = 60
     # training_device = "cuda:0"
     gpu_device = "cuda:0"
     gpu_update_event = mp.Event()
