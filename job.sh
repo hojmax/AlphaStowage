@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=rl
 #SBATCH --output=%j.txt  # Use %j to denote the job ID
-#SBATCH --gres=gpu:5
-#SBATCH --time=20:00:00
+#SBATCH --gres=gpu:8
+#SBATCH --time=30:00:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=15
+#SBATCH --cpus-per-task=24
 #SBATCH --mem-per-cpu=1G
 
 echo "*** Loading modules ***"
