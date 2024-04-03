@@ -197,7 +197,7 @@ def run_processes(config, pretrained):
     # gpu_update_event = mp.Event()
     # training_pipe = mp.Pipe()
     # inference_pipes = [mp.Pipe() for _ in range(16)]
-    inference_processes = 60
+    inference_processes = 90
     # training_device = "cuda:0"
     gpu_device = "cuda:0"
     gpu_update_event = mp.Event()
