@@ -1,19 +1,17 @@
 import torch
-import torch.optim as optim
-import Node
 import numpy as np
 import json
 from MPSPEnv import Env
-from Node import (
+from node import (
     remove_all_pruning,
     get_torch_obs,
     close_envs_in_tree,
     TruncatedEpisodeError,
+    Node,
+    alpha_zero_search,
 )
 import random
 import warnings
-import wandb
-from NeuralNetwork import NeuralNetwork
 
 
 def get_action(
@@ -63,7 +61,7 @@ def play_episode(env, net, config, device, deterministic=False):
     transposition_table = {}
 
     while not env.terminal:
-        reused_tree, probabilities, transposition_table = Node.alpha_zero_search(
+        reused_tree, probabilities, transposition_table = alpha_zero_search(
             env,
             net,
             device,
@@ -138,22 +136,6 @@ def test_network(model, testset, config):
     model.train(mode=was_training)
 
     return avg_error, avg_reshuffles
-
-
-def save_model(model: NeuralNetwork, config: dict, i: int) -> None:
-    model_path = f"model{i}.pt"
-    torch.save(model.state_dict(), model_path)
-
-    if config["train"]["log_wandb"]:
-        wandb.save(model_path)
-
-
-def get_device():
-    return torch.device(
-        "cuda"
-        if torch.cuda.is_available()
-        else "mps" if torch.backends.mps.is_available() else "cpu"
-    )
 
 
 def get_config(file_path):

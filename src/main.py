@@ -1,8 +1,8 @@
-from Train import get_config, create_testset
+from train import get_config, create_testset
 import torch
-from NeuralNetwork import NeuralNetwork
+from network import NeuralNetwork
 import wandb
-from Buffer import ReplayBuffer
+from replay_buffer import ReplayBuffer
 import numpy as np
 from checkpoint_config import CheckpointConfig
 from self_play import SelfPlay
@@ -12,7 +12,6 @@ import ray
 import copy
 from trainer import Trainer
 import time
-import copy
 
 
 @ray.remote(num_cpus=0, num_gpus=0)

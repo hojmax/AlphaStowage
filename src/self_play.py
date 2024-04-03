@@ -1,13 +1,12 @@
-from Train import play_episode, get_env
+from train import play_episode, get_env
 import torch
-from Node import TruncatedEpisodeError
+from node import TruncatedEpisodeError
 import warnings
-from Buffer import ReplayBuffer
+from replay_buffer import ReplayBuffer
 from shared_storage import SharedStorage
-from Logging import log_episode
-import torch.multiprocessing as mp
+from logger import log_episode
 import numpy as np
-from NeuralNetwork import NeuralNetwork
+from network import NeuralNetwork
 import ray
 
 

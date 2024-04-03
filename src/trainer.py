@@ -1,9 +1,9 @@
 import torch
 import time
-from Buffer import ReplayBuffer
-from Logging import log_step, init_wandb_run
+from replay_buffer import ReplayBuffer
+from logger import log_step, init_wandb_run
 import numpy as np
-from NeuralNetwork import NeuralNetwork
+from network import NeuralNetwork
 import copy
 from shared_storage import SharedStorage
 import ray

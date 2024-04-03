@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from MPSPEnv import Env
-from NeuralNetwork import NeuralNetwork
+from network import NeuralNetwork
 
 
 class TruncatedEpisodeError(Exception):

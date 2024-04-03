@@ -1,7 +1,7 @@
-from Train import create_testset, test_network
+from train import create_testset, test_network
 import torch
-from NeuralNetwork import NeuralNetwork
-from Logging import log_eval
+from network import NeuralNetwork
+from logger import log_eval
 import ray
 from shared_storage import SharedStorage
 import numpy as np
