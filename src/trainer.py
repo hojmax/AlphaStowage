@@ -49,11 +49,11 @@ class Trainer:
         )
 
     def training_loop(
-        self, shared_storage: SharedStorage, replay_buffer: ReplayBuffer
+        self, shared_storage: SharedStorage, replay_buffer: ReplayBuffer, id: str
     ) -> None:
 
         if self.config["train"]["log_wandb"]:
-            init_wandb_run(self.config)
+            init_wandb_run(self.config, id)
 
         while ray.get(shared_storage.get_info.remote("num_played_games")) < 1:
             logging.info("Waiting for games to be played before training...")
@@ -110,7 +110,7 @@ class Trainer:
 
         self.optimizer.step()
         self.scheduler.step()
-        self.training_step += self.config["train"]["batch_size"]
+        self.training_step += 1
 
         return loss.item(), value_loss.item(), cross_entropy.item()
 

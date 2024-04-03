@@ -4,7 +4,6 @@ from network import NeuralNetwork
 import wandb
 from replay_buffer import ReplayBuffer
 import numpy as np
-from checkpoint_config import CheckpointConfig
 from self_play import SelfPlay
 from shared_storage import SharedStorage
 from evaluator import Evaluator
@@ -12,6 +11,7 @@ import ray
 import copy
 from trainer import Trainer
 import time
+import uuid
 
 
 @ray.remote(num_cpus=0, num_gpus=0)
@@ -20,27 +20,6 @@ class CPUActor:
 
     def get_initial_weights(self, config):
         return NeuralNetwork(config).get_weights()
-
-
-def get_model_weights_path(pretrained: CheckpointConfig):
-    api = wandb.Api()
-    run = api.run(pretrained["wandb_run"])
-    file = run.file(pretrained["wandb_model"])
-    file.download(replace=True)
-
-    return pretrained["wandb_model"]
-
-
-def init_model(
-    config: dict, device: torch.device, pretrained: CheckpointConfig
-) -> NeuralNetwork:
-    model = NeuralNetwork(config).to(device)
-
-    if pretrained["wandb_model"] and pretrained["wandb_run"]:
-        model_weights_path = get_model_weights_path(pretrained)
-        model.load_state_dict(torch.load(model_weights_path, map_location=device))
-
-    return model
 
 
 class AlphaZero:
@@ -71,6 +50,9 @@ class AlphaZero:
         self.shared_storage_worker = None
 
     def train(self) -> None:
+
+        id = str(uuid.uuid4())
+
         # Initialize workers
         self.training_worker = Trainer.options(num_cpus=1, num_gpus=0).remote(
             self.config, self.checkpoint
@@ -94,15 +76,15 @@ class AlphaZero:
         # Launch workers
         [
             self_play.self_play_loop.remote(
-                self.shared_storage_worker, self.replay_buffer_worker
+                self.shared_storage_worker, self.replay_buffer_worker, id
             )
             for self_play in self.self_play_workers
         ]
         self.training_worker.training_loop.remote(
-            self.shared_storage_worker, self.replay_buffer_worker
+            self.shared_storage_worker, self.replay_buffer_worker, id
         )
 
-        self.logging_loop()
+        self.logging_loop(id)
 
     def terminate_workers(self):
         """
@@ -124,7 +106,7 @@ class AlphaZero:
         self.replay_buffer_worker = None
         self.shared_storage_worker = None
 
-    def logging_loop(self):
+    def logging_loop(self, id: str) -> None:
         keys = [
             "num_played_games",
             "training_step",
@@ -135,14 +117,11 @@ class AlphaZero:
         self.test_worker = Evaluator.options(num_cpus=1, num_gpus=0).remote(
             self.config, self.checkpoint, self.config["train"]["seed"]
         )
-        self.test_worker.eval_loop.remote(self.shared_storage_worker)
+        self.test_worker.eval_loop.remote(self.shared_storage_worker, id)
 
         try:
             while info["training_step"] < self.config["train"]["training_steps"]:
                 info = ray.get(self.shared_storage_worker.get_info.remote(keys))
-                print(
-                    f"Games: {info['num_played_games']}, Training step: {info['training_step']}"
-                )
                 time.sleep(2)
         except KeyboardInterrupt:
             pass

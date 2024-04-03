@@ -1,6 +1,6 @@
 {
   "train": {
-    "log_wandb": false,
+    "log_wandb": true,
     "l2_weight_reg": 0.0001,
     "batch_size": 512,
     "learning_rate": 0.001,
@@ -11,9 +11,9 @@
     "value_scaling": 0.1,
     "batches_before_eval": 2000,
     "can_only_add": true,
-    "num_workers": 4,
+    "num_workers": 2,
     "seed": 0,
-    "checkpoint_interval": 5000
+    "checkpoint_interval": 100
   },
   "mcts": {
     "c_puct": 5,

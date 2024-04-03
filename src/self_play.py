@@ -4,7 +4,7 @@ from node import TruncatedEpisodeError
 import warnings
 from replay_buffer import ReplayBuffer
 from shared_storage import SharedStorage
-from logger import log_episode
+from logger import log_episode, init_wandb_run
 import numpy as np
 from network import NeuralNetwork
 import ray
@@ -22,8 +22,11 @@ class SelfPlay:
         np.random.seed(seed)
 
     def self_play_loop(
-        self, shared_storage: SharedStorage, replay_buffer: ReplayBuffer
+        self, shared_storage: SharedStorage, replay_buffer: ReplayBuffer, id: str
     ) -> None:
+
+        if self.config["train"]["log_wandb"]:
+            init_wandb_run(self.config, id)
 
         while ray.get(shared_storage.get_info.remote("training_step")) < self.config[
             "train"

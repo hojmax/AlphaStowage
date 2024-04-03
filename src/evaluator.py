@@ -1,7 +1,7 @@
 from train import create_testset, test_network
 import torch
 from network import NeuralNetwork
-from logger import log_eval
+from logger import log_eval, init_wandb_run
 import ray
 from shared_storage import SharedStorage
 import numpy as np
@@ -29,7 +29,11 @@ class Evaluator:
         log_eval(avg_value, avg_reshuffles, config, batch=0)
         self.best_avg_value = avg_value
 
-    def eval_loop(self, shared_storage: SharedStorage) -> None:
+    def eval_loop(self, shared_storage: SharedStorage, id: str) -> None:
+
+        if self.config["train"]["log_wandb"]:
+            init_wandb_run(self.config, id)
+
         training_step = ray.get(shared_storage.get_info.remote("training_step"))
         while training_step < self.config["train"]["training_steps"] and not ray.get(
             shared_storage.get_info.remote("terminate")
