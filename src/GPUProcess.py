@@ -3,7 +3,6 @@ from NeuralNetwork import NeuralNetwork
 
 
 def gpu_process(device, stop_event, update_event, config, pipes):
-    batch_size = 25
     model = NeuralNetwork(config, device).to(device)
     model.eval()
     bays = []
@@ -26,7 +25,7 @@ def gpu_process(device, stop_event, update_event, config, pipes):
                 flat_ts.append(flat_T)
                 conns.append(parent_conn)
 
-                if len(bays) < batch_size:
+                if len(bays) < config["inference"]["batch_size"]:
                     continue
 
                 bays = torch.cat(bays, dim=0)

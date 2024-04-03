@@ -200,7 +200,7 @@ def add_children(
     probabilities: np.ndarray, state_value: float, node: Node, config: dict
 ) -> None:
     possible_actions = (
-        range(node.env.C) if config["train"]["can_only_add"] else range(2 * node.env.C)
+        range(node.env.C) if config["inference"]["can_only_add"] else range(2 * node.env.C)
     )
     for action in possible_actions:
         is_legal = node.env.action_masks()[action]

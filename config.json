@@ -1,4 +1,9 @@
 {
+  "env": {
+    "R": 8,
+    "C": 4,
+    "N": 6
+  },
   "train": {
     "log_wandb": true,
     "l2_weight_reg": 0.0001,
@@ -8,9 +13,16 @@
     "scheduler_gamma": 0.5,
     "train_for_n_batches": 5e5,
     "buffer_size": 450000,
-    "value_scaling": 0.1,
-    "batches_before_eval": 2000,
-    "can_only_add": true
+    "value_scaling": 0.1
+  },
+  "inference": {
+    "can_only_add": true,
+    "n_processes": 60,
+    "batch_size": 25
+  },
+  "eval": {
+    "testset_size": 15,
+    "batch_interval": 2000
   },
   "mcts": {
     "c_puct": 10,
@@ -18,11 +30,6 @@
     "search_iterations": 100,
     "dirichlet_weight": 0.25,
     "dirichlet_alpha": 0.2
-  },
-  "env": {
-    "R": 8,
-    "C": 4,
-    "N": 6
   },
   "nn": {
     "blocks": 16,
@@ -36,8 +43,5 @@
     "value_kernel_size": 1,
     "value_stride": 1,
     "value_hidden": 256
-  },
-  "eval": {
-    "testset_size": 50
   }
 }

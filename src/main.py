@@ -24,6 +24,7 @@ from torch.multiprocessing import Process
 import numpy as np
 from multiprocessing.connection import Connection
 from GPUProcess import gpu_process
+from Evaluator import evaluator_loop
 
 
 class PretrainedModel(TypedDict):
@@ -35,41 +36,6 @@ class PretrainedModel(TypedDict):
 
     wandb_run: str = None
     wandb_model: str = None
-
-
-class Evaluator:
-    def __init__(self, conn: Connection, update_events: list[mp.Event], config: dict):
-        self.conn = conn
-        self.update_events = update_events
-        self.config = config
-        self.test_set = create_testset(config)
-        avg_value, avg_reshuffles = test_network(self.conn, self.test_set, self.config)
-        log_eval(avg_value, avg_reshuffles, config, batch=0)
-        self.best_avg_value = avg_value
-
-    def should_eval(self, batch: int) -> bool:
-        return batch % self.config["train"]["batches_before_eval"] == 0
-
-    def update_inference_params(self) -> None:
-        self.config["train"]["can_only_add"] = False
-
-        torch.save(self.model.state_dict(), "shared_model.pt")
-
-        for event in self.update_events:
-            event.set()
-
-    def run_eval(self, batch: int) -> None:
-        avg_value, avg_reshuffles = test_network(self.conn, self.test_set, self.config)
-        log_eval(avg_value, avg_reshuffles, self.config, batch)
-
-        if avg_value >= self.best_avg_value:
-            self.best_avg_value = avg_value
-            self.update_inference_params()
-            save_model(self.model, self.config, batch)
-
-    def close(self) -> None:
-        for env in self.test_set:
-            env.close()
 
 
 def inference_loop(
@@ -129,8 +95,7 @@ def training_loop(
     pretrained: PretrainedModel,
     buffer: ReplayBuffer,
     stop_event: mp.Event,
-    update_events: list[mp.Event],
-    conn: Connection,
+    model_nr: mp.Value,
     config: dict,
 ) -> None:
     torch.manual_seed(0)
@@ -143,7 +108,6 @@ def training_loop(
 
     optimizer = get_optimizer(model, config)
     scheduler = get_scheduler(optimizer, config)
-    evaluator = Evaluator(conn, update_events, config)
     model.train()
 
     while len(buffer) < config["train"]["batch_size"]:
@@ -153,8 +117,9 @@ def training_loop(
     batches = tqdm(range(1, int(config["train"]["train_for_n_batches"]) + 1))
 
     for batch in batches:
-        if evaluator.should_eval(batch):
-            evaluator.run_eval(batch)
+        if batch % config["eval"]["batch_interval"] == 0:
+            model_nr.value = batch
+            torch.save(model.state_dict(), f"model{model_nr.value}.pt")
 
         avg_loss, avg_value_loss, avg_cross_entropy = train_batch(
             model, buffer, optimizer, scheduler, config
@@ -164,7 +129,6 @@ def training_loop(
             batch, avg_loss, avg_value_loss, avg_cross_entropy, current_lr, config
         )
 
-    evaluator.close()
     stop_event.set()
 
 
@@ -192,31 +156,35 @@ def init_model(
 def run_processes(config, pretrained):
     buffer = ReplayBuffer(config)
     stop_event = mp.Event()
-    # training_device = "mps"
-    # gpu_device = "mps"
-    # gpu_update_event = mp.Event()
-    # training_pipe = mp.Pipe()
-    # inference_pipes = [mp.Pipe() for _ in range(16)]
-    inference_processes = 90
-    # training_device = "cuda:0"
-    gpu_device = "cuda:0"
+    training_device = "cuda:0" if torch.cuda.is_available() else "mps"
+    gpu_device = "cuda:1" if torch.cuda.is_available() else "mps"
+    model_nr = mp.Value("i", 0)
     gpu_update_event = mp.Event()
-    training_pipe = mp.Pipe()
-    inference_pipes = [mp.Pipe() for _ in range(inference_processes)]
+    evaluation_pipe = mp.Pipe()
+    inference_pipes = [mp.Pipe() for _ in range(config["inference"]["n_processes"])]
 
     processes = [
-        # Process(
-        #     target=training_loop,
-        #     args=(
-        #         training_device,
-        #         pretrained,
-        #         buffer,
-        #         stop_event,
-        #         gpu_update_event,
-        #         training_pipe[1],
-        #         config,
-        #     ),
-        # ),
+        Process(
+            target=training_loop,
+            args=(
+                training_device,
+                pretrained,
+                buffer,
+                stop_event,
+                model_nr,
+                config,
+            ),
+        ),
+        Process(
+            target=evaluator_loop,
+            args=(
+                evaluation_pipe[1],
+                model_nr,
+                gpu_update_event,
+                stop_event,
+                config,
+            ),
+        ),
         Process(
             target=gpu_process,
             args=(
@@ -224,7 +192,7 @@ def run_processes(config, pretrained):
                 stop_event,
                 gpu_update_event,
                 config,
-                inference_pipes + [training_pipe],
+                inference_pipes + [evaluation_pipe],
             ),
         ),
     ] + [
@@ -251,7 +219,9 @@ def run_processes(config, pretrained):
 if __name__ == "__main__":
     mp.set_start_method("spawn")
     pretrained = PretrainedModel(wandb_run=None, wandb_model=None)
-    config = get_config("config.json")
+    config = get_config(
+        "config.json" if torch.cuda.is_available() else "local_config.json"
+    )
     if config["train"]["log_wandb"]:
         init_wandb_group()
     run_processes(config, pretrained)

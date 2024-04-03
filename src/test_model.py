@@ -121,7 +121,7 @@ def get_pretrained_model(pretrained: PretrainedModel):
     file = run.file(pretrained["wandb_model"])
     file.download(replace=True)
     config = run.config
-    config["train"]["can_only_add"] = False
+    config["inference"]["can_only_add"] = False
 
     model = NeuralNetwork(config=config, device="cpu")
     model.load_state_dict(torch.load(pretrained["wandb_model"], map_location="cpu"))

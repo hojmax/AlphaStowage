@@ -5,3 +5,4 @@ shared_model.pt
 benchmark
 dirichlet.ipynb
 test.py
+local_config.json
