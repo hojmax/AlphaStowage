@@ -130,9 +130,6 @@ def play_episode(env, net, config, device, deterministic=False):
 
         reused_tree = update_tree(reused_tree, action, env)
 
-        with open("output.log", "a") as f:
-            f.write(f"move made.")
-
     close_envs_in_tree(reused_tree)
 
     final_value = -env.moves_to_solve

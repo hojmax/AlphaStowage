@@ -102,13 +102,9 @@ def inference_loop(
         env.reset(np.random.randint(1e9))
 
         try:
-            with open("output.log", "a") as f:
-                f.write(f"Thread {id} playing episode {i}...\n")
             observations, final_value, final_reshuffles = play_episode(
                 env, model, config, model.device, deterministic=False
             )
-            with open("output.log", "a") as f:
-                f.write(f"Thread {id} finished episode {i}.\n")
             i += 1
             env.close()
         except TruncatedEpisodeError:
@@ -190,8 +186,7 @@ def run_processes(config, pretrained):
     buffer = ReplayBuffer(config)
     stop_event = mp.Event()
     devices = (
-        # [f"cuda:{i}" for i in range(torch.cuda.device_count())]
-        ["cuda:0"] + ["cpu"] * 40
+        [f"cuda:{i}" for i in range(torch.cuda.device_count())]
         if torch.cuda.is_available()
         else ["mps", "cpu", "cpu", "cpu", "cpu", "cpu", "cpu", "cpu"]
     )
