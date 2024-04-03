@@ -3,3 +3,4 @@ wandb
 model*.pt
 shared_model.pt
 benchmark
+output.log

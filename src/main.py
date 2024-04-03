@@ -102,11 +102,13 @@ def inference_loop(
         env.reset(np.random.randint(1e9))
 
         try:
-            print("Thread", id, f"playing episode {i}...")
+            with open("output.log", "a") as f:
+                f.write(f"Thread {id} playing episode {i}...\n")
             observations, final_value, final_reshuffles = play_episode(
                 env, model, config, model.device, deterministic=False
             )
-            print("Thread", id, f"finished episode {i}.")
+            with open("output.log", "a") as f:
+                f.write(f"Thread {id} finished episode {i}.\n")
             i += 1
             env.close()
         except TruncatedEpisodeError:
@@ -204,7 +206,15 @@ def run_processes(config, pretrained):
     ] + [
         Process(
             target=inference_loop,
-            args=(id + 1, device, pretrained, buffer, stop_event, update_event, config),
+            args=(
+                id + 1,
+                device,
+                pretrained,
+                buffer,
+                stop_event,
+                update_event,
+                config,
+            ),
         )
         for id, (device, update_event) in enumerate(zip(devices[1:], update_events))
     ]

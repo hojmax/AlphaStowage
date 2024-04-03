@@ -8,7 +8,7 @@ def init_wandb_group() -> None:
 
 def init_wandb_run(config: dict) -> None:
     wandb.init(
-        entity="alphastowage",
+        entity="hojmax",
         project="AlphaStowage",
         config=config,
         save_code=True,
