@@ -90,12 +90,32 @@ def inference_loop(
             buffer.increment_episode()
 
 
+def swap_over(
+    model_nr: mp.Value,
+    batch: int,
+    model: NeuralNetwork,
+    config: dict,
+    gpu_update_event: mp.Event,
+) -> None:
+    model_path = f"model{batch}.pt"
+    torch.save(model.state_dict(), model_path)
+    torch.save(model.state_dict(), f"shared_model.pt")
+    model_nr.value = batch
+
+    if config["train"]["log_wandb"]:
+        wandb.save(model_path)
+
+    config["inference"]["can_only_add"] = False
+    gpu_update_event.set()
+
+
 def training_loop(
     device: torch.device,
     pretrained: PretrainedModel,
     buffer: ReplayBuffer,
     stop_event: mp.Event,
     model_nr: mp.Value,
+    gpu_update_event: mp.Event,
     config: dict,
 ) -> None:
     torch.manual_seed(0)
@@ -118,8 +138,7 @@ def training_loop(
 
     for batch in batches:
         if batch % config["eval"]["batch_interval"] == 0:
-            model_nr.value = batch
-            torch.save(model.state_dict(), f"model{model_nr.value}.pt")
+            swap_over(model_nr, batch, model, config, gpu_update_event)
 
         avg_loss, avg_value_loss, avg_cross_entropy = train_batch(
             model, buffer, optimizer, scheduler, config
@@ -172,6 +191,7 @@ def run_processes(config, pretrained):
                 buffer,
                 stop_event,
                 model_nr,
+                gpu_update_event,
                 config,
             ),
         ),
@@ -180,7 +200,6 @@ def run_processes(config, pretrained):
             args=(
                 evaluation_pipe[1],
                 model_nr,
-                gpu_update_event,
                 stop_event,
                 config,
             ),
