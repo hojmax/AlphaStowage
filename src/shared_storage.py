@@ -37,3 +37,7 @@ class SharedStorage:
             self.current_checkpoint.update(keys)
         else:
             raise TypeError
+
+    def increment_info(self, key, value=1):
+        self.current_checkpoint[key] += value
+        return self.current_checkpoint[key]

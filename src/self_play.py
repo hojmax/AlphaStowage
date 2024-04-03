@@ -50,10 +50,6 @@ class SelfPlay:
                 env.close()
                 continue
 
-            num_played_games = ray.get(
-                shared_storage.get_info.remote("num_played_games")
-            )
-
             log_episode(
                 ray.get(shared_storage.get_info.remote("num_played_games")),
                 final_value,
@@ -61,4 +57,4 @@ class SelfPlay:
                 self.config,
             )
 
-            shared_storage.set_info.remote("num_played_games", num_played_games + 1)
+            shared_storage.increment_info.remote("num_played_games")
