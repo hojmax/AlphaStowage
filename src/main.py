@@ -1,109 +1,26 @@
-from Train import (
-    get_config,
-    create_testset,
-    play_episode,
-    test_network,
-    get_optimizer,
-    get_scheduler,
-    train_batch,
-    get_env,
-    save_model,
-)
+from Train import get_config, create_testset
 import torch
 from NeuralNetwork import NeuralNetwork
-from tqdm import tqdm
 import wandb
-from Node import TruncatedEpisodeError
-import time
-import warnings
 from Buffer import ReplayBuffer
-from Logging import log_batch, log_eval, log_episode, init_wandb_run, init_wandb_group
-import torch.multiprocessing as mp
-from torch.multiprocessing import Process
 import numpy as np
 from checkpoint_config import CheckpointConfig
 from self_play import SelfPlay
+from shared_storage import SharedStorage
+from evaluator import Evaluator
+import ray
+import copy
+from trainer import Trainer
+import time
+import copy
 
 
-class Evaluator:
-    def __init__(
-        self, model: NeuralNetwork, update_events: list[mp.Event], config: dict
-    ):
-        self.model = model
-        self.update_events = update_events
-        self.config = config
-        self.test_set = create_testset(config)
-        avg_value, avg_reshuffles = test_network(self.model, self.test_set, self.config)
-        log_eval(avg_value, avg_reshuffles, config, batch=0)
-        self.best_avg_value = avg_value
+@ray.remote(num_cpus=0, num_gpus=0)
+class CPUActor:
+    """Trick to force DataParallel to stay on CPU to get weights on CPU even if there is a GPU"""
 
-    def eval_loop(self, stop_event: mp.Event) -> None:
-        batch = 0
-        while not stop_event.is_set():
-            if self.should_eval(batch):
-                self.run_eval(batch)
-            batch += 1
-
-    def should_eval(self, batch: int) -> bool:
-        return batch % self.config["train"]["batches_before_eval"] == 0
-
-    def update_inference_params(self) -> None:
-        self.config["train"]["can_only_add"] = False
-
-        torch.save(self.model.state_dict(), "shared_model.pt")
-
-        for event in self.update_events:
-            event.set()
-
-    def run_eval(self, batch: int) -> None:
-        avg_value, avg_reshuffles = test_network(self.model, self.test_set, self.config)
-        log_eval(avg_value, avg_reshuffles, self.config, batch)
-
-        if avg_value >= self.best_avg_value:
-            self.best_avg_value = avg_value
-            self.update_inference_params()
-            save_model(self.model, self.config, batch)
-
-    def close(self) -> None:
-        for env in self.test_set:
-            env.close()
-
-
-def training_loop(
-    device: torch.device,
-    pretrained: CheckpointConfig,
-    buffer: ReplayBuffer,
-    stop_event: mp.Event,
-    config: dict,
-) -> None:
-    torch.manual_seed(0)
-    np.random.seed(0)
-
-    model = init_model(config, device, pretrained)
-
-    if config["train"]["log_wandb"]:
-        init_wandb_run(config)
-
-    optimizer = get_optimizer(model, config)
-    scheduler = get_scheduler(optimizer, config)
-    model.train()
-
-    while len(buffer) < config["train"]["batch_size"]:
-        print("Waiting for buffer to fill up...")
-        time.sleep(1)
-
-    batches = tqdm(range(1, int(config["train"]["train_for_n_batches"]) + 1))
-
-    for batch in batches:
-        avg_loss, avg_value_loss, avg_cross_entropy = train_batch(
-            model, buffer, optimizer, scheduler, config
-        )
-        current_lr = scheduler.get_last_lr()[0]
-        log_batch(
-            batch, avg_loss, avg_value_loss, avg_cross_entropy, current_lr, config
-        )
-
-    stop_event.set()
+    def get_initial_weights(self, config):
+        return NeuralNetwork(config).get_weights()
 
 
 def get_model_weights_path(pretrained: CheckpointConfig):
@@ -127,40 +44,121 @@ def init_model(
     return model
 
 
-def run_processes(config, pretrained):
-    buffer = ReplayBuffer(config)
-    stop_event = mp.Event()
-    device = "cuda:0" if torch.cuda.is_available() else "mps"
-    print("GPUs:", torch.cuda.device_count(), "CPUs", mp.cpu_count())
+class AlphaZero:
+    def __init__(self, config: dict):
+        self.config = config
+        self.test_set = create_testset(config)
 
-    update_events = [mp.Event() for _ in range(config["train"]["num_workers"])]
+        # Fix seed
+        np.random.seed(self.config["train"]["seed"])
+        torch.manual_seed(self.config["train"]["seed"])
 
-    processes = [
-        Process(
-            target=training_loop,
-            args=(device, pretrained, buffer, stop_event, config),
+        # Initialize checkpoint
+        self.checkpoint = {
+            "training_step": 0,
+            "num_played_games": 0,
+            "terminate": False,
+        }
+        cpu_actor = CPUActor.remote()
+        cpu_weights = cpu_actor.get_initial_weights.remote(self.config)
+        self.checkpoint["weights"] = copy.deepcopy(ray.get(cpu_weights))
+        self.checkpoint["best_weights"] = copy.deepcopy(ray.get(cpu_weights))
+
+        # Workers
+        self.self_play_workers = None
+        self.test_worker = None
+        self.training_worker = None
+        self.replay_buffer_worker = None
+        self.shared_storage_worker = None
+
+    def train(self) -> None:
+        # Initialize workers
+        self.training_worker = Trainer.options(num_cpus=1, num_gpus=0).remote(
+            self.config, self.checkpoint
         )
-    ]
 
-    for i in range(config["train"]["num_workers"]):
-        self_play_worker = SelfPlay(config, seed=i)
-        self_play_worker_process = Process(
-            target=self_play_worker.selfplay_loop,
-            args=(stop_event, update_events[i], buffer),
+        self.shared_storage_worker = SharedStorage.remote(
+            self.checkpoint,
+            self.config,
         )
-        processes.append(self_play_worker_process)
+        self.shared_storage_worker.set_info.remote("terminate", False)
 
-    for process in processes:
-        process.start()
+        self.replay_buffer_worker = ReplayBuffer.remote(self.config)
 
-    for process in processes:
-        process.join()
+        self.self_play_workers = [
+            SelfPlay.options(num_cpus=1, num_gpus=0).remote(
+                self.config, self.checkpoint, seed=i
+            )
+            for i in range(self.config["train"]["num_workers"])
+        ]
+
+        # Launch workers
+        [
+            self_play.self_play_loop.remote(
+                self.shared_storage_worker, self.replay_buffer_worker
+            )
+            for self_play in self.self_play_workers
+        ]
+        self.training_worker.training_loop.remote(
+            self.shared_storage_worker, self.replay_buffer_worker
+        )
+
+        self.logging_loop()
+
+    def terminate_workers(self):
+        """
+        Softly terminate the running tasks and garbage collect the workers.
+        """
+        if self.shared_storage_worker:
+            self.shared_storage_worker.set_info.remote("terminate", True)
+            self.checkpoint = ray.get(
+                self.shared_storage_worker.get_checkpoint.remote()
+            )
+        if self.replay_buffer_worker:
+            self.replay_buffer = ray.get(self.replay_buffer_worker.get_buffer.remote())
+
+        print("\nShutting down workers...")
+
+        self.self_play_workers = None
+        self.test_worker = None
+        self.training_worker = None
+        self.replay_buffer_worker = None
+        self.shared_storage_worker = None
+
+    def logging_loop(self):
+        keys = [
+            "num_played_games",
+            "training_step",
+        ]
+
+        info = ray.get(self.shared_storage_worker.get_info.remote(keys))
+
+        self.test_worker = Evaluator.options(num_cpus=1, num_gpus=0).remote(
+            self.config, self.checkpoint, self.config["train"]["seed"]
+        )
+        self.test_worker.eval_loop.remote(self.shared_storage_worker)
+
+        try:
+            while info["training_step"] < self.config["train"]["training_steps"]:
+                info = ray.get(self.shared_storage_worker.get_info.remote(keys))
+                print(
+                    f"Games: {info['num_played_games']}, Training step: {info['training_step']}"
+                )
+                time.sleep(2)
+        except KeyboardInterrupt:
+            pass
+
+        self.terminate_workers()
+
+    def load_checkpoint(self, wandb_run: str, wandb_model: str) -> None:
+        api = wandb.Api()
+        run = api.run(wandb_run)
+        file = run.file(wandb_model)
+        file.download(replace=True)
+        self.checkpoint = torch.load(wandb_model, map_location="cpu")
 
 
 if __name__ == "__main__":
-    mp.set_start_method("spawn")
-    pretrained = CheckpointConfig(wandb_run=None, wandb_model=None)
     config = get_config("config.json")
-    if config["train"]["log_wandb"]:
-        init_wandb_group()
-    run_processes(config, pretrained)
+    az = AlphaZero(config)
+    az.train()

@@ -3,63 +3,63 @@ import torch
 from Node import TruncatedEpisodeError
 import warnings
 from Buffer import ReplayBuffer
-from Logging import log_episode, init_wandb_run
+from shared_storage import SharedStorage
+from Logging import log_episode
 import torch.multiprocessing as mp
 import numpy as np
 from NeuralNetwork import NeuralNetwork
+import ray
 
 
+@ray.remote
 class SelfPlay:
-
-    def __init__(self, config: dict, checkpoint_path: str | None = None, seed: int = 0):
+    def __init__(self, config: dict, checkpoint: dict, seed: int = 0):
         self.config = config
-        self.stop_event = mp.Event()
-        self.update_event = mp.Event()
         self.model = NeuralNetwork(config)
-        if checkpoint_path is not None:
-            self.model.load_state_dict(torch.load(checkpoint_path, map_location="cpu"))
+        self.model.set_weights(checkpoint["best_weights"])
         self.model.to("cpu")
         self.model.eval()
         torch.manual_seed(seed)
         np.random.seed(seed)
 
-    def selfplay_loop(
-        self, stop_event: mp.Event, update_event: mp.Event, buffer: ReplayBuffer
+    def self_play_loop(
+        self, shared_storage: SharedStorage, replay_buffer: ReplayBuffer
     ) -> None:
 
-        if self.config["train"]["log_wandb"]:
-            init_wandb_run(self.config)
-
-        i = 0
-        while not stop_event.is_set():
-            if update_event.is_set():
-                self.model.load_state_dict(
-                    torch.load("shared_model.pt", map_location="cpu")
-                )
-                update_event.clear()
+        while ray.get(shared_storage.get_info.remote("training_step")) < self.config[
+            "train"
+        ]["training_steps"] and not ray.get(
+            shared_storage.get_info.remote("terminate")
+        ):
+            self.model.set_weights(
+                ray.get(shared_storage.get_info.remote("best_weights"))
+            )
 
             env = get_env(self.config)
             env.reset(np.random.randint(1e9))
 
             try:
-                print(f"playing episode {i}...")
                 observations, final_value, final_reshuffles = play_episode(
                     env, self.model, self.config, "cpu", deterministic=False
                 )
-                print(f"finished episode {i}.")
-                i += 1
+                for bay, flat_T, prob, value in observations:
+                    replay_buffer.extend.remote((bay, flat_T, prob, value))
+
                 env.close()
             except TruncatedEpisodeError:
                 warnings.warn("Episode was truncated in training.")
                 env.close()
                 continue
 
-            for bay, flat_T, prob, value in observations:
-                buffer.extend(bay, flat_T, prob, value)
+            num_played_games = ray.get(
+                shared_storage.get_info.remote("num_played_games")
+            )
 
             log_episode(
-                buffer.increment_episode(),
+                ray.get(shared_storage.get_info.remote("num_played_games")),
                 final_value,
                 final_reshuffles,
                 self.config,
             )
+
+            shared_storage.set_info.remote("num_played_games", num_played_games + 1)

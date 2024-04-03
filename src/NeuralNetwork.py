@@ -54,6 +54,18 @@ class Residual_Block(nn.Module):
         return out
 
 
+def dict_to_cpu(dictionary):
+    cpu_dict = {}
+    for key, value in dictionary.items():
+        if isinstance(value, torch.Tensor):
+            cpu_dict[key] = value.cpu()
+        elif isinstance(value, dict):
+            cpu_dict[key] = dict_to_cpu(value)
+        else:
+            cpu_dict[key] = value
+    return cpu_dict
+
+
 class NeuralNetwork(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -130,13 +142,21 @@ class NeuralNetwork(nn.Module):
         )
 
     def forward(self, bay, flat_T):
+
         flat_T = self.flat_T_reshaper(flat_T)
         flat_T = flat_T.view(-1, 1, self.env_config["R"], self.env_config["C"])
-        x = torch.cat([bay, flat_T], dim=1)
+        try:
+            x = torch.cat([bay, flat_T], dim=1)
+        except:
+            print(bay.shape, flat_T.shape)
+            raise
         out = self.layers(x)
         policy = self.policy_head(out)
         value = self.value_head(out)
         return policy, value
+
+    def get_weights(self):
+        return dict_to_cpu(self.state_dict())
 
     def set_weights(self, weights):
         self.load_state_dict(weights)

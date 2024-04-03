@@ -241,7 +241,7 @@ def remove_all_pruning(node: Node) -> None:
 
 
 def get_tree_probs(node: Node, config: dict) -> torch.Tensor:
-    action_probs = torch.zeros(2 * config["env"]["C"], dtype=torch.float64)
+    action_probs = torch.zeros(2 * config["env"]["C"], dtype=torch.float32)
 
     for i in node.children:
         value = np.power(

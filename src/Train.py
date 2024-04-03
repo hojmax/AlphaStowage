@@ -16,62 +16,14 @@ import wandb
 from NeuralNetwork import NeuralNetwork
 
 
-def loss_fn(pred_value, value, pred_prob, prob, config):
-    value_error = torch.mean(torch.square(value - pred_value))
-    cross_entropy = (
-        -torch.sum(prob.flatten() * torch.log(pred_prob.flatten())) / prob.shape[0]
-    )
-    loss = config["train"]["value_scaling"] * value_error + cross_entropy
-    return loss, value_error, cross_entropy
-
-
-def optimize_model(pred_value, value, pred_prob, prob, optimizer, scheduler, config):
-    loss, value_loss, cross_entropy = loss_fn(
-        pred_value=pred_value,
-        value=value,
-        pred_prob=pred_prob,
-        prob=prob,
-        config=config,
-    )
-    optimizer.zero_grad()
-    loss.backward()
-
-    optimizer.step()
-    scheduler.step()
-
-    return loss.item(), value_loss.item(), cross_entropy.item()
-
-
-def train_batch(model, buffer, optimizer, scheduler, config):
-    bay, flat_T, prob, value = buffer.sample(config["train"]["batch_size"])
-    bay = bay.to(model.device)
-    flat_T = flat_T.to(model.device)
-    prob = prob.to(model.device)
-    value = value.to(model.device)
-
-    pred_prob, pred_value = model(bay, flat_T)
-    loss, value_loss, cross_entropy = optimize_model(
-        pred_value=pred_value,
-        value=value,
-        pred_prob=pred_prob,
-        prob=prob,
-        optimizer=optimizer,
-        scheduler=scheduler,
-        config=config,
-    )
-    return (
-        loss,
-        value_loss,
-        cross_entropy,
-    )
-
-
 def get_action(
     probabilities: torch.Tensor, deterministic: bool, config: dict, env: Env
 ) -> int:
     if deterministic:
         action = torch.argmax(probabilities).item()
     else:
+        probabilities = probabilities.numpy()
+        probabilities /= np.sum(probabilities)
         action = np.random.choice(2 * config["env"]["C"], p=probabilities)
 
     action = action if action < env.C else action + env.C - config["env"]["C"]
@@ -106,9 +58,6 @@ def add_value_to_observations(observations, final_value):
 
 
 def play_episode(env, net, config, device, deterministic=False):
-    if deterministic:
-        np.random.seed(0)
-
     observations = []
     reused_tree = None
     transposition_table = {}
@@ -212,19 +161,3 @@ def get_config(file_path):
         config = json.load(f)
 
     return config
-
-
-def get_optimizer(model, config):
-    return optim.Adam(
-        model.parameters(),
-        lr=config["train"]["learning_rate"],
-        weight_decay=config["train"]["l2_weight_reg"],
-    )
-
-
-def get_scheduler(optimizer, config):
-    return optim.lr_scheduler.StepLR(
-        optimizer,
-        config["train"]["scheduler_step_size_in_batches"],
-        config["train"]["scheduler_gamma"],
-    )

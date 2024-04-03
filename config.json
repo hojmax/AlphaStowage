@@ -6,12 +6,14 @@
     "learning_rate": 0.001,
     "scheduler_step_size_in_batches": 1e5,
     "scheduler_gamma": 0.5,
-    "train_for_n_batches": 5e5,
+    "training_steps": 5e5,
     "buffer_size": 450000,
     "value_scaling": 0.1,
     "batches_before_eval": 2000,
     "can_only_add": true,
-    "num_workers": 4
+    "num_workers": 4,
+    "seed": 0,
+    "checkpoint_interval": 5000
   },
   "mcts": {
     "c_puct": 5,

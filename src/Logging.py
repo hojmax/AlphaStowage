@@ -32,7 +32,7 @@ def log_episode(
         )
 
 
-def log_batch(
+def log_step(
     i: int,
     avg_loss: float,
     avg_value_loss: float,
@@ -52,7 +52,7 @@ def log_batch(
         )
     else:
         print(
-            f"*Batch {i}* Loss: {avg_loss}, Value Loss: {avg_value_loss}, Cross Entropy: {avg_cross_entropy}, LR: {lr}"
+            f"*Step {i}* Loss: {avg_loss}, Value Loss: {avg_value_loss}, Cross Entropy: {avg_cross_entropy}, LR: {lr}"
         )
 
 

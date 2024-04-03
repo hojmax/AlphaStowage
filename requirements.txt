@@ -3,3 +3,4 @@ tqdm
 pygame
 MPSPEnv==0.0.20
 torch
+ray==2.9.2
