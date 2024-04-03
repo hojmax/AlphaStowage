@@ -112,11 +112,11 @@ def run_network(
     bay, flat_t = get_torch_obs(node.env, config)
     conn.send((bay, flat_t))
     probabilities, state_value = conn.recv()
-    state_value = torch.clip(
-        state_value,
-        min=0,
-        max=node.env.R * node.env.C * (node.env.remaining_ports + 1),
-    )
+    # state_value = torch.clip(
+    #     state_value,
+    #     min=0,
+    #     max=node.env.R * node.env.C * (node.env.remaining_ports + 1),
+    # )
     return probabilities, state_value
 
 
