@@ -87,7 +87,7 @@ def inference_loop(
 
     avg_value = 0
     avg_reshuffles = 0
-    avg_over = 10
+    avg_over = 2
     i = 0
     while not stop_event.is_set():
 

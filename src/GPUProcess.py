@@ -3,7 +3,7 @@ from NeuralNetwork import NeuralNetwork
 
 
 def gpu_process(device, stop_event, update_event, config, pipes):
-    batch_size = 15
+    batch_size = 25
     model = NeuralNetwork(config, device).to(device)
     model.eval()
     bays = []
