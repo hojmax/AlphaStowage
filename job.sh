@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=rl
 #SBATCH --output=%j.txt  # Use %j to denote the job ID
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:titanrtx:1
 #SBATCH --time=30:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=96
