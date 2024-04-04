@@ -1,8 +1,8 @@
 {
   "env": {
-    "R": 8,
-    "C": 4,
-    "N": 6
+    "R": 12,
+    "C": 12,
+    "N": 16
   },
   "train": {
     "log_wandb": true,
@@ -22,18 +22,18 @@
   },
   "eval": {
     "testset_size": 15,
-    "batch_interval": 6000
+    "batch_interval": 2000
   },
   "mcts": {
-    "c_puct": 5,
+    "c_puct": 10,
     "temperature": 0.6,
     "search_iterations": 100,
     "dirichlet_weight": 0.25,
-    "dirichlet_alpha": 1
+    "dirichlet_alpha": 0.2
   },
   "nn": {
-    "blocks": 16,
-    "hidden_channels": 32,
+    "blocks": 20,
+    "hidden_channels": 64,
     "hidden_kernel_size": 3,
     "hidden_stride": 1,
     "policy_channels": 2,

@@ -1,6 +1,5 @@
 from Train import (
     get_config,
-    create_testset,
     play_episode,
     test_network,
     get_optimizer,
