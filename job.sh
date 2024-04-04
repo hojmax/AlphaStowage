@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=rl
 #SBATCH --output=%j.txt  # Use %j to denote the job ID
-#SBATCH --gres=gpu:a100:2
+#SBATCH --gres=gpu:2
 #SBATCH --time=30:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=96
@@ -10,7 +10,7 @@
 echo "*** Loading modules ***"
 
 module load anaconda3/2023.03-py3.10
-module load python/3.9.16
+module load python/3.11.3
 
 echo "*** Loading environment ***"
 
