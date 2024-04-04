@@ -7,7 +7,6 @@ class ReplayBuffer:
     def __init__(self, config):
         self.max_size = config["train"]["buffer_size"]
         self.lock = mp.Lock()
-        self.episode = mp.Value("i", 0)
         self.ptr = mp.Value("i", 0)
         self.size = mp.Value("i", 0)
 
@@ -23,11 +22,6 @@ class ReplayBuffer:
         self.flat_T = torch.zeros(flat_T_size, dtype=torch.float32).share_memory_()
         self.prob = torch.zeros(prob_size, dtype=torch.float32).share_memory_()
         self.value = torch.zeros(value_size, dtype=torch.float32).share_memory_()
-
-    def increment_episode(self) -> int:
-        with self.lock:
-            self.episode.value += 1
-            return self.episode.value
 
     def extend(
         self,

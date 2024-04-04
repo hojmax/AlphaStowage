@@ -11,7 +11,7 @@
     "learning_rate": 0.001,
     "scheduler_step_size_in_batches": 1e5,
     "scheduler_gamma": 0.5,
-    "train_for_n_batches": 5e5,
+    "min_lr": 1e-5,
     "buffer_size": 450000,
     "value_scaling": 0.1
   },

@@ -1,5 +1,28 @@
 import wandb
 import os
+import time
+from Buffer import ReplayBuffer
+import torch.multiprocessing as mp
+
+
+def logging_process(buffer: ReplayBuffer, queue: mp.Queue, config: dict) -> None:
+    if config["train"]["log_wandb"]:
+        init_wandb_run(config)
+
+    episode_count = 1
+
+    while True:
+        if not queue.empty():
+            value, reshuffles = queue.get()
+            log_episode(
+                episode_count,
+                value,
+                reshuffles,
+                config,
+            )
+            episode_count += 1
+        else:
+            time.sleep(1)
 
 
 def init_wandb_group() -> None:
@@ -53,19 +76,4 @@ def log_batch(
     else:
         print(
             f"*Batch {i}* Loss: {avg_loss}, Value Loss: {avg_value_loss}, Cross Entropy: {avg_cross_entropy}, LR: {lr}"
-        )
-
-
-def log_eval(avg_error: float, avg_reshuffles: float, config: dict, batch: int):
-    if config["train"]["log_wandb"]:
-        wandb.log(
-            {
-                "eval_moves": avg_error,
-                "eval_reshuffles": avg_reshuffles,
-                "batch": batch,
-            }
-        )
-    else:
-        print(
-            f"*Eval {batch}* Avg. Value: {avg_error}, Avg. Reshuffles: {avg_reshuffles}"
         )

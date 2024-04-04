@@ -14,6 +14,7 @@ import random
 import warnings
 import wandb
 from NeuralNetwork import NeuralNetwork
+from StepLRWithMinLR import StepLRWithMinLR
 
 
 def loss_fn(pred_value, value, pred_prob, prob, config):
@@ -216,8 +217,9 @@ def get_optimizer(model, config):
 
 
 def get_scheduler(optimizer, config):
-    return optim.lr_scheduler.StepLR(
+    return StepLRWithMinLR(
         optimizer,
         config["train"]["scheduler_step_size_in_batches"],
         config["train"]["scheduler_gamma"],
+        config["train"]["min_lr"],
     )

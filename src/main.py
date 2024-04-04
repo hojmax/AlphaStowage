@@ -18,13 +18,12 @@ import time
 from typing import TypedDict
 import warnings
 from Buffer import ReplayBuffer
-from Logging import log_batch, log_eval, log_episode, init_wandb_run, init_wandb_group
+from Logging import log_batch, logging_process, init_wandb_run, init_wandb_group
 import torch.multiprocessing as mp
 from torch.multiprocessing import Process
 import numpy as np
 from multiprocessing.connection import Connection
 from GPUProcess import gpu_process
-from Evaluator import evaluator_loop
 
 
 class PretrainedModel(TypedDict):
@@ -41,21 +40,15 @@ class PretrainedModel(TypedDict):
 def inference_loop(
     id: int,
     buffer: ReplayBuffer,
-    stop_event: mp.Event,
     conn: Connection,
+    episode_queue: mp.Queue,
     config: dict,
 ) -> None:
     torch.manual_seed(id)
     np.random.seed(id)
 
-    if config["train"]["log_wandb"]:
-        init_wandb_run(config)
-
-    avg_value = 0
-    avg_reshuffles = 0
-    avg_over = 2
     i = 0
-    while not stop_event.is_set():
+    while True:
 
         env = get_env(config)
         env.reset(np.random.randint(1e9))
@@ -74,24 +67,10 @@ def inference_loop(
         for bay, flat_T, prob, value in observations:
             buffer.extend(bay, flat_T, prob, value)
 
-        avg_value += final_value / avg_over
-        avg_reshuffles += final_reshuffles / avg_over
-
-        if i % avg_over == 0:
-            log_episode(
-                buffer.increment_episode(),
-                avg_value,
-                avg_reshuffles,
-                config,
-            )
-            avg_value = 0
-            avg_reshuffles = 0
-        else:
-            buffer.increment_episode()
+        episode_queue.put((final_value, final_reshuffles))
 
 
 def swap_over(
-    model_nr: mp.Value,
     batch: int,
     model: NeuralNetwork,
     config: dict,
@@ -100,7 +79,6 @@ def swap_over(
     model_path = f"model{batch}.pt"
     torch.save(model.state_dict(), model_path)
     torch.save(model.state_dict(), f"shared_model.pt")
-    model_nr.value = batch
 
     if config["train"]["log_wandb"]:
         wandb.save(model_path)
@@ -113,8 +91,6 @@ def training_loop(
     device: torch.device,
     pretrained: PretrainedModel,
     buffer: ReplayBuffer,
-    stop_event: mp.Event,
-    model_nr: mp.Value,
     gpu_update_event: mp.Event,
     config: dict,
 ) -> None:
@@ -134,11 +110,10 @@ def training_loop(
         print("Waiting for buffer to fill up...")
         time.sleep(1)
 
-    batches = tqdm(range(1, int(config["train"]["train_for_n_batches"]) + 1))
-
-    for batch in batches:
+    batch = 1
+    while True:
         if batch % config["eval"]["batch_interval"] == 0:
-            swap_over(model_nr, batch, model, config, gpu_update_event)
+            swap_over(batch, model, config, gpu_update_event)
 
         avg_loss, avg_value_loss, avg_cross_entropy = train_batch(
             model, buffer, optimizer, scheduler, config
@@ -147,8 +122,7 @@ def training_loop(
         log_batch(
             batch, avg_loss, avg_value_loss, avg_cross_entropy, current_lr, config
         )
-
-    stop_event.set()
+        batch += 1
 
 
 def get_model_weights_path(pretrained: PretrainedModel):
@@ -174,13 +148,11 @@ def init_model(
 
 def run_processes(config, pretrained):
     buffer = ReplayBuffer(config)
-    stop_event = mp.Event()
     training_device = "cuda:0" if torch.cuda.is_available() else "mps"
     gpu_device = "cuda:1" if torch.cuda.is_available() else "mps"
-    model_nr = mp.Value("i", 0)
     gpu_update_event = mp.Event()
-    evaluation_pipe = mp.Pipe()
     inference_pipes = [mp.Pipe() for _ in range(config["inference"]["n_processes"])]
+    episode_queue = mp.Queue()
 
     processes = [
         Process(
@@ -189,18 +161,7 @@ def run_processes(config, pretrained):
                 training_device,
                 pretrained,
                 buffer,
-                stop_event,
-                model_nr,
                 gpu_update_event,
-                config,
-            ),
-        ),
-        Process(
-            target=evaluator_loop,
-            args=(
-                evaluation_pipe[1],
-                model_nr,
-                stop_event,
                 config,
             ),
         ),
@@ -208,20 +169,27 @@ def run_processes(config, pretrained):
             target=gpu_process,
             args=(
                 gpu_device,
-                stop_event,
                 gpu_update_event,
                 config,
-                inference_pipes + [evaluation_pipe],
+                inference_pipes,
+            ),
+        ),
+        Process(
+            target=logging_process,
+            args=(
+                buffer,
+                episode_queue,
+                config,
             ),
         ),
     ] + [
         Process(
             target=inference_loop,
             args=(
-                id + 1,
+                id,
                 buffer,
-                stop_event,
                 conn,
+                episode_queue,
                 config,
             ),
         )
@@ -241,6 +209,8 @@ if __name__ == "__main__":
     config = get_config(
         "config.json" if torch.cuda.is_available() else "local_config.json"
     )
+
     if config["train"]["log_wandb"]:
         init_wandb_group()
+
     run_processes(config, pretrained)

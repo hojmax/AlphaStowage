@@ -2,7 +2,7 @@ import torch
 from NeuralNetwork import NeuralNetwork
 
 
-def gpu_process(device, stop_event, update_event, config, pipes):
+def gpu_process(device, update_event, config, pipes):
     model = NeuralNetwork(config, device).to(device)
     model.eval()
     bays = []
@@ -10,7 +10,7 @@ def gpu_process(device, stop_event, update_event, config, pipes):
     conns = []
 
     with torch.no_grad():
-        while not stop_event.is_set():
+        while True:
             if update_event.is_set():
                 model.load_state_dict(
                     torch.load("shared_model.pt", map_location=model.device)
