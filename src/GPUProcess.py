@@ -41,6 +41,8 @@ def gpu_process(device, update_event, config, pipes):
                 flat_ts.append(flat_T)
                 conns.append(parent_conn)
 
+                del bay, flat_T
+
                 if len(bays) < config["inference"]["batch_size"]:
                     continue
 
@@ -53,6 +55,9 @@ def gpu_process(device, update_event, config, pipes):
 
                 for conn, policy, value in zip(conns, policies, values):
                     conn.send((policy, value))
+                    del policy, value
+
+                del (bays, flat_ts, conns, policies, values)
 
                 bays = []
                 flat_ts = []

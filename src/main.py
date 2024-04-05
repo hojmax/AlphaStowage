@@ -70,6 +70,8 @@ def inference_loop(
 
         episode_queue.put((final_value, final_reshuffles))
 
+        del observations, final_value, final_reshuffles
+
 
 def swap_over(
     batch: int,

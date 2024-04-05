@@ -16,6 +16,7 @@ def logging_process(queue: mp.Queue, config: dict) -> None:
             value, reshuffles = queue.get()
             episode_logger.log(episode_count, value, reshuffles, config)
             episode_count += 1
+            del value, reshuffles
         else:
             time.sleep(1)
 
