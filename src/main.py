@@ -14,7 +14,13 @@ import time
 from typing import TypedDict
 import warnings
 from Buffer import ReplayBuffer
-from Logging import log_batch, logging_process, init_wandb_run, init_wandb_group
+from Logging import (
+    log_batch,
+    logging_process,
+    init_wandb_run,
+    init_wandb_group,
+    BatchLogger,
+)
 import torch.multiprocessing as mp
 from torch.multiprocessing import Process
 import numpy as np
@@ -92,6 +98,7 @@ def training_loop(
 ) -> None:
     torch.manual_seed(0)
     np.random.seed(0)
+    batch_logger = BatchLogger(config)
 
     model = init_model(config, device, pretrained)
 
@@ -111,13 +118,11 @@ def training_loop(
         if batch % config["eval"]["batch_interval"] == 0:
             swap_over(batch, model, config, gpu_update_event)
 
-        avg_loss, avg_value_loss, avg_cross_entropy = train_batch(
+        loss, value_loss, cross_entropy = train_batch(
             model, buffer, optimizer, scheduler, config
         )
         current_lr = scheduler.get_last_lr()[0]
-        log_batch(
-            batch, avg_loss, avg_value_loss, avg_cross_entropy, current_lr, config
-        )
+        batch_logger.log(batch, loss, value_loss, cross_entropy, current_lr, config)
         batch += 1
 
 
@@ -173,7 +178,6 @@ def run_processes(config, pretrained):
         Process(
             target=logging_process,
             args=(
-                buffer,
                 episode_queue,
                 config,
             ),

@@ -185,14 +185,6 @@ def test_network(conn, testset, config):
     return avg_error, avg_reshuffles
 
 
-def save_model(model: NeuralNetwork, config: dict, i: int) -> None:
-    model_path = f"model{i}.pt"
-    torch.save(model.state_dict(), model_path)
-
-    if config["train"]["log_wandb"]:
-        wandb.save(model_path)
-
-
 def get_device():
     return torch.device(
         "cuda"
