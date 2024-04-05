@@ -10,7 +10,7 @@
 echo "*** Loading modules ***"
 
 module load anaconda3/2023.03-py3.10
-module load python/3.11.3
+module load python/3.9.16
 
 echo "*** Loading environment ***"
 
