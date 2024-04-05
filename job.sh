@@ -31,7 +31,6 @@ pip install -r requirements.txt --quiet
 echo "*** Running script: ${1:-src/main.py} ***"
 
 # This command increases the number of file descriptors available to the process
-# Should fix this error I had: https://stackoverflow.com/questions/71642653/how-to-resolve-the-error-runtimeerror-received-0-items-of-ancdata
 ulimit -n 10000
 
 # Run the specified Python script, defaulting to main.py if none is provided

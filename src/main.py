@@ -15,7 +15,6 @@ from typing import TypedDict
 import warnings
 from Buffer import ReplayBuffer
 from Logging import (
-    log_batch,
     logging_process,
     init_wandb_run,
     init_wandb_group,
