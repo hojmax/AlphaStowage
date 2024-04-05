@@ -4,36 +4,6 @@ import time
 import torch.multiprocessing as mp
 
 
-def get_file_access_mode(fd_path):
-    try:
-        with open(f"/proc/self/fdinfo/{fd_path}", "r") as f:
-            flags = f.readline().strip()
-        mode = ""
-        if "01" in flags:
-            mode = "write"
-        elif "02" in flags:
-            mode = "read"
-        else:
-            mode = "unknown"
-        return mode
-    except Exception as e:
-        return f"Error determining access mode: {e}"
-
-
-def log_open_fds(logfile="open_fds.log"):
-    with open(logfile, "a") as log:  # 'a' opens the file in append mode
-        fds = os.listdir("/proc/self/fd")
-        current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-        log.write(f"{current_time} - Number of open file descriptors: {len(fds)}\n")
-        for fd in fds:
-            try:
-                path = os.readlink(f"/proc/self/fd/{fd}")
-                mode = get_file_access_mode(fd)
-                log.write(f"{current_time} - FD {fd}: {path}, Mode: {mode}\n")
-            except Exception as e:
-                log.write(f"{current_time} - Error reading file descriptor {fd}: {e}\n")
-
-
 def logging_process(queue: mp.Queue, config: dict) -> None:
     if config["train"]["log_wandb"]:
         init_wandb_run(config)
@@ -48,6 +18,13 @@ def logging_process(queue: mp.Queue, config: dict) -> None:
             episode_count += 1
         else:
             time.sleep(1)
+
+
+def log_process_ps(processed_per_second: float, config: dict) -> None:
+    if config["train"]["log_wandb"]:
+        wandb.log({"processed_per_second": processed_per_second})
+    else:
+        print(f"Processed per second: {processed_per_second}")
 
 
 def init_wandb_group() -> None:
@@ -142,7 +119,6 @@ class BatchLogger:
             self.avg_cross_entropy /= self.log_interval
             self.avg_lr /= self.log_interval
 
-            log_open_fds()
             log_batch(
                 i,
                 self.avg_loss,

@@ -1,13 +1,22 @@
 import torch
 from NeuralNetwork import NeuralNetwork
+import time
+from Logging import init_wandb_run, log_process_ps
 
 
 def gpu_process(device, update_event, config, pipes):
+    if config["train"]["log_wandb"]:
+        init_wandb_run(config)
+
     model = NeuralNetwork(config, device).to(device)
     model.eval()
     bays = []
     flat_ts = []
     conns = []
+    start_time = time.time()
+    processed = 0
+    avg_over = 100000
+    i = 0
 
     with torch.no_grad():
         while True:
@@ -16,6 +25,13 @@ def gpu_process(device, update_event, config, pipes):
                     torch.load("shared_model.pt", map_location=model.device)
                 )
                 update_event.clear()
+
+            i += 1
+            if i % avg_over == 0:
+                processed_per_second = processed / (time.time() - start_time)
+                log_process_ps(processed_per_second, config)
+                processed = 0
+                start_time = time.time()
 
             for parent_conn, _ in pipes:
                 if not parent_conn.poll():
@@ -28,6 +44,7 @@ def gpu_process(device, update_event, config, pipes):
                 if len(bays) < config["inference"]["batch_size"]:
                     continue
 
+                processed += len(bays)
                 bays = torch.cat(bays, dim=0)
                 flat_ts = torch.stack(flat_ts)
                 policies, values = model(bays.to(device), flat_ts.to(device))

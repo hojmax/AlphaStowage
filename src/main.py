@@ -204,6 +204,7 @@ def run_processes(config, pretrained):
 
 if __name__ == "__main__":
     mp.set_start_method("spawn")
+    mp.set_sharing_strategy("file_system")
     pretrained = PretrainedModel(wandb_run=None, wandb_model=None)
     config = get_config(
         "config.json" if torch.cuda.is_available() else "local_config.json"

@@ -19,7 +19,7 @@
   "inference": {
     "can_only_add": true,
     "n_processes": 60,
-    "batch_size": 25,
+    "batch_size": 40,
     "log_interval": 10
   },
   "eval": {
