@@ -131,44 +131,40 @@ def get_pretrained_model(pretrained: PretrainedModel):
 
 if __name__ == "__main__":
     pretrained = PretrainedModel(
-        wandb_run="alphastowage/AlphaStowage/l3wodtt2", wandb_model="model116000.pt"
+        wandb_run="hojmax/AlphaStowage/to148hwz", wandb_model="model486000.pt"
     )
     print("Pretrained Model:", pretrained)
-    config = get_config("config.json")
+    config = get_config("local_config.json")
     model = get_pretrained_model(pretrained)
-    test_on_benchmark(model, config)
+    # test_on_benchmark(model, config)
 
-    # env = Env(
-    #     6,
-    #     4,
-    #     4,
-    #     skip_last_port=True,
-    #     take_first_action=True,
-    #     strict_mask=True,
-    # )
-    # env.reset()
-    # env.step(0)
-    # env.step(0)
-    # env.step(0)
-    # env.step(0)
-    # env.step(0)
+    env = Env(
+        6,
+        4,
+        4,
+        skip_last_port=True,
+        take_first_action=True,
+        strict_mask=True,
+    )
+    env.reset()
+    env.step(0)
+    env.step(0)
+    env.step(0)
+    env.step(0)
+    env.step(0)
+    config["mcts"]["search_iterations"] = 100
+    root, probs, transposition_table = alpha_zero_search(env, model, "cpu", config)
+    bay, flat_t = get_torch_obs(env, config)
+    probabilities, state_value = model(bay, flat_t)
+    print("Bay:", bay, "Flat T:", flat_t)
+    print("Bay:", env.bay, "T:", env.T)
+    print("Net Probs:", probabilities, "Net Value:", state_value)
+    print("MCTS Probs:", probs)
+    draw_tree(root)
     # config["mcts"]["search_iterations"] = 100
     # root, probs, transposition_table = alpha_zero_search(env, net, "cpu", config)
-
-    # for _ in range(1000):
-    #     print(get_action(probs, False, config, env), end=" ")
-    # print()
-    # bay, flat_t = get_torch_obs(env, config)
-    # probabilities, state_value = net(bay, flat_t)
-    # print("Bay:", bay, "Flat T:", flat_t)
-    # print("Bay:", env.bay, "T:", env.T)
-    # print("Net Probs:", probabilities, "Net Value:", state_value)
-    # print("MCTS Probs:", probs)
-    # draw_tree(root)
-    # # config["mcts"]["search_iterations"] = 100
-    # # root, probs, transposition_table = alpha_zero_search(env, net, "cpu", config)
-    # # print("MCTS Probs 2:", probs)
-    # env.close()
+    # print("MCTS Probs 2:", probs)
+    env.close()
 
 # env = Env(
 #     config["env"]["R"],
