@@ -82,7 +82,7 @@ def get_torch_bay(env: Env, config: dict) -> torch.Tensor:
         constant_values=-1,
     )
     bay = torch.from_numpy(bay).unsqueeze(0).unsqueeze(0).float()
-    return bay
+    return bay.clone()
 
 
 def get_torch_flat_T(env: Env, config: dict) -> torch.Tensor:
@@ -97,7 +97,7 @@ def get_torch_flat_T(env: Env, config: dict) -> torch.Tensor:
     flat_T = T[i, j]
     flat_T = flat_T / (env.R * env.C)
     flat_T = torch.from_numpy(flat_T).unsqueeze(0).float()
-    return flat_T
+    return flat_T.clone()
 
 
 def get_torch_obs(env: Env, config: dict) -> tuple[torch.Tensor, torch.Tensor]:
