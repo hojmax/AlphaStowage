@@ -225,6 +225,7 @@ if __name__ == "__main__":
     run_processes(config, pretrained)
 
 
+# 0. https://github.com/pytorch/pytorch/issues/973#issuecomment-291277264
 # 1. https://github.com/openai/baselines/issues/619
 # 2. https://pytorch.org/docs/stable/multiprocessing.html
 # 3. https://github.com/pytorch/pytorch/issues/11201

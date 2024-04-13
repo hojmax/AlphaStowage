@@ -6,7 +6,7 @@ import json
 from MPSPEnv import Env
 from Node import (
     remove_all_pruning,
-    get_torch_obs,
+    get_np_obs,
     close_envs_in_tree,
     TruncatedEpisodeError,
 )
@@ -122,7 +122,9 @@ def play_episode(env, conn, config, deterministic=False):
             reused_tree,
             transposition_table,
         )
-        bay, flat_T = get_torch_obs(env, config)
+        bay, flat_T = get_np_obs(env, config)
+        bay = torch.tensor(bay, dtype=torch.float32)
+        flat_T = torch.tensor(flat_T, dtype=torch.float32)
         observations.append([bay, flat_T, probabilities])
 
         action = get_action(probabilities, deterministic, config, env)

@@ -2,7 +2,7 @@ import torch
 from NeuralNetwork import NeuralNetwork
 import time
 from Logging import init_wandb_run, log_process_ps  # , log_memory_usage
-
+import numpy as np
 
 def gpu_process(device, update_event, config, pipes):
     if config["train"]["log_wandb"]:
@@ -38,8 +38,8 @@ def gpu_process(device, update_event, config, pipes):
                 if not parent_conn.poll():
                     continue
                 bay, flat_T = parent_conn.recv()
-                bays.append(bay.clone())
-                flat_ts.append(flat_T.clone())
+                bays.append(bay.copy())
+                flat_ts.append(flat_T.copy())
 
                 del bay, flat_T
 
@@ -49,14 +49,16 @@ def gpu_process(device, update_event, config, pipes):
                     continue
 
                 processed += len(bays)
-                bays = torch.cat(bays, dim=0)
-                flat_ts = torch.stack(flat_ts)
+                # bays = torch.cat(bays, dim=0)
+                # flat_ts = torch.stack(flat_ts)
+                bays = torch.from_numpy(np.concatenate(bays, axis=0)).to(device)
+                flat_ts = torch.from_numpy(np.stack(flat_ts)).to(device)
                 policies, values = model(bays.to(device), flat_ts.to(device))
                 policies = policies.cpu()
                 values = values.cpu()
 
                 for conn, policy, value in zip(conns, policies, values):
-                    conn.send((policy, value))
+                    conn.send((torch.Tensor.numpy(policy, force=True).clone(), torch.Tensor.numpy(value, force=True).clone()))
 
                 del (bays, flat_ts, conns, policies, values)
 

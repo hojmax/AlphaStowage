@@ -72,8 +72,9 @@ class Node:
         return output
 
 
-def get_torch_bay(env: Env, config: dict) -> torch.Tensor:
+def get_np_bay(env: Env, config: dict) -> np.ndarray:
     bay = env.bay
+    bay = bay.astype(np.float32)
     bay = bay / env.remaining_ports
     bay = np.pad(
         bay,
@@ -81,12 +82,13 @@ def get_torch_bay(env: Env, config: dict) -> torch.Tensor:
         mode="constant",
         constant_values=-1,
     )
-    bay = torch.from_numpy(bay).unsqueeze(0).unsqueeze(0).float()
-    return bay.clone()
+    bay = bay.reshape(1, 1, bay.shape[0], bay.shape[1])
+    return bay
 
 
-def get_torch_flat_T(env: Env, config: dict) -> torch.Tensor:
+def get_np_flat_T(env: Env, config: dict) -> np.ndarray:
     T = env.T
+    T = T.astype(np.float32)
     T = np.pad(
         T,
         ((0, config["env"]["N"] - env.N), (0, config["env"]["N"] - env.N)),
@@ -96,31 +98,31 @@ def get_torch_flat_T(env: Env, config: dict) -> torch.Tensor:
     i, j = np.triu_indices(n=T.shape[0], k=1)
     flat_T = T[i, j]
     flat_T = flat_T / (env.R * env.C)
-    flat_T = torch.from_numpy(flat_T).unsqueeze(0).float()
-    return flat_T.clone()
+    flat_T = flat_T.reshape(1, flat_T.shape[0])
+    return flat_T
 
 
-def get_torch_obs(env: Env, config: dict) -> tuple[torch.Tensor, torch.Tensor]:
-    bay = get_torch_bay(env, config)
-    flat_T = get_torch_flat_T(env, config)
+def get_np_obs(env: Env, config: dict) -> tuple[np.ndarray, np.ndarray]:
+    bay = get_np_bay(env, config)
+    flat_T = get_np_flat_T(env, config)
     return bay, flat_T
 
 
 def run_network(
     node: Node, conn: Connection, config: dict
 ) -> tuple[np.ndarray, np.ndarray]:
-    bay, flat_t = get_torch_obs(node.env, config)
+    bay, flat_t = get_np_obs(node.env, config)
     conn.send((bay, flat_t))
     probabilities, state_value = conn.recv()
-    new_probabilities = probabilities.clone()
-    new_value = state_value.clone()
+    new_probabilities = probabilities.copy()
+    new_value = state_value.copy()
     del bay, flat_t, probabilities, state_value
     # state_value = torch.clip(
     #     state_value,
     #     min=0,
     #     max=node.env.R * node.env.C * (node.env.remaining_ports + 1),
     # )
-    return new_probabilities, new_value
+    return torch.from_numpy(new_probabilities), torch.from_numpy(new_value)
 
 
 def get_prob_and_value(
