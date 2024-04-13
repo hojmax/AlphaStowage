@@ -19,6 +19,7 @@ from Logging import (
     init_wandb_run,
     init_wandb_group,
     BatchLogger,
+    # log_memory_usage,
 )
 import torch.multiprocessing as mp
 from torch.multiprocessing import Process
@@ -50,7 +51,7 @@ def inference_loop(
 
     i = 0
     while True:
-
+        # log_memory_usage(f"inference_{id}")
         env = get_env(config)
         env.reset(np.random.randint(1e9))
 
@@ -116,6 +117,7 @@ def training_loop(
 
     batch = 1
     while True:
+        # log_memory_usage("training")
         if batch % config["eval"]["batch_interval"] == 0:
             swap_over(batch, model, config, gpu_update_event)
 
@@ -205,8 +207,13 @@ def run_processes(config, pretrained):
 
 
 if __name__ == "__main__":
+    import resource
+
+    rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
+    resource.setrlimit(resource.RLIMIT_NOFILE, (4096, rlimit[1]))
     mp.set_start_method("spawn")
     mp.set_sharing_strategy("file_system")
+    torch.multiprocessing.set_sharing_strategy("file_system")
     pretrained = PretrainedModel(wandb_run=None, wandb_model=None)
     config = get_config(
         "config.json" if torch.cuda.is_available() else "local_config.json"
@@ -216,3 +223,10 @@ if __name__ == "__main__":
         init_wandb_group()
 
     run_processes(config, pretrained)
+
+
+# 1. https://github.com/openai/baselines/issues/619
+# 2. https://pytorch.org/docs/stable/multiprocessing.html
+# 3. https://github.com/pytorch/pytorch/issues/11201
+# 4. https://discuss.pytorch.org/t/too-many-open-files-when-using-dataloader/9476
+# 5. https://github.com/Project-MONAI/MONAI/issues/701
