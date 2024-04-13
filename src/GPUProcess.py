@@ -58,7 +58,7 @@ def gpu_process(device, update_event, config, pipes):
                 values = values.cpu()
 
                 for conn, policy, value in zip(conns, policies, values):
-                    conn.send((torch.Tensor.numpy(policy, force=True).clone(), torch.Tensor.numpy(value, force=True).clone()))
+                    conn.send((torch.Tensor.numpy(policy, force=True).copy(), torch.Tensor.numpy(value, force=True).copy()))
 
                 del (bays, flat_ts, conns, policies, values)
 
