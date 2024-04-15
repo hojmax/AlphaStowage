@@ -3,38 +3,6 @@ import os
 import time
 import torch.multiprocessing as mp
 
-# import logging
-# import psutil
-# import datetime
-# import csv
-
-
-# def log_memory_usage(process_tag):
-#     process = psutil.Process(os.getpid())  # Get current process
-#     mem = process.memory_info().rss  # Get memory usage (bytes)
-
-#     # Define the filename based on the process ID
-#     filename = f"memory_usage_{process_tag}.csv"
-
-#     # Check if the file exists to determine if headers are needed
-#     file_exists = os.path.isfile(filename)
-
-#     with open(filename, "a", newline="") as csvfile:
-#         fieldnames = ["timestamp", "memory_usage_MB"]
-#         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-
-#         # Write the header only if the file is new
-#         if not file_exists:
-#             writer.writeheader()
-
-#         # Write the memory usage data
-#         writer.writerow(
-#             {
-#                 "timestamp": datetime.datetime.now(),
-#                 "memory_usage_MB": mem / (1024 * 1024),
-#             }
-#         )
-
 
 def logging_process(queue: mp.Queue, config: dict) -> None:
     if config["train"]["log_wandb"]:
@@ -45,7 +13,6 @@ def logging_process(queue: mp.Queue, config: dict) -> None:
 
     while True:
         if not queue.empty():
-            # log_memory_usage("logging")
             value, reshuffles = queue.get()
             episode_logger.log(episode_count, value, reshuffles, config)
             episode_count += 1

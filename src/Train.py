@@ -15,6 +15,18 @@ import warnings
 import wandb
 from NeuralNetwork import NeuralNetwork
 from StepLRWithMinLR import StepLRWithMinLR
+from typing import TypedDict
+
+
+class PretrainedModel(TypedDict):
+    """Optional way of specifying models from previous runs (to continue training, testing etc.)
+    Example:
+    wandb_run: "alphastowage/AlphaStowage/camwudzo"
+    wandb_model: "model20000.pt"
+    """
+
+    wandb_run: str = None
+    wandb_model: str = None
 
 
 def loss_fn(pred_value, value, pred_prob, prob, config):
@@ -106,6 +118,27 @@ def add_value_to_observations(observations, final_value):
     return output
 
 
+def get_model_weights_path(pretrained: PretrainedModel):
+    api = wandb.Api()
+    run = api.run(pretrained["wandb_run"])
+    file = run.file(pretrained["wandb_model"])
+    file.download(replace=True)
+
+    return pretrained["wandb_model"]
+
+
+def init_model(
+    config: dict, device: torch.device, pretrained: PretrainedModel
+) -> NeuralNetwork:
+    model = NeuralNetwork(config, device).to(device)
+
+    if pretrained["wandb_model"] and pretrained["wandb_run"]:
+        model_weights_path = get_model_weights_path(pretrained)
+        model.load_state_dict(torch.load(model_weights_path, map_location=device))
+
+    return model
+
+
 def play_episode(env, conn, config, deterministic=False):
     if deterministic:
         np.random.seed(0)
@@ -138,6 +171,7 @@ def play_episode(env, conn, config, deterministic=False):
     reshuffles = env.total_reward
     observations = add_value_to_observations(observations, final_value)
 
+    del transposition_table, reused_tree
     return observations, final_value, reshuffles
 
 

@@ -5,13 +5,14 @@ from Train import (
     get_scheduler,
     train_batch,
     get_env,
+    init_model,
+    PretrainedModel,
 )
 import torch
 from NeuralNetwork import NeuralNetwork
 import wandb
 from Node import TruncatedEpisodeError
 import time
-from typing import TypedDict
 import warnings
 from Buffer import ReplayBuffer
 from Logging import (
@@ -19,24 +20,12 @@ from Logging import (
     init_wandb_run,
     init_wandb_group,
     BatchLogger,
-    # log_memory_usage,
 )
 import torch.multiprocessing as mp
 from torch.multiprocessing import Process
 import numpy as np
 from multiprocessing.connection import Connection
 from GPUProcess import gpu_process
-
-
-class PretrainedModel(TypedDict):
-    """Optional way of specifying models from previous runs (to continue training, testing etc.)
-    Example:
-    wandb_run: "alphastowage/AlphaStowage/camwudzo"
-    wandb_model: "model20000.pt"
-    """
-
-    wandb_run: str = None
-    wandb_model: str = None
 
 
 def inference_loop(
@@ -51,7 +40,6 @@ def inference_loop(
 
     i = 0
     while True:
-        # log_memory_usage(f"inference_{id}")
         env = get_env(config)
         env.reset(np.random.randint(1e9))
 
@@ -117,7 +105,6 @@ def training_loop(
 
     batch = 1
     while True:
-        # log_memory_usage("training")
         if batch % config["eval"]["batch_interval"] == 0:
             swap_over(batch, model, config, gpu_update_event)
 
@@ -127,27 +114,6 @@ def training_loop(
         current_lr = scheduler.get_last_lr()[0]
         batch_logger.log(batch, loss, value_loss, cross_entropy, current_lr, config)
         batch += 1
-
-
-def get_model_weights_path(pretrained: PretrainedModel):
-    api = wandb.Api()
-    run = api.run(pretrained["wandb_run"])
-    file = run.file(pretrained["wandb_model"])
-    file.download(replace=True)
-
-    return pretrained["wandb_model"]
-
-
-def init_model(
-    config: dict, device: torch.device, pretrained: PretrainedModel
-) -> NeuralNetwork:
-    model = NeuralNetwork(config, device).to(device)
-
-    if pretrained["wandb_model"] and pretrained["wandb_run"]:
-        model_weights_path = get_model_weights_path(pretrained)
-        model.load_state_dict(torch.load(model_weights_path, map_location=device))
-
-    return model
 
 
 def run_processes(config, pretrained):
@@ -172,6 +138,7 @@ def run_processes(config, pretrained):
         Process(
             target=gpu_process,
             args=(
+                pretrained,
                 gpu_device,
                 gpu_update_event,
                 config,
@@ -207,14 +174,11 @@ def run_processes(config, pretrained):
 
 
 if __name__ == "__main__":
-    import resource
-
-    rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
-    resource.setrlimit(resource.RLIMIT_NOFILE, (4096, rlimit[1]))
     mp.set_start_method("spawn")
     mp.set_sharing_strategy("file_system")
-    torch.multiprocessing.set_sharing_strategy("file_system")
-    pretrained = PretrainedModel(wandb_run=None, wandb_model=None)
+    pretrained = PretrainedModel(
+        wandb_run="hojmax/AlphaStowage/c6sqnqh5", wandb_model="model694000.pt"
+    )
     config = get_config(
         "config.json" if torch.cuda.is_available() else "local_config.json"
     )
@@ -223,11 +187,3 @@ if __name__ == "__main__":
         init_wandb_group()
 
     run_processes(config, pretrained)
-
-
-# 0. https://github.com/pytorch/pytorch/issues/973#issuecomment-291277264
-# 1. https://github.com/openai/baselines/issues/619
-# 2. https://pytorch.org/docs/stable/multiprocessing.html
-# 3. https://github.com/pytorch/pytorch/issues/11201
-# 4. https://discuss.pytorch.org/t/too-many-open-files-when-using-dataloader/9476
-# 5. https://github.com/Project-MONAI/MONAI/issues/701
