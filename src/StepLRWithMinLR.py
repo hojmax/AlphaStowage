@@ -10,3 +10,6 @@ class StepLRWithMinLR(StepLR):
         lr_list = super().get_lr()
         lr_list = [max(lr, self.min_lr) for lr in lr_list]
         return lr_list
+
+    def current_lr(self):
+        return self.get_last_lr()[0]

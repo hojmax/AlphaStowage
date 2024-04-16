@@ -1,122 +1,28 @@
-from Train import (
-    get_config,
-    play_episode,
-    get_optimizer,
-    get_scheduler,
-    train_batch,
-    get_env,
-    init_model,
-    PretrainedModel,
-)
-import torch
-from NeuralNetwork import NeuralNetwork
-import wandb
-from Node import TruncatedEpisodeError
-import time
-import warnings
-from Buffer import ReplayBuffer
-from Logging import (
-    logging_process,
-    init_wandb_run,
-    init_wandb_group,
-    BatchLogger,
-)
+from InferenceLoggerProcess import InferenceLoggerProcess
+from InferenceProcess import InferenceProcess
+from TrainingProcess import TrainingProcess
+from GPUProcess import GPUProcess
+from Logging import init_wandb_group
 import torch.multiprocessing as mp
-from torch.multiprocessing import Process
-import numpy as np
-from multiprocessing.connection import Connection
-from GPUProcess import gpu_process
+from Train import PretrainedModel
+from Buffer import ReplayBuffer
+import torch
+import json
 
 
-def inference_loop(
-    id: int,
-    buffer: ReplayBuffer,
-    conn: Connection,
-    episode_queue: mp.Queue,
-    config: dict,
-) -> None:
-    torch.manual_seed(id)
-    np.random.seed(id)
-
-    i = 0
-    while True:
-        env = get_env(config)
-        env.reset(np.random.randint(1e9))
-
-        try:
-            observations, final_value, final_reshuffles = play_episode(
-                env, conn, config, deterministic=False
-            )
-            i += 1
-            env.close()
-        except TruncatedEpisodeError:
-            warnings.warn("Episode was truncated in training.")
-            env.close()
-            continue
-
-        for bay, flat_T, prob, value in observations:
-            buffer.extend(bay, flat_T, prob, value)
-
-        episode_queue.put((final_value, final_reshuffles))
-
-        del observations, final_value, final_reshuffles
+def start_process_loop(process_class, *args, **kwargs):
+    process = process_class(*args, **kwargs)
+    process.loop()
 
 
-def swap_over(
-    batch: int,
-    model: NeuralNetwork,
-    config: dict,
-    gpu_update_event: mp.Event,
-) -> None:
-    model_path = f"model{batch}.pt"
-    torch.save(model.state_dict(), model_path)
-    torch.save(model.state_dict(), f"shared_model.pt")
+def get_config(file_path):
+    with open(file_path, "r") as f:
+        config = json.load(f)
 
-    if config["train"]["log_wandb"]:
-        wandb.save(model_path)
-
-    config["inference"]["can_only_add"] = False
-    gpu_update_event.set()
+    return config
 
 
-def training_loop(
-    device: torch.device,
-    pretrained: PretrainedModel,
-    buffer: ReplayBuffer,
-    gpu_update_event: mp.Event,
-    config: dict,
-) -> None:
-    torch.manual_seed(0)
-    np.random.seed(0)
-    batch_logger = BatchLogger(config)
-
-    model = init_model(config, device, pretrained)
-
-    if config["train"]["log_wandb"]:
-        init_wandb_run(config)
-
-    optimizer = get_optimizer(model, config)
-    scheduler = get_scheduler(optimizer, config)
-    model.train()
-
-    while len(buffer) < config["train"]["batch_size"]:
-        print("Waiting for buffer to fill up...")
-        time.sleep(1)
-
-    batch = 1
-    while True:
-        if batch % config["eval"]["batch_interval"] == 0:
-            swap_over(batch, model, config, gpu_update_event)
-
-        loss, value_loss, cross_entropy = train_batch(
-            model, buffer, optimizer, scheduler, config
-        )
-        current_lr = scheduler.get_last_lr()[0]
-        batch_logger.log(batch, loss, value_loss, cross_entropy, current_lr, config)
-        batch += 1
-
-
-def run_processes(config, pretrained):
+def run_processes(config: dict, pretrained: PretrainedModel):
     buffer = ReplayBuffer(config)
     training_device = "cuda:0" if torch.cuda.is_available() else "mps"
     gpu_device = "cuda:1" if torch.cuda.is_available() else "mps"
@@ -125,45 +31,49 @@ def run_processes(config, pretrained):
     episode_queue = mp.Queue()
 
     processes = [
-        Process(
-            target=training_loop,
+        mp.Process(
+            target=start_process_loop,
             args=(
-                training_device,
-                pretrained,
+                TrainingProcess,
                 buffer,
                 gpu_update_event,
-                config,
-            ),
-        ),
-        Process(
-            target=gpu_process,
-            args=(
+                training_device,
                 pretrained,
-                gpu_device,
-                gpu_update_event,
                 config,
-                inference_pipes,
             ),
         ),
-        Process(
-            target=logging_process,
+        mp.Process(
+            target=start_process_loop,
             args=(
+                GPUProcess,
+                inference_pipes,
+                gpu_update_event,
+                gpu_device,
+                pretrained,
+                config,
+            ),
+        ),
+        mp.Process(
+            target=start_process_loop,
+            args=(
+                InferenceLoggerProcess,
                 episode_queue,
                 config,
             ),
         ),
     ] + [
-        Process(
-            target=inference_loop,
+        mp.Process(
+            target=start_process_loop,
             args=(
-                id,
+                InferenceProcess,
+                seed,
                 buffer,
                 conn,
                 episode_queue,
                 config,
             ),
         )
-        for id, (_, conn) in enumerate(inference_pipes)
+        for seed, (_, conn) in enumerate(inference_pipes)
     ]
 
     for process in processes:
@@ -176,14 +86,15 @@ def run_processes(config, pretrained):
 if __name__ == "__main__":
     mp.set_start_method("spawn")
     mp.set_sharing_strategy("file_system")
-    pretrained = PretrainedModel(
-        wandb_run="hojmax/AlphaStowage/c6sqnqh5", wandb_model="model694000.pt"
-    )
     config = get_config(
         "config.json" if torch.cuda.is_available() else "local_config.json"
     )
+    pretrained = PretrainedModel(
+        wandb_run=config["wandb"]["pretrained_run"],
+        wandb_model=config["wandb"]["pretrained_model"],
+    )
 
-    if config["train"]["log_wandb"]:
+    if config["wandb"]["should_log"]:
         init_wandb_group()
 
     run_processes(config, pretrained)

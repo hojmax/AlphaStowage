@@ -82,7 +82,6 @@ def get_np_bay(env: Env, config: dict) -> np.ndarray:
         mode="constant",
         constant_values=-1,
     )
-    bay = bay.reshape(1, 1, bay.shape[0], bay.shape[1])
     return bay
 
 
@@ -98,7 +97,6 @@ def get_np_flat_T(env: Env, config: dict) -> np.ndarray:
     i, j = np.triu_indices(n=T.shape[0], k=1)
     flat_T = T[i, j]
     flat_T = flat_T / (env.R * env.C)
-    flat_T = flat_T.reshape(1, flat_T.shape[0])
     return flat_T
 
 
@@ -110,19 +108,10 @@ def get_np_obs(env: Env, config: dict) -> tuple[np.ndarray, np.ndarray]:
 
 def run_network(
     node: Node, conn: Connection, config: dict
-) -> tuple[np.ndarray, np.ndarray]:
-    bay, flat_t = get_np_obs(node.env, config)
-    conn.send((bay, flat_t))
-    probabilities, state_value = conn.recv()
-    new_probabilities = probabilities.copy()
-    new_value = state_value.copy()
-    del bay, flat_t, probabilities, state_value
-    # state_value = torch.clip(
-    #     state_value,
-    #     min=0,
-    #     max=node.env.R * node.env.C * (node.env.remaining_ports + 1),
-    # )
-    return torch.from_numpy(new_probabilities), torch.from_numpy(new_value)
+) -> tuple[torch.Tensor, torch.Tensor]:
+    conn.send(get_np_obs(node.env, config))
+    probabilities, value = conn.recv()
+    return torch.tensor(probabilities), torch.tensor(value)
 
 
 def get_prob_and_value(

@@ -6,12 +6,38 @@ import networkx as nx
 from networkx.drawing.nx_pydot import graphviz_layout
 from NeuralNetwork import NeuralNetwork
 from MPSPEnv import Env
-from Node import alpha_zero_search, get_torch_obs
-from Train import get_config, test_network, play_episode, get_action
+from Node import alpha_zero_search, get_torch_obs, TruncatedEpisodeError
+from Train import get_config, play_episode
 import wandb
 import os
+import warnings
 import pandas as pd
 from main import PretrainedModel
+
+
+def test_network(conn, testset, config):
+    avg_error = 0
+    avg_reshuffles = 0
+
+    for env in testset:
+        copy_env = env.copy()
+        try:
+            _, value, reshuffles = play_episode(
+                copy_env, conn, config, deterministic=True
+            )
+            avg_error += value
+            avg_reshuffles += reshuffles
+        except TruncatedEpisodeError:
+            warnings.warn("Episode was truncated during evaluation.")
+            avg_error += -1e9
+            avg_reshuffles += -1e9
+
+        copy_env.close()
+
+    avg_error /= len(testset)
+    avg_reshuffles /= len(testset)
+
+    return avg_error, avg_reshuffles
 
 
 def _draw_tree_recursive(graph, node):

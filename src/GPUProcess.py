@@ -1,105 +1,88 @@
-import torch
-from NeuralNetwork import NeuralNetwork
-import time
-from Logging import init_wandb_run, log_process_ps
-import numpy as np
 from Train import init_model
-
-# import torch.multiprocessing as mp
-
-
-# class GPUProcess:
-#     def __init__(self, device, update_event, config, pipes):
-#         self.device = device
-#         self.update_event = update_event
-#         self.config = config
-#         self.pipes = pipes
-#         self.model = NeuralNetwork(config, device).to(device)
-#         self.model.eval()
-#         self.reset_queue()
-
-#     def reset_queue(self) -> None:
-#         self.bays = []
-#         self.flat_ts = []
-#         self.conns = []
-
-#     def check_for_model_update(self) -> None:
-#         if self.update_event.is_set():
-#             self.model.load_state_dict(
-#                 torch.load("shared_model.pt", map_location=self.model.device)
-#             )
-#             self.update_event.clear()
-
-#     def receive_data(self) -> None:
-#         for parent_conn, _ in self.pipes:
-#             if not parent_conn.poll():
-#                 continue
-#             bay, flat_T = parent_conn.recv()
-#             self.bays.append(bay)
-#             self.flat_ts.append(flat_T)
-#             self.conns.append(parent_conn)
+import numpy as np
+import torch
+from Train import PretrainedModel
+import torch.multiprocessing as mp
 
 
-def gpu_process(pretrained, device, update_event, config, pipes):
-    if config["train"]["log_wandb"]:
-        init_wandb_run(config)
+class GPUProcess:
+    def __init__(
+        self,
+        pipes: list,
+        update_event: mp.Event,
+        device: torch.device,
+        pretrained: PretrainedModel,
+        config: dict,
+    ) -> None:
+        self.device = device
+        self.update_event = update_event
+        self.config = config
+        self.pipes = pipes
+        self.model = init_model(config, device, pretrained)
+        self.model.eval()
+        self._reset_queue()
 
-    model = init_model(config, device, pretrained)
-    model.eval()
-    bays = []
-    flat_ts = []
-    conns = []
-    start_time = time.time()
-    processed = 0
-    avg_over = 1000
-    i = 0
+    def loop(self):
+        with torch.no_grad():
+            while True:
+                self._pull_model_update()
+                self._receive_data()
 
-    with torch.no_grad():
-        while True:
-            if update_event.is_set():
-                model.load_state_dict(
-                    torch.load("shared_model.pt", map_location=model.device)
+                if self._queue_is_full():
+                    policies, values = self._process_data()
+                    self._send_data(policies, values)
+                    self._reset_queue()
+
+    def _reset_queue(self) -> None:
+        self.bays = []
+        self.flat_ts = []
+        self.conns = []
+
+    def _pull_model_update(self) -> None:
+        if self.update_event.is_set():
+            self.model.load_state_dict(
+                torch.load("shared_model.pt", map_location=self.model.device)
+            )
+            self.update_event.clear()
+
+    def _receive_data(self) -> None:
+        for parent_conn, _ in self.pipes:
+            if not parent_conn.poll():
+                continue
+            bay, flat_T = parent_conn.recv()
+            self.bays.append(bay)
+            self.flat_ts.append(flat_T)
+            self.conns.append(parent_conn)
+
+    def _queue_is_full(self) -> bool:
+        return len(self.bays) >= self.config["inference"]["batch_size"]
+
+    def _process_bays(self):
+        bays = np.stack(self.bays)
+        bays = torch.tensor(bays)
+        bays = bays.unsqueeze(1)  # Add channel dimension
+        bays = bays.to(self.device)
+        return bays
+
+    def _process_flat_ts(self):
+        flat_ts = np.stack(self.flat_ts)
+        flat_ts = torch.tensor(flat_ts)
+        flat_ts = flat_ts.to(self.device)
+        return flat_ts
+
+    def _process_data(self) -> None:
+        bays = self._process_bays()
+        flat_ts = self._process_flat_ts()
+        policies, values = self.model(bays, flat_ts)
+        policies = policies.detach().cpu().numpy()
+        values = values.detach().cpu().numpy()
+        return policies, values
+
+    def _send_data(self, policies, values):
+        for conn, policy, value in zip(self.conns, policies, values):
+            conn.send(
+                (
+                    policy,
+                    value,
                 )
-                update_event.clear()
-
-            i += 1
-            if i % avg_over == 0:
-                processed_per_second = processed / (time.time() - start_time)
-                log_process_ps(processed_per_second, config)
-                processed = 0
-                start_time = time.time()
-
-            for parent_conn, _ in pipes:
-                if not parent_conn.poll():
-                    continue
-                bay, flat_T = parent_conn.recv()
-                bays.append(bay.copy())
-                flat_ts.append(flat_T.copy())
-
-                del bay, flat_T
-
-                conns.append(parent_conn)
-
-                if len(bays) < config["inference"]["batch_size"]:
-                    continue
-
-                processed += len(bays)
-                bays = torch.from_numpy(np.concatenate(bays, axis=0)).to(device)
-                flat_ts = torch.from_numpy(np.stack(flat_ts)).to(device)
-                policies, values = model(bays.to(device), flat_ts.to(device))
-                policies = policies.cpu()
-                values = values.cpu()
-
-                for conn, policy, value in zip(conns, policies, values):
-                    conn.send(
-                        (
-                            torch.Tensor.numpy(policy, force=True).copy(),
-                            torch.Tensor.numpy(value, force=True).copy(),
-                        )
-                    )
-
-                del (bays, flat_ts, conns, policies, values)
-
-                bays = []
-                flat_ts = []
-                conns = []
+            )
