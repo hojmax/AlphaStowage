@@ -7,88 +7,7 @@ from Buffer import ReplayBuffer
 from multiprocessing.connection import Connection
 from multiprocessing import Queue
 import time
-from Node import (
-    remove_all_pruning,
-    close_envs_in_tree,
-    Node,
-    get_np_obs,
-    alpha_zero_search,
-)
-
-
-def get_action(
-    probabilities: torch.Tensor, deterministic: bool, config: dict, env: Env
-) -> int:
-    if deterministic:
-        action = torch.argmax(probabilities).item()
-    else:
-        action = np.random.choice(2 * config["env"]["C"], p=probabilities)
-
-    action = action if action < env.C else action + env.C - config["env"]["C"]
-
-    return action
-
-
-def close_other_branches(reused_tree: Node, action: int, env: Env) -> None:
-    for a in range(2 * env.C):
-        if a != action and a in reused_tree.children:
-            close_envs_in_tree(reused_tree.children[a])
-
-
-def update_tree(reused_tree: Node, action: int, env: Env) -> None:
-    close_other_branches(reused_tree, action, env)
-
-    reused_tree.env.close()
-    reused_tree = reused_tree.children[action]
-    reused_tree.parent = None
-    reused_tree.prior_prob = None
-    remove_all_pruning(reused_tree)
-    return reused_tree
-
-
-def add_value_to_observations(observations, final_value):
-    output = []
-
-    for i, sample in enumerate(observations):
-        output.append(sample + [torch.tensor(final_value + i)])
-
-    return output
-
-
-def play_episode(env, conn, config, deterministic=False):
-    if deterministic:
-        np.random.seed(0)
-
-    observations = []
-    reused_tree = None
-    transposition_table = {}
-
-    while not env.terminal:
-        reused_tree, probabilities, transposition_table = alpha_zero_search(
-            env,
-            conn,
-            config,
-            reused_tree,
-            transposition_table,
-        )
-        bay, flat_T = get_np_obs(env, config)
-        bay = torch.tensor(bay, dtype=torch.float32)
-        flat_T = torch.tensor(flat_T, dtype=torch.float32)
-        observations.append([bay, flat_T, probabilities])
-
-        action = get_action(probabilities, deterministic, config, env)
-        env.step(action)
-
-        reused_tree = update_tree(reused_tree, action, env)
-
-    close_envs_in_tree(reused_tree)
-
-    final_value = -env.moves_to_solve
-    reshuffles = env.total_reward
-    observations = add_value_to_observations(observations, final_value)
-
-    del transposition_table, reused_tree
-    return observations, final_value, reshuffles
+from EpisodePlayer import EpisodePlayer
 
 
 class InferenceProcess:
@@ -113,9 +32,8 @@ class InferenceProcess:
             start = time.time()
 
             try:
-                observations, value, reshuffles = play_episode(
-                    env, self.conn, self.config, deterministic=False
-                )
+                player = EpisodePlayer(env, self.conn, self.config, deterministic=False)
+                observations, value, reshuffles, removes = player.run_episode()
             except TruncatedEpisodeError:
                 continue
             finally:
@@ -126,7 +44,12 @@ class InferenceProcess:
 
             seconds = time.time() - start
             self.log_episode_queue.put(
-                {"value": value, "reshuffles": reshuffles, "seconds/episode": seconds}
+                {
+                    "value": value,
+                    "reshuffles": reshuffles,
+                    "seconds/episode": seconds,
+                    "removes/episode": removes,
+                }
             )
 
     def _get_env(self) -> Env:

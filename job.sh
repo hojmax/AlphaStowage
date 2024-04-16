@@ -30,8 +30,5 @@ pip install -r requirements.txt --quiet
 
 echo "*** Running script: ${1:-src/main.py} ***"
 
-# This command increases the number of file descriptors available to the process
-# ulimit -n 10000
-
 # Run the specified Python script, defaulting to main.py if none is provided
 python3 ${1:-src/main.py} 

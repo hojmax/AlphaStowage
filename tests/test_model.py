@@ -6,8 +6,8 @@ import networkx as nx
 from networkx.drawing.nx_pydot import graphviz_layout
 from NeuralNetwork import NeuralNetwork
 from MPSPEnv import Env
-from Node import alpha_zero_search, get_torch_obs, TruncatedEpisodeError
-from Train import get_config, play_episode
+from Node import alpha_zero_search, get_np_obs, TruncatedEpisodeError
+from main import get_config
 import wandb
 import os
 import warnings
@@ -15,29 +15,29 @@ import pandas as pd
 from main import PretrainedModel
 
 
-def test_network(conn, testset, config):
-    avg_error = 0
-    avg_reshuffles = 0
+# def test_network(conn, testset, config):
+#     avg_error = 0
+#     avg_reshuffles = 0
 
-    for env in testset:
-        copy_env = env.copy()
-        try:
-            _, value, reshuffles = play_episode(
-                copy_env, conn, config, deterministic=True
-            )
-            avg_error += value
-            avg_reshuffles += reshuffles
-        except TruncatedEpisodeError:
-            warnings.warn("Episode was truncated during evaluation.")
-            avg_error += -1e9
-            avg_reshuffles += -1e9
+#     for env in testset:
+#         copy_env = env.copy()
+#         try:
+#             _, value, reshuffles = play_episode(
+#                 copy_env, conn, config, deterministic=True
+#             )
+#             avg_error += value
+#             avg_reshuffles += reshuffles
+#         except TruncatedEpisodeError:
+#             warnings.warn("Episode was truncated during evaluation.")
+#             avg_error += -1e9
+#             avg_reshuffles += -1e9
 
-        copy_env.close()
+#         copy_env.close()
 
-    avg_error /= len(testset)
-    avg_reshuffles /= len(testset)
+#     avg_error /= len(testset)
+#     avg_reshuffles /= len(testset)
 
-    return avg_error, avg_reshuffles
+#     return avg_error, avg_reshuffles
 
 
 def _draw_tree_recursive(graph, node):
@@ -133,12 +133,12 @@ def transform_benchmarking_data(data):
     return testset
 
 
-def test_on_benchmark(conn, config):
-    testset = get_benchmarking_data("benchmark/set_2")
-    testset = [e for e in testset if e["N"] == 6 and e["R"] == 6 and e["C"] == 2]
-    testset = transform_benchmarking_data(testset)
-    avg_error, avg_reshuffles = test_network(conn, testset, config)
-    print("Average Error:", avg_error, "Average Reshuffles:", avg_reshuffles)
+# def test_on_benchmark(conn, config):
+#     testset = get_benchmarking_data("benchmark/set_2")
+#     testset = [e for e in testset if e["N"] == 6 and e["R"] == 6 and e["C"] == 2]
+#     testset = transform_benchmarking_data(testset)
+#     avg_error, avg_reshuffles = test_network(conn, testset, config)
+#     print("Average Error:", avg_error, "Average Reshuffles:", avg_reshuffles)
 
 
 def get_pretrained_model(pretrained: PretrainedModel):
@@ -157,7 +157,7 @@ def get_pretrained_model(pretrained: PretrainedModel):
 
 if __name__ == "__main__":
     pretrained = PretrainedModel(
-        wandb_run="hojmax/AlphaStowage/to148hwz", wandb_model="model486000.pt"
+        wandb_run="hojmax/AlphaStowage/esmw5y6x", wandb_model="model86000.pt"
     )
     print("Pretrained Model:", pretrained)
     config = get_config("local_config.json")
@@ -166,27 +166,50 @@ if __name__ == "__main__":
 
     env = Env(
         6,
-        4,
-        4,
+        2,
+        6,
         skip_last_port=True,
         take_first_action=True,
         strict_mask=True,
     )
-    env.reset()
+    env.reset_to_transportation(
+        np.array(
+            [
+                [0, 10, 2, 0, 0, 0],
+                [0, 0, 0, 0, 0, 10],
+                [0, 0, 0, 0, 2, 0],
+                [0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 2],
+                [0, 0, 0, 0, 0, 0],
+            ],
+            dtype=np.int32,
+        )
+    )
     env.step(0)
     env.step(0)
     env.step(0)
     env.step(0)
     env.step(0)
-    config["mcts"]["search_iterations"] = 100
-    root, probs, transposition_table = alpha_zero_search(env, model, "cpu", config)
-    bay, flat_t = get_torch_obs(env, config)
+    env.step(0)
+    env.step(0)
+    env.step(0)
+    env.step(0)
+    env.step(0)
+    env.step(0)
+    env.step(2)
+    env.step(3)
+    # root, probs, transposition_table = alpha_zero_search(env, model, "cpu", config)
+    bay, flat_t = get_np_obs(env, config)
+    flat_t = torch.tensor(flat_t).unsqueeze(0)
+    bay = torch.tensor(bay).unsqueeze(0).unsqueeze(0)
+    print(bay.shape)
+    print(flat_t.shape)
     probabilities, state_value = model(bay, flat_t)
     print("Bay:", bay, "Flat T:", flat_t)
     print("Bay:", env.bay, "T:", env.T)
     print("Net Probs:", probabilities, "Net Value:", state_value)
-    print("MCTS Probs:", probs)
-    draw_tree(root)
+    # print("MCTS Probs:", probs)
+    # draw_tree(root)
     # config["mcts"]["search_iterations"] = 100
     # root, probs, transposition_table = alpha_zero_search(env, net, "cpu", config)
     # print("MCTS Probs 2:", probs)

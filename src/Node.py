@@ -282,7 +282,7 @@ def alpha_zero_search(
     config: dict,
     reused_tree: Node = None,
     transposition_table: dict[Env, tuple[np.ndarray, np.ndarray]] = {},
-) -> tuple[Node, torch.Tensor, dict[Env, tuple[np.ndarray, np.ndarray]]]:
+) -> tuple[torch.Tensor, Node, dict[Env, tuple[np.ndarray, np.ndarray]]]:
     root_node = (
         reused_tree if reused_tree else Node(root_env.copy(), config["mcts"]["c_puct"])
     )
@@ -303,7 +303,7 @@ def alpha_zero_search(
             best_score = max(best_score, state_value)
 
     return (
-        root_node,
         get_tree_probs(root_node, config),
+        root_node,
         transposition_table,
     )
