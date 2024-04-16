@@ -7,6 +7,7 @@ import wandb
 from Logging import init_wandb_run
 from StepLogger import StepLogger
 import time
+import subprocess
 
 
 class TrainingProcess:
@@ -63,12 +64,10 @@ class TrainingProcess:
         return self.batch % self.config["train"]["swap_and_save_interval"] == 0
 
     def _swap_over(self) -> None:
-        model_path = f"model{self.batch}.pt"
-        torch.save(self.model.state_dict(), model_path)
         torch.save(self.model.state_dict(), f"shared_model.pt")
 
         if self.config["wandb"]["should_log"]:
-            wandb.save(model_path)
+            wandb.save("shared_model.pt")
 
         self.config["inference"]["can_only_add"] = False
         self.gpu_update_event.set()

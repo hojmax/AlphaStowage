@@ -3,6 +3,7 @@ import numpy as np
 import torch
 from Train import PretrainedModel
 import torch.multiprocessing as mp
+import gc
 
 
 class GPUProcess:
@@ -31,7 +32,9 @@ class GPUProcess:
                 if self._queue_is_full():
                     policies, values = self._process_data()
                     self._send_data(policies, values)
+                    del policies, values
                     self._reset_queue()
+                    gc.collect()
 
     def _reset_queue(self) -> None:
         self.bays = []
@@ -73,9 +76,12 @@ class GPUProcess:
     def _process_data(self) -> None:
         bays = self._process_bays()
         flat_ts = self._process_flat_ts()
-        policies, values = self.model(bays, flat_ts)
-        policies = policies.detach().cpu().numpy()
-        values = values.detach().cpu().numpy()
+        with torch.no_grad():
+            policies, values = self.model(bays, flat_ts)
+            policies = policies.detach().cpu().numpy()
+            values = values.detach().cpu().numpy()
+
+        del bays, flat_ts
         return policies, values
 
     def _send_data(self, policies, values):

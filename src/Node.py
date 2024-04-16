@@ -111,7 +111,10 @@ def run_network(
 ) -> tuple[torch.Tensor, torch.Tensor]:
     conn.send(get_np_obs(node.env, config))
     probabilities, value = conn.recv()
-    return torch.tensor(probabilities), torch.tensor(value)
+    n_probabilities = torch.tensor(probabilities.copy())
+    n_value = torch.tensor(value.copy())
+    del probabilities, value
+    return n_probabilities, n_value
 
 
 def get_prob_and_value(
