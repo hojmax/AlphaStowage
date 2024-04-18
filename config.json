@@ -23,8 +23,8 @@
   },
   "inference": {
     "can_only_add": false,
-    "n_processes": 96,
-    "batch_size": 50,
+    "n_processes": 60,
+    "batch_size": 40,
     "log_interval": 100
   },
   "mcts": {
