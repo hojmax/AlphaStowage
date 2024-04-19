@@ -67,10 +67,9 @@ class TrainingProcess:
         torch.save(self.model.state_dict(), f"shared_model.pt")
 
         if self.config["wandb"]["should_log"]:
-            model_path = f"model{self.batch}.pt"
-            torch.save(self.model.state_dict(), model_path)
-            wandb.save(model_path)
-            os.remove(model_path)
+            artifact = wandb.Artifact(name=f"model{self.batch}", type="model")
+            artifact.add_file("shared_model.pt")
+            wandb.run.log_artifact(artifact)
 
         self.config["inference"]["can_only_add"] = False
         self.gpu_update_event.set()
