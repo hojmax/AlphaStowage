@@ -6,7 +6,7 @@ import networkx as nx
 from networkx.drawing.nx_pydot import graphviz_layout
 from NeuralNetwork import NeuralNetwork
 from MPSPEnv import Env
-from Node import alpha_zero_search, get_np_obs, TruncatedEpisodeError
+from MCTS import alpha_zero_search, get_np_obs, TruncatedEpisodeError
 from main import get_config
 import wandb
 import os

@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import random
 from MPSPEnv import Env
-from Node import TruncatedEpisodeError
+from MCTS import TruncatedEpisodeError
 from Buffer import ReplayBuffer
 from multiprocessing.connection import Connection
 from multiprocessing import Queue

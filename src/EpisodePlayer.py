@@ -1,7 +1,6 @@
-from Node import (
+from MCTS import (
     remove_all_pruning,
     close_envs_in_tree,
-    Node,
     get_np_obs,
     alpha_zero_search,
 )
