@@ -22,9 +22,9 @@
     "swap_and_save_interval": 12000
   },
   "inference": {
-    "can_only_add": false,
-    "n_processes": 60,
-    "batch_size": 40,
+    "can_only_add": true,
+    "n_processes": 120,
+    "batch_size": 60,
     "log_interval": 100
   },
   "mcts": {

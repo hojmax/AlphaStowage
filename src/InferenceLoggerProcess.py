@@ -7,7 +7,8 @@ import time
 
 class InferenceLoggerProcess:
     """Collects episode data from inference processes and logs it.
-    The episode data includes: value, reshuffles and seconds/episode."""
+    The episode data includes: value, reshuffles, seconds/episode and removes/episode.
+    """
 
     def __init__(self, queue: Queue, config: dict):
         self.queue = queue
@@ -27,4 +28,4 @@ class InferenceLoggerProcess:
             if not self.queue.empty():
                 self.logger.log(self.queue.get())
             else:
-                time.sleep(1)
+                time.sleep(5)
