@@ -24,8 +24,9 @@ def get_config(file_path):
 
 def run_processes(config: dict, pretrained: PretrainedModel):
     buffer = ReplayBuffer(config)
-    training_device = "cuda:0" if torch.cuda.is_available() else "mps"
-    gpu_device = "cuda:1" if torch.cuda.is_available() else "mps"
+    n_gpus = torch.cuda.device_count()
+    training_device = "cuda:0" if n_gpus >= 1 else "mps"
+    gpu_device = "cuda:1" if n_gpus >= 2 else ("cuda:0" if n_gpus >= 1 else "mps")
     gpu_update_event = mp.Event()
     inference_pipes = [mp.Pipe() for _ in range(config["inference"]["n_processes"])]
     episode_queue = mp.Queue()
