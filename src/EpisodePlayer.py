@@ -38,13 +38,13 @@ class EpisodePlayer:
                 self.n_removes += 1
             self.env.step(action)
 
-        self.cleanup()
+        self._cleanup()
         del self.env, self.conn, self.transposition_table, self.reused_tree
 
         gc.collect()
         return self.observations, self.final_value, self.reshuffles, self.n_removes
 
-    def cleanup(self):
+    def _cleanup(self):
         close_envs_in_tree(self.reused_tree)
 
         self.final_value = -self.env.moves_to_solve
