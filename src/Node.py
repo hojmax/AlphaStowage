@@ -226,8 +226,12 @@ def add_children(
             estimated_value=state_value,
             parent=node,
             depth=node.depth + 1,
-            c_puct=config["mcts"]["c_puct"],
+            c_puct=get_c_puct(new_env, config),
         )
+
+
+def get_c_puct(env: Env, config: dict) -> float:
+    return config["mcts"]["c_puct_constant"] * env.remaining_ports * env.R * env.C
 
 
 def backup(node: Node, value: float) -> None:
@@ -295,7 +299,9 @@ def alpha_zero_search(
     transposition_table: dict[Env, tuple[np.ndarray, np.ndarray]] = {},
 ) -> tuple[Node, torch.Tensor, dict[Env, tuple[np.ndarray, np.ndarray]]]:
     root_node = (
-        reused_tree if reused_tree else Node(root_env.copy(), config["mcts"]["c_puct"])
+        reused_tree
+        if reused_tree
+        else Node(root_env.copy(), get_c_puct(root_env, config))
     )
     best_score = float("-inf")
     for _ in range(config["mcts"]["search_iterations"]):

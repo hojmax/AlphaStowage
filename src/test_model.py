@@ -6,7 +6,7 @@ import networkx as nx
 from networkx.drawing.nx_pydot import graphviz_layout
 from NeuralNetwork import NeuralNetwork
 from MPSPEnv import Env
-from Node import alpha_zero_search, get_torch_obs
+from Node import alpha_zero_search, get_np_obs
 from Train import get_config, test_network, play_episode, get_action
 import wandb
 import os
@@ -131,10 +131,10 @@ def get_pretrained_model(pretrained: PretrainedModel):
 
 if __name__ == "__main__":
     pretrained = PretrainedModel(
-        wandb_run="hojmax/AlphaStowage/to148hwz", wandb_model="model486000.pt"
+        wandb_run="hojmax/AlphaStowage/fbbbok9m", wandb_model="model900000.pt"
     )
     print("Pretrained Model:", pretrained)
-    config = get_config("local_config.json")
+    config = get_config("config.json")
     model = get_pretrained_model(pretrained)
     # test_on_benchmark(model, config)
 
@@ -146,21 +146,44 @@ if __name__ == "__main__":
         take_first_action=True,
         strict_mask=True,
     )
-    env.reset()
+    env.reset_to_transportation(
+        np.array(
+            [[0, 0, 0, 24], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+            dtype=np.int32,
+        )
+    )
     env.step(0)
     env.step(0)
     env.step(0)
     env.step(0)
     env.step(0)
-    config["mcts"]["search_iterations"] = 100
-    root, probs, transposition_table = alpha_zero_search(env, model, "cpu", config)
-    bay, flat_t = get_torch_obs(env, config)
+    env.step(0)
+    env.step(0)
+    env.step(0)
+    env.step(0)
+    env.step(0)
+    env.step(0)
+    env.step(0)
+    env.step(0)
+    env.step(0)
+    env.step(0)
+    env.step(0)
+    env.step(0)
+    env.step(0)
+    env.step(0)
+    env.step(0)
+    env.step(0)
+    env.step(0)
+    bay, flat_t = get_np_obs(env, config)
+    bay = torch.from_numpy(bay).float()
+    flat_t = torch.from_numpy(flat_t).float()
     probabilities, state_value = model(bay, flat_t)
     print("Bay:", bay, "Flat T:", flat_t)
-    print("Bay:", env.bay, "T:", env.T)
+    print("Bay:")
+    print(env.bay)
+    print("T:")
+    print(env.T)
     print("Net Probs:", probabilities, "Net Value:", state_value)
-    print("MCTS Probs:", probs)
-    draw_tree(root)
     # config["mcts"]["search_iterations"] = 100
     # root, probs, transposition_table = alpha_zero_search(env, net, "cpu", config)
     # print("MCTS Probs 2:", probs)

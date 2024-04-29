@@ -27,7 +27,7 @@
     "batch_interval": 12000
   },
   "mcts": {
-    "c_puct": 10,
+    "c_puct_constant": 0.14,
     "temperature": 0.6,
     "search_iterations": 100,
     "dirichlet_weight": 0.25,
