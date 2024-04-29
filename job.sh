@@ -5,7 +5,7 @@
 #SBATCH --time=90:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=60
-#SBATCH --mem-per-cpu=2G
+#SBATCH --mem-per-cpu=4G
 
 echo "*** Loading modules ***"
 
