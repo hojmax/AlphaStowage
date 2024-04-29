@@ -146,6 +146,8 @@ def play_episode(env, conn, config, deterministic=False):
     observations = []
     reused_tree = None
     transposition_table = {}
+    removes = 0
+    all_moves = 0
 
     while not env.terminal:
         reused_tree, probabilities, transposition_table = Node.alpha_zero_search(
@@ -161,7 +163,10 @@ def play_episode(env, conn, config, deterministic=False):
         observations.append([bay, flat_T, probabilities])
 
         action = get_action(probabilities, deterministic, config, env)
+        if action >= env.C:
+            removes += 1
         env.step(action)
+        all_moves += 1
 
         reused_tree = update_tree(reused_tree, action, env)
 
@@ -170,9 +175,10 @@ def play_episode(env, conn, config, deterministic=False):
     final_value = -env.moves_to_solve
     reshuffles = env.total_reward
     observations = add_value_to_observations(observations, final_value)
+    remove_fraction = removes / all_moves
 
     del transposition_table, reused_tree
-    return observations, final_value, reshuffles
+    return observations, final_value, reshuffles, remove_fraction
 
 
 def get_env(config):

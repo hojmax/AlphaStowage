@@ -13,8 +13,10 @@ def logging_process(queue: mp.Queue, config: dict) -> None:
 
     while True:
         if not queue.empty():
-            value, reshuffles = queue.get()
-            episode_logger.log(episode_count, value, reshuffles, config)
+            value, reshuffles, remove_fraction = queue.get()
+            episode_logger.log(
+                episode_count, value, reshuffles, remove_fraction, config
+            )
             episode_count += 1
             del value, reshuffles
         else:
@@ -42,7 +44,11 @@ def init_wandb_run(config: dict) -> None:
 
 
 def log_episode(
-    episode: int, final_value: int, final_reshuffles: int, config: dict
+    episode: int,
+    final_value: int,
+    final_reshuffles: int,
+    avg_remove_fraction: float,
+    config: dict,
 ) -> None:
     if config["train"]["log_wandb"]:
         wandb.log(
@@ -50,6 +56,7 @@ def log_episode(
                 "episode": episode,
                 "value": final_value,
                 "reshuffles": final_reshuffles,
+                "remove_fraction": avg_remove_fraction,
             }
         )
     else:
@@ -64,22 +71,33 @@ class EpisodeLogger:
     def __init__(self, config: dict):
         self.avg_value = 0
         self.avg_reshuffles = 0
+        self.avg_remove_fraction = 0
         self.count = 0
         self.log_interval = config["inference"]["log_interval"]
 
-    def log(self, episode: int, value: int, reshuffles: int, config: dict):
+    def log(
+        self,
+        episode: int,
+        value: int,
+        reshuffles: int,
+        remove_fraction: float,
+        config: dict,
+    ):
         self.avg_value += value
         self.avg_reshuffles += reshuffles
+        self.avg_remove_fraction += remove_fraction
         self.count += 1
 
         if self.count == self.log_interval:
             self.avg_value /= self.log_interval
             self.avg_reshuffles /= self.log_interval
+            self.avg_remove_fraction /= self.log_interval
 
             log_episode(
                 episode,
                 self.avg_value,
                 self.avg_reshuffles,
+                self.avg_remove_fraction,
                 config,
             )
 

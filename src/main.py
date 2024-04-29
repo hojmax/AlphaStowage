@@ -44,7 +44,7 @@ def inference_loop(
         env.reset(np.random.randint(1e9))
 
         try:
-            observations, final_value, final_reshuffles = play_episode(
+            observations, final_value, final_reshuffles, remove_fraction = play_episode(
                 env, conn, config, deterministic=False
             )
             i += 1
@@ -57,9 +57,9 @@ def inference_loop(
         for bay, flat_T, prob, value in observations:
             buffer.extend(bay, flat_T, prob, value)
 
-        episode_queue.put((final_value, final_reshuffles))
+        episode_queue.put((final_value, final_reshuffles, remove_fraction))
 
-        del observations, final_value, final_reshuffles
+        del observations, final_value, final_reshuffles, remove_fraction
 
 
 def swap_over(
@@ -177,7 +177,7 @@ if __name__ == "__main__":
     mp.set_start_method("spawn")
     mp.set_sharing_strategy("file_system")
     pretrained = PretrainedModel(
-        wandb_run="hojmax/AlphaStowage/0mh7t6hv", wandb_model="model504000.pt"
+        wandb_run="hojmax/AlphaStowage/fbbbok9m", wandb_model="model900000.pt"
     )
     config = get_config(
         "config.json" if torch.cuda.is_available() else "local_config.json"
