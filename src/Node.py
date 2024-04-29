@@ -29,6 +29,8 @@ class Node:
         self.parent = parent
         self.depth = depth
         self.c_puct = c_puct
+        self._uct = None
+        self.children_pruned = 0
 
     @property
     def Q(self) -> float:
@@ -47,21 +49,57 @@ class Node:
             / (1 + self.visit_count)
         )
 
+    @property
+    def uct(self) -> float:
+        if self._uct == None:
+            self._uct = self.Q + self.U
+
+        return self._uct
+
+    def prune(self) -> None:
+        if self.parent and not self.pruned:
+            self.parent.children_pruned += 1
+        else:
+            raise TruncatedEpisodeError
+
+        self.pruned = True
+
+    def unprune(self) -> None:
+        if self.parent and self.pruned:
+            self.parent.children_pruned -= 1
+
+        self.pruned = False
+
     def increment_value(self, value: float) -> None:
         self.total_action_value += value
         self.visit_count += 1
         self.mean_action_value = self.total_action_value / self.visit_count
 
-    @property
-    def uct(self) -> float:
-        return self.Q + self.U
+        self._uct = None
+        for child in self.children.values():
+            child._uct = None
 
     @property
-    def valid_children(self) -> list["Node"]:
+    def no_valid_children(self) -> bool:
+        return self.children_pruned == len(self.children)
+
+    def get_valid_children(self) -> list["Node"]:
         return [child for child in self.children.values() if not child.pruned]
 
+    def add_child(
+        self, action: int, new_env: Env, prior: float, state_value: float, config: dict
+    ) -> None:
+        self.children[action] = Node(
+            env=new_env,
+            prior_prob=prior,
+            estimated_value=state_value,
+            parent=self,
+            depth=self.depth + 1,
+            c_puct=get_c_puct(new_env, config),
+        )
+
     def select_child(self) -> "Node":
-        return max(self.valid_children, key=lambda x: x.uct)
+        return max(self.get_valid_children(), key=lambda x: x.uct)
 
     def __str__(self) -> str:
         output = f"{self.env.bay}\n{self.env.T}\nN={self.visit_count}, Q={self.Q:.2f}\nMoves={self.env.moves_to_solve}"
@@ -220,14 +258,7 @@ def add_children(
             if action < node.env.C
             else probabilities[action + config["env"]["C"] - node.env.C]
         )
-        node.children[action] = Node(
-            env=new_env,
-            prior_prob=prior,
-            estimated_value=state_value,
-            parent=node,
-            depth=node.depth + 1,
-            c_puct=get_c_puct(new_env, config),
-        )
+        node.add_child(action, new_env, prior, state_value, config)
 
 
 def get_c_puct(env: Env, config: dict) -> float:
@@ -242,7 +273,7 @@ def backup(node: Node, value: float) -> None:
 
 
 def remove_all_pruning(node: Node) -> None:
-    node.pruned = False
+    node.unprune()
 
     for child in node.children.values():
         remove_all_pruning(child)
@@ -262,28 +293,24 @@ def get_tree_probs(node: Node, config: dict) -> torch.Tensor:
 
 
 def prune_and_move_back_up(node: Node) -> Node:
-    node.pruned = True
-
-    if is_root(node):
-        raise TruncatedEpisodeError
+    node.prune()
 
     return node.parent
 
 
-def should_prune(node: Node, best_score: float) -> bool:
-    moves_upper_bound = node.env.N * node.env.C * node.env.R
+def should_prune(node: Node, best_score: float, moves_upper_bound: int) -> bool:
     return (
-        len(node.valid_children) == 0
+        node.no_valid_children
         or -node.env.moves_to_solve < best_score
         or -node.env.moves_to_solve <= -moves_upper_bound
     )
 
 
-def find_leaf(root_node: Node, best_score: float) -> Node:
+def find_leaf(root_node: Node, best_score: float, moves_upper_bound: int) -> Node:
     node = root_node
 
     while node.children:
-        if should_prune(node, best_score):
+        if should_prune(node, best_score, moves_upper_bound):
             node = prune_and_move_back_up(node)
         else:
             node = node.select_child()
@@ -303,9 +330,10 @@ def alpha_zero_search(
         if reused_tree
         else Node(root_env.copy(), get_c_puct(root_env, config))
     )
+    moves_upper_bound = root_env.N * root_env.C * root_env.R
     best_score = float("-inf")
     for _ in range(config["mcts"]["search_iterations"]):
-        node = find_leaf(root_node, best_score)
+        node = find_leaf(root_node, best_score, moves_upper_bound)
 
         state_value = evaluate(
             node,

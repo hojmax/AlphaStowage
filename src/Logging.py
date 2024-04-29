@@ -61,7 +61,7 @@ def log_episode(
         )
     else:
         print(
-            f"*Episode {episode}* Value: {final_value}, Reshuffles: {final_reshuffles}"
+            f"*Episode {episode}* Value: {final_value}, Reshuffles: {final_reshuffles}, Remove Fraction: {avg_remove_fraction}"
         )
 
 

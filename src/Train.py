@@ -189,6 +189,7 @@ def get_env(config):
         skip_last_port=True,
         take_first_action=True,
         strict_mask=True,
+        speedy=True,
     )
 
 
