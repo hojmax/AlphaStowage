@@ -51,7 +51,7 @@ def gpu_process(pretrained, device, update_event, config, pipes):
     conns = []
     start_time = time.time()
     processed = 0
-    avg_over = 1000
+    avg_over = 100000
     i = 0
 
     with torch.no_grad():
