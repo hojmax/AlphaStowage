@@ -53,11 +53,13 @@ class SelfPlay:
                 env.close()
                 continue
 
-            log_episode(
-                ray.get(shared_storage.get_info.remote("num_played_games")),
-                final_value,
-                final_reshuffles,
-                self.config,
-            )
+            # log_episode(
+            #     ray.get(shared_storage.get_info.remote("num_played_games")),
+            #     final_value,
+            #     final_reshuffles,
+            #     self.config,
+            # )
+
+            shared_storage.increment_info.remote("steps_played", len(observations))
 
             shared_storage.increment_info.remote("num_played_games")

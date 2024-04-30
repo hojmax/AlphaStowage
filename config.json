@@ -1,35 +1,35 @@
 {
   "train": {
-    "log_wandb": true,
+    "log_wandb": false,
     "l2_weight_reg": 0.0001,
     "batch_size": 512,
-    "learning_rate": 0.001,
-    "scheduler_step_size_in_batches": 1e5,
+    "learning_rate": 0.0001,
+    "scheduler_step_size_in_batches": 5e5,
     "scheduler_gamma": 0.5,
     "training_steps": 5e5,
-    "buffer_size": 450000,
-    "value_scaling": 0.1,
+    "buffer_size": 900000,
+    "value_scaling": 0.3,
     "batches_before_eval": 2000,
     "can_only_add": true,
-    "num_workers": 2,
+    "num_workers": 6,
     "seed": 0,
     "checkpoint_interval": 100
   },
   "mcts": {
-    "c_puct": 5,
+    "c_puct": 10,
     "temperature": 0.6,
     "search_iterations": 100,
     "dirichlet_weight": 0.25,
-    "dirichlet_alpha": 1
+    "dirichlet_alpha": 0.2
   },
   "env": {
-    "R": 8,
-    "C": 4,
-    "N": 6
+    "R": 12,
+    "C": 12,
+    "N": 16
   },
   "nn": {
-    "blocks": 16,
-    "hidden_channels": 32,
+    "blocks": 20,
+    "hidden_channels": 64,
     "hidden_kernel_size": 3,
     "hidden_stride": 1,
     "policy_channels": 2,
