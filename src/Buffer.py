@@ -23,6 +23,15 @@ class ReplayBuffer:
         self.prob = torch.zeros(prob_size, dtype=torch.float32).share_memory_()
         self.value = torch.zeros(value_size, dtype=torch.float32).share_memory_()
 
+    def save_to_disk(self):
+        data = {
+            "bay": self.bay,
+            "flat_T": self.flat_T,
+            "prob": self.prob,
+            "value": self.value,
+        }
+        torch.save(data, f"replay_buffer_checkpoint.pt")
+
     def extend(
         self,
         bay: torch.Tensor,
@@ -37,6 +46,9 @@ class ReplayBuffer:
             self.value[self.ptr.value] = value
             self.ptr.value = (self.ptr.value + 1) % self.max_size
             self.size.value = min(self.size.value + 1, self.max_size)
+
+            if self.ptr.value == 0:
+                self.save_to_disk()
 
     def sample(self, batch_size: int) -> tuple:
         with self.lock:

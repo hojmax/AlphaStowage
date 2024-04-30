@@ -5,10 +5,6 @@ from multiprocessing.connection import Connection
 from Node import Node
 
 
-class TruncatedEpisodeError(Exception):
-    pass
-
-
 def get_np_bay(env: Env, config: dict) -> np.ndarray:
     bay = env.bay
     bay = bay.astype(np.float32)
@@ -103,8 +99,8 @@ def expand_node(
 
 
 def close_envs_in_tree(node: Node) -> None:
-    if node.env:
-        node.env.close()
+    node.close()
+
     for child in node.children.values():
         close_envs_in_tree(child)
 
@@ -139,21 +135,12 @@ def add_children(
         is_legal = node.env.action_masks()[action]
         if not is_legal:
             continue
-        new_env = node.env.copy()
-        new_env.step(action)
         prior = (
             probabilities[action]
             if action < node.env.C
             else probabilities[action + config["env"]["C"] - node.env.C]
         )
-        node.children[action] = Node(
-            env=new_env,
-            prior_prob=prior,
-            estimated_value=state_value,
-            parent=node,
-            depth=node.depth + 1,
-            c_puct=config["mcts"]["c_puct"],
-        )
+        node.add_child(action, node.env.copy(), prior, state_value, config)
 
 
 def backup(node: Node, value: float) -> None:
@@ -164,7 +151,7 @@ def backup(node: Node, value: float) -> None:
 
 
 def remove_all_pruning(node: Node) -> None:
-    node.pruned = False
+    node.unprune()
 
     for child in node.children.values():
         remove_all_pruning(child)
@@ -184,28 +171,25 @@ def get_tree_probs(node: Node, config: dict) -> torch.Tensor:
 
 
 def prune_and_move_back_up(node: Node) -> Node:
-    node.pruned = True
-
-    if is_root(node):
-        raise TruncatedEpisodeError
+    node.prune()
 
     return node.parent
 
 
-def should_prune(node: Node, best_score: float) -> bool:
+def should_prune(node: Node, best_score: float, moves_upper_bound: int) -> bool:
     moves_upper_bound = node.env.N * node.env.C * node.env.R
     return (
-        len(node.valid_children) == 0
+        node.no_valid_children
         or -node.env.moves_to_solve < best_score
         or -node.env.moves_to_solve <= -moves_upper_bound
     )
 
 
-def find_leaf(root_node: Node, best_score: float) -> Node:
+def find_leaf(root_node: Node, best_score: float, moves_upper_bound: int) -> Node:
     node = root_node
 
     while node.children:
-        if should_prune(node, best_score):
+        if should_prune(node, best_score, moves_upper_bound):
             node = prune_and_move_back_up(node)
         else:
             node = node.select_child()
@@ -220,12 +204,11 @@ def alpha_zero_search(
     reused_tree: Node = None,
     transposition_table: dict[Env, tuple[np.ndarray, np.ndarray]] = {},
 ) -> tuple[torch.Tensor, Node, dict[Env, tuple[np.ndarray, np.ndarray]]]:
-    root_node = (
-        reused_tree if reused_tree else Node(root_env.copy(), config["mcts"]["c_puct"])
-    )
+    root_node = reused_tree if reused_tree else Node(root_env.copy(), config)
+    moves_upper_bound = root_env.N * root_env.C * root_env.R
     best_score = float("-inf")
     for _ in range(config["mcts"]["search_iterations"]):
-        node = find_leaf(root_node, best_score)
+        node = find_leaf(root_node, best_score, moves_upper_bound)
 
         state_value = evaluate(
             node,

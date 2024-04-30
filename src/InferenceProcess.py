@@ -2,11 +2,10 @@ import torch
 import numpy as np
 import random
 from MPSPEnv import Env
-from MCTS import TruncatedEpisodeError
+from Node import TruncatedEpisodeError
 from Buffer import ReplayBuffer
 from multiprocessing.connection import Connection
 from multiprocessing import Queue
-import time
 from EpisodePlayer import EpisodePlayer
 
 
@@ -29,7 +28,6 @@ class InferenceProcess:
     def loop(self):
         while True:
             env = self._get_env()
-            start = time.time()
 
             try:
                 player = EpisodePlayer(env, self.conn, self.config, deterministic=False)
@@ -42,12 +40,10 @@ class InferenceProcess:
             for obs in observations:
                 self.buffer.extend(*obs)
 
-            seconds = time.time() - start
             self.log_episode_queue.put(
                 {
                     "value": value,
                     "reshuffles": reshuffles,
-                    "seconds/episode": seconds,
                     "removes/episode": removes,
                 }
             )
@@ -60,6 +56,7 @@ class InferenceProcess:
             skip_last_port=True,
             take_first_action=True,
             strict_mask=True,
+            speedy=True,
         )
         env.reset(np.random.randint(1e9))
         return env

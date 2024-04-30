@@ -7,7 +7,9 @@
   "wandb": {
     "should_log": true,
     "pretrained_run": "hojmax/AlphaStowage/0mh7t6hv",
-    "pretrained_model": "model504000.pt"
+    "pretrained_model": "model504000.pt",
+    "entity": "hojmax",
+    "project": "AlphaStowage"
   },
   "train": {
     "l2_weight_reg": 0.0001,
@@ -16,19 +18,19 @@
     "scheduler_step_size_in_batches": 5e5,
     "scheduler_gamma": 0.5,
     "min_lr": 1e-5,
-    "buffer_size": 900000,
+    "buffer_size": 1800000,
     "value_scaling": 0.3,
     "log_interval": 1000,
     "swap_and_save_interval": 12000
   },
   "inference": {
-    "can_only_add": true,
-    "n_processes": 80,
-    "batch_size": 30,
+    "can_only_add": false,
+    "n_processes": 60,
+    "batch_size": 1,
     "log_interval": 100
   },
   "mcts": {
-    "c_puct": 10,
+    "c_puct_constant": 0.14,
     "temperature": 0.6,
     "search_iterations": 100,
     "dirichlet_weight": 0.25,

@@ -6,7 +6,7 @@ import networkx as nx
 from networkx.drawing.nx_pydot import graphviz_layout
 from NeuralNetwork import NeuralNetwork
 from MPSPEnv import Env
-from MCTS import alpha_zero_search, get_np_obs, TruncatedEpisodeError
+from MCTS import get_np_obs
 from main import get_config
 import wandb
 import os
@@ -160,7 +160,7 @@ if __name__ == "__main__":
         wandb_run="hojmax/AlphaStowage/esmw5y6x", wandb_model="model86000.pt"
     )
     print("Pretrained Model:", pretrained)
-    config = get_config("local_config.json")
+    config = get_config("config.json")
     model = get_pretrained_model(pretrained)
     # test_on_benchmark(model, config)
 
@@ -206,7 +206,10 @@ if __name__ == "__main__":
     print(flat_t.shape)
     probabilities, state_value = model(bay, flat_t)
     print("Bay:", bay, "Flat T:", flat_t)
-    print("Bay:", env.bay, "T:", env.T)
+    print("Bay:")
+    print(env.bay)
+    print("T:")
+    print(env.T)
     print("Net Probs:", probabilities, "Net Value:", state_value)
     # print("MCTS Probs:", probs)
     # draw_tree(root)
