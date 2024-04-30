@@ -51,7 +51,7 @@ def gpu_process(pretrained, device, update_event, config, pipes):
     conns = []
     start_time = time.time()
     processed = 0
-    avg_over = 100000
+    avg_over = 1000
     i = 0
 
     with torch.no_grad():
@@ -80,26 +80,26 @@ def gpu_process(pretrained, device, update_event, config, pipes):
 
                 conns.append(parent_conn)
 
-                if len(bays) < config["inference"]["batch_size"]:
-                    continue
+            if len(bays) < config["inference"]["batch_size"]:
+                continue
 
-                processed += len(bays)
-                bays = torch.from_numpy(np.concatenate(bays, axis=0)).to(device)
-                flat_ts = torch.from_numpy(np.stack(flat_ts)).to(device)
-                policies, values = model(bays.to(device), flat_ts.to(device))
-                policies = policies.cpu()
-                values = values.cpu()
+            processed += len(bays)
+            bays = torch.from_numpy(np.concatenate(bays, axis=0)).to(device)
+            flat_ts = torch.from_numpy(np.stack(flat_ts)).to(device)
+            policies, values = model(bays.to(device), flat_ts.to(device))
+            policies = policies.cpu()
+            values = values.cpu()
 
-                for conn, policy, value in zip(conns, policies, values):
-                    conn.send(
-                        (
-                            torch.Tensor.numpy(policy, force=True).copy(),
-                            torch.Tensor.numpy(value, force=True).copy(),
-                        )
+            for conn, policy, value in zip(conns, policies, values):
+                conn.send(
+                    (
+                        torch.Tensor.numpy(policy, force=True).copy(),
+                        torch.Tensor.numpy(value, force=True).copy(),
                     )
+                )
 
-                del (bays, flat_ts, conns, policies, values)
+            del (bays, flat_ts, conns, policies, values)
 
-                bays = []
-                flat_ts = []
-                conns = []
+            bays = []
+            flat_ts = []
+            conns = []
