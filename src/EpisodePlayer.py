@@ -8,7 +8,6 @@ from MPSPEnv import Env
 from multiprocessing.connection import Connection
 import torch
 import numpy as np
-import gc
 
 
 class EpisodePlayer:
@@ -39,9 +38,7 @@ class EpisodePlayer:
             self.env.step(action)
 
         self._cleanup()
-        del self.env, self.conn, self.transposition_table, self.reused_tree
 
-        gc.collect()
         return self.observations, self.final_value, self.reshuffles, self.n_removes
 
     def _cleanup(self):

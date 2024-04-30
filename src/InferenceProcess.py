@@ -8,7 +8,6 @@ from multiprocessing.connection import Connection
 from multiprocessing import Queue
 import time
 from EpisodePlayer import EpisodePlayer
-import gc
 
 
 class InferenceProcess:
@@ -52,8 +51,6 @@ class InferenceProcess:
                     "removes/episode": removes,
                 }
             )
-            del env, player, observations
-            gc.collect()
 
     def _get_env(self) -> Env:
         env = Env(
