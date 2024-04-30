@@ -12,12 +12,12 @@
     "scheduler_step_size_in_batches": 5e5,
     "scheduler_gamma": 0.5,
     "min_lr": 1e-5,
-    "buffer_size": 1800000,
+    "buffer_size": 900000,
     "value_scaling": 0.3,
     "log_interval": 1000
   },
   "inference": {
-    "can_only_add": false,
+    "can_only_add": true,
     "n_processes": 40,
     "batch_size": 28,
     "log_interval": 100
@@ -27,7 +27,7 @@
     "batch_interval": 12000
   },
   "mcts": {
-    "c_puct_constant": 0.14,
+    "c_puct_constant": 10,
     "temperature": 0.6,
     "search_iterations": 100,
     "dirichlet_weight": 0.25,
