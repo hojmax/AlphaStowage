@@ -175,7 +175,6 @@ def run_processes(config, pretrained):
 
 if __name__ == "__main__":
     mp.set_start_method("spawn")
-    mp.set_sharing_strategy("file_system")
     pretrained = PretrainedModel(
         wandb_run="hojmax/AlphaStowage/nscfu7w2", wandb_model="model612000.pt"
     )
