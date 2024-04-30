@@ -17,8 +17,9 @@ class Node:
         estimated_value: float = 0,
         parent: "Node" = None,
         depth: int = 0,
+        action: int = None,
     ) -> None:
-        self.env = env
+        self._env = env
         self.pruned = False
         self.visit_count = 0
         self.total_action_value = 0
@@ -31,6 +32,18 @@ class Node:
         self.c_puct = c_puct
         self._uct = None
         self.children_pruned = 0
+        self.needed_action = action
+
+    @property
+    def env(self) -> Env:
+        if self.needed_action is not None:
+            self._env.step(self.needed_action)
+            self.needed_action = None
+
+        return self._env
+
+    def close(self):
+        self._env.close()
 
     @property
     def Q(self) -> float:
@@ -96,6 +109,7 @@ class Node:
             parent=self,
             depth=self.depth + 1,
             c_puct=get_c_puct(new_env, config),
+            action=action,
         )
 
     def select_child(self) -> "Node":
@@ -215,8 +229,8 @@ def expand_node(
 
 
 def close_envs_in_tree(node: Node) -> None:
-    if node.env:
-        node.env.close()
+    node.close()
+
     for child in node.children.values():
         close_envs_in_tree(child)
 
@@ -251,14 +265,12 @@ def add_children(
         is_legal = node.env.action_masks()[action]
         if not is_legal:
             continue
-        new_env = node.env.copy()
-        new_env.step(action)
         prior = (
             probabilities[action]
             if action < node.env.C
             else probabilities[action + config["env"]["C"] - node.env.C]
         )
-        node.add_child(action, new_env, prior, state_value, config)
+        node.add_child(action, node.env.copy(), prior, state_value, config)
 
 
 def get_c_puct(env: Env, config: dict) -> float:
