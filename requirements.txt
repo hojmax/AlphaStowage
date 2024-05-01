@@ -1,6 +1,8 @@
-wandb
-tqdm
-pygame
-MPSPEnv==0.0.20
-torch
+wandb==0.15.10
+tqdm==4.66.1
+MPSPEnv==0.0.26
+torch==2.1.0
 ray==2.9.2
+numpy==1.24.1
+networkx==3.2
+pandas==2.2.0

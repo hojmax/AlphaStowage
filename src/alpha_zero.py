@@ -31,6 +31,12 @@ class AlphaZero:
         np.random.seed(self.config["train"]["seed"])
         torch.manual_seed(self.config["train"]["seed"])
 
+        try:
+            ray.init(address="auto")
+        except ConnectionError:
+            print("Ray initialization failed. Trying to start Ray...")
+            ray.init()
+
         # Initialize checkpoint
         self.checkpoint = {
             "training_step": 0,
