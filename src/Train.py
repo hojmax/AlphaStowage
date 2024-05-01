@@ -21,6 +21,8 @@ class PretrainedModel(TypedDict):
 
 
 def loss_fn(pred_value, value, pred_prob, prob, config):
+    pred_prob = torch.clamp(pred_prob, min=1e-9)
+    pred_value = torch.clamp(pred_value, min=-1e6, max=1e6)
     value_error = torch.mean(torch.square(value - pred_value))
     cross_entropy = (
         -torch.sum(prob.flatten() * torch.log(pred_prob.flatten())) / prob.shape[0]
