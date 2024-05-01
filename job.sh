@@ -6,6 +6,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=96
 #SBATCH --mem-per-cpu=4G
+#SBATCH --exclude=hendrixgpu16fl # Exclude the node with H100s
 
 echo "*** Loading modules ***"
 
