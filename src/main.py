@@ -92,6 +92,7 @@ if __name__ == "__main__":
     pretrained = PretrainedModel(
         wandb_run=config["wandb"]["pretrained_run"],
         wandb_model=config["wandb"]["pretrained_model"],
+        artifact=config["wandb"]["artifact"],
     )
 
     if config["wandb"]["should_log"]:

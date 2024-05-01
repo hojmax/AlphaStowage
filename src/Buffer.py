@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.multiprocessing as mp
+import warnings
 
 
 class ReplayBuffer:
@@ -23,12 +24,33 @@ class ReplayBuffer:
         self.prob = torch.zeros(prob_size, dtype=torch.float32).share_memory_()
         self.value = torch.zeros(value_size, dtype=torch.float32).share_memory_()
 
+        if config["train"]["buffer_checkpoint_path"]:
+            self.load_from_disk(config)
+
+        self.config = config
+
+    def load_from_disk(self, config):
+        try:
+            data = torch.load(config["train"]["buffer_checkpoint_path"])
+            self.bay = data["bay"]
+            self.flat_T = data["flat_T"]
+            self.prob = data["prob"]
+            self.value = data["value"]
+            self.ptr.value = data["ptr"]
+            self.size.value = data["size"]
+        except FileNotFoundError:
+            warnings.warn(
+                f"Could not find file at {config['train']['buffer_checkpoint_path']}"
+            )
+
     def save_to_disk(self):
         data = {
             "bay": self.bay,
             "flat_T": self.flat_T,
             "prob": self.prob,
             "value": self.value,
+            "ptr": self.ptr.value,
+            "size": self.size.value,
         }
         torch.save(data, f"replay_buffer_checkpoint.pt")
 
@@ -47,7 +69,11 @@ class ReplayBuffer:
             self.ptr.value = (self.ptr.value + 1) % self.max_size
             self.size.value = min(self.size.value + 1, self.max_size)
 
-            if self.ptr.value == 0:
+            if (
+                self.ptr.value
+                % self.config["train"]["save_buffer_every_n_observations"]
+                == 0
+            ):
                 self.save_to_disk()
 
     def sample(self, batch_size: int) -> tuple:

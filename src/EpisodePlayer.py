@@ -31,23 +31,25 @@ class EpisodePlayer:
             np.random.seed(0)
 
     def run_episode(self):
+        actions = []
         while not self.env.terminal:
             action = self._get_action()
             if action >= self.env.C:
                 self.n_removes += 1
+            actions.append(action)
             self.env.step(action)
 
-        self._cleanup()
+        self._cleanup(actions)
 
         return self.observations, self.final_value, self.reshuffles, self.n_removes
 
-    def _cleanup(self):
+    def _cleanup(self, actions: list[int]):
         close_envs_in_tree(self.reused_tree)
 
         self.final_value = -self.env.moves_to_solve
         self.reshuffles = self.env.total_reward
 
-        self._add_value_to_observations()
+        self._add_value_to_observations(actions)
 
     def _add_observation(self, probabilities: torch.Tensor, env: Env) -> None:
         bay, flat_T = get_np_obs(env, self.config)
@@ -97,9 +99,12 @@ class EpisodePlayer:
         self.reused_tree.prior_prob = None
         remove_all_pruning(self.reused_tree)
 
-    def _add_value_to_observations(self):
+    def _add_value_to_observations(self, actions: list[int]) -> None:
+        cummulative_removes = 0
+        offset = 1 if self.env.take_first_action else 0
         for i in range(len(self.observations)):
-            value = self.final_value + i
-            if self.env.take_first_action:
-                value += 1
+            value = self.final_value + i - cummulative_removes + offset
             self.observations[i] += [torch.tensor(value)]
+
+            if actions[i] >= self.env.C:
+                cummulative_removes += 1

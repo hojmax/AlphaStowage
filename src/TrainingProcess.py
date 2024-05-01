@@ -69,7 +69,6 @@ class TrainingProcess:
             artifact.add_file("shared_model.pt")
             wandb.run.log_artifact(artifact)
 
-        self.config["inference"]["can_only_add"] = False
         self.gpu_update_event.set()
 
     def _wait_for_buffer(self):

@@ -24,9 +24,14 @@ class InferenceProcess:
         self.conn = conn
         self.log_episode_queue = log_episode_queue
         self.config = config
+        self.episode_count = 0
 
     def loop(self):
         while True:
+            self.config["inference"]["can_only_add"] = (
+                self.episode_count
+                < self.config["inference"]["n_episodes_with_only_add"]
+            )
             env = self._get_env()
 
             try:
@@ -47,6 +52,7 @@ class InferenceProcess:
                     "removes/episode": removes,
                 }
             )
+            self.episode_count += 1
 
     def _get_env(self) -> Env:
         env = Env(

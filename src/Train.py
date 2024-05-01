@@ -4,6 +4,8 @@ import wandb
 from NeuralNetwork import NeuralNetwork
 from StepLRWithMinLR import StepLRWithMinLR
 from typing import TypedDict
+import os
+import time
 
 
 class PretrainedModel(TypedDict):
@@ -15,6 +17,7 @@ class PretrainedModel(TypedDict):
 
     wandb_run: str = None
     wandb_model: str = None
+    artifact: str = None
 
 
 def loss_fn(pred_value, value, pred_prob, prob, config):
@@ -26,7 +29,9 @@ def loss_fn(pred_value, value, pred_prob, prob, config):
     return loss, value_error, cross_entropy
 
 
-def optimize_model(pred_value, value, pred_prob, prob, optimizer, scheduler, config):
+def optimize_model(
+    model, pred_value, value, pred_prob, prob, optimizer, scheduler, config
+):
     loss, value_loss, cross_entropy = loss_fn(
         pred_value=pred_value,
         value=value,
@@ -36,6 +41,8 @@ def optimize_model(pred_value, value, pred_prob, prob, optimizer, scheduler, con
     )
     optimizer.zero_grad()
     loss.backward()
+
+    torch.nn.utils.clip_grad_norm_(model.parameters(), config["train"]["clip_grad"])
 
     optimizer.step()
     scheduler.step()
@@ -52,6 +59,7 @@ def train_batch(model, buffer, optimizer, scheduler, config):
 
     pred_prob, pred_value = model(bay, flat_T)
     loss, value_loss, cross_entropy = optimize_model(
+        model=model,
         pred_value=pred_value,
         value=value,
         pred_prob=pred_prob,
@@ -68,12 +76,25 @@ def train_batch(model, buffer, optimizer, scheduler, config):
 
 
 def get_model_weights_path(pretrained: PretrainedModel):
-    api = wandb.Api()
-    run = api.run(pretrained["wandb_run"])
-    file = run.file(pretrained["wandb_model"])
-    file.download(replace=True)
+    if pretrained["artifact"]:
+        download_path = os.path.join(
+            "artifacts",
+            pretrained["artifact"].split("/")[-1],
+            pretrained["wandb_model"],
+        )
+        if os.path.exists(download_path):
+            return download_path
 
-    return pretrained["wandb_model"]
+        api = wandb.Api()
+        artifact = api.artifact(pretrained["artifact"])
+        path = artifact.download()
+        return os.path.join(path, pretrained["wandb_model"])
+    else:
+        api = wandb.Api()
+        run = api.run(pretrained["wandb_run"])
+        file = run.file(pretrained["wandb_model"])
+        file.download(replace=True)
+        return pretrained["wandb_model"]
 
 
 def init_model(
@@ -81,7 +102,9 @@ def init_model(
 ) -> NeuralNetwork:
     model = NeuralNetwork(config, device).to(device)
 
-    if pretrained["wandb_model"] and pretrained["wandb_run"]:
+    if pretrained["wandb_model"] and (
+        pretrained["wandb_run"] or pretrained["artifact"]
+    ):
         model_weights_path = get_model_weights_path(pretrained)
         model.load_state_dict(torch.load(model_weights_path, map_location=device))
 
