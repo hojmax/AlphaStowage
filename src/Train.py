@@ -52,6 +52,9 @@ def optimize_model(
     return loss.item(), value_loss.item(), cross_entropy.item()
 
 
+printed_once = False
+
+
 def train_batch(model, buffer, optimizer, scheduler, config):
     bay, flat_T, prob, value = buffer.sample(config["train"]["batch_size"])
     bay = bay.to(model.device)
@@ -70,6 +73,20 @@ def train_batch(model, buffer, optimizer, scheduler, config):
         scheduler=scheduler,
         config=config,
     )
+
+    if loss > 50 and not printed_once:
+        printed_once = True
+        print("Loss larger than 5")
+        print("Loss: ", loss)
+        print("Value loss: ", value_loss)
+        print("Cross entropy: ", cross_entropy)
+        print("Prob: ", prob)
+        print("Pred prob: ", pred_prob)
+        print("Value: ", value)
+        print("Pred value: ", pred_value)
+        print("Bay: ", bay)
+        print("Flat_T: ", flat_T)
+
     return (
         loss,
         value_loss,
