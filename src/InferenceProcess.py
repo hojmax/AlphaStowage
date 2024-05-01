@@ -36,7 +36,7 @@ class InferenceProcess:
 
             try:
                 player = EpisodePlayer(env, self.conn, self.config, deterministic=False)
-                observations, value, reshuffles, remove_freq = player.run_episode()
+                observations, value, reshuffles, remove_fraction = player.run_episode()
             except TruncatedEpisodeError:
                 continue
             finally:
@@ -46,7 +46,11 @@ class InferenceProcess:
                 self.buffer.extend(*obs)
 
             self.log_episode_queue.put(
-                {"value": value, "reshuffles": reshuffles, "remove_freq": remove_freq}
+                {
+                    "value": value,
+                    "reshuffles": reshuffles,
+                    "remove_fraction": remove_fraction,
+                }
             )
             self.episode_count += 1
 
