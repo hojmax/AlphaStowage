@@ -52,9 +52,6 @@ def optimize_model(
     return loss.item(), value_loss.item(), cross_entropy.item()
 
 
-printed_once = False
-
-
 def train_batch(model, buffer, optimizer, scheduler, config):
     global printed_once
 
@@ -76,18 +73,19 @@ def train_batch(model, buffer, optimizer, scheduler, config):
         config=config,
     )
 
-    if loss > 50 and not printed_once:
-        printed_once = True
+    if loss > 50:
+        current_time = time.time()
+        time_stamp = time.strftime("%Y-%m-%d-%H-%M-%S", time.gmtime(current_time))
         print("Loss larger than 50")
-        torch.save(bay, "bay.pt")
-        torch.save(flat_T, "flat_T.pt")
-        torch.save(prob, "prob.pt")
-        torch.save(value, "value.pt")
-        torch.save(pred_value, "pred_value.pt")
-        torch.save(pred_prob, "pred_prob.pt")
-        torch.save(loss, "loss.pt")
-        torch.save(value_loss, "value_loss.pt")
-        torch.save(cross_entropy, "cross_entropy.pt")
+        torch.save(bay, f"bay_{time_stamp}.pt")
+        torch.save(flat_T, f"flat_T_{time_stamp}.pt")
+        torch.save(prob, f"prob_{time_stamp}.pt")
+        torch.save(value, f"value_{time_stamp}.pt")
+        torch.save(pred_prob, f"pred_prob_{time_stamp}.pt")
+        torch.save(pred_value, f"pred_value_{time_stamp}.pt")
+        torch.save(loss, f"loss_{time_stamp}.pt")
+        torch.save(value_loss, f"value_loss_{time_stamp}.pt")
+        torch.save(cross_entropy, f"cross_entropy_{time_stamp}.pt")
         print("Saved tensors")
 
     return (
