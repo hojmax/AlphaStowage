@@ -41,7 +41,12 @@ class EpisodePlayer:
 
         self._cleanup(actions)
 
-        return self.observations, self.final_value, self.reshuffles, self.n_removes
+        return (
+            self.observations,
+            self.final_value,
+            self.reshuffles,
+            self.n_removes / len(actions),
+        )
 
     def _cleanup(self, actions: list[int]):
         close_envs_in_tree(self.reused_tree)
