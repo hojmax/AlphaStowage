@@ -56,6 +56,12 @@ if __name__ == "__main__":
 
                 num_workers = int(num_workers)
                 alpha_zero.self_play(num_workers)
+            elif choice == 2:
+                wandb_run = input("Enter the wandb run id: ")
+                wandb_model = input("Enter the wandb model id: ")
+                alpha_zero.load_checkpoint(wandb_run, wandb_model)
+            elif choice == 3:
+                break
 
             print("\nDone")
 
