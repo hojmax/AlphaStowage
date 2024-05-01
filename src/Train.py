@@ -76,16 +76,17 @@ def train_batch(model, buffer, optimizer, scheduler, config):
 
     if loss > 50 and not printed_once:
         printed_once = True
-        print("Loss larger than 5")
-        print("Loss: ", loss)
-        print("Value loss: ", value_loss)
-        print("Cross entropy: ", cross_entropy)
-        print("Prob: ", prob)
-        print("Pred prob: ", pred_prob)
-        print("Value: ", value)
-        print("Pred value: ", pred_value)
-        print("Bay: ", bay)
-        print("Flat_T: ", flat_T)
+        print("Loss larger than 50")
+        torch.save(bay, "bay.pt")
+        torch.save(flat_T, "flat_T.pt")
+        torch.save(prob, "prob.pt")
+        torch.save(value, "value.pt")
+        torch.save(pred_value, "pred_value.pt")
+        torch.save(pred_prob, "pred_prob.pt")
+        torch.save(loss, "loss.pt")
+        torch.save(value_loss, "value_loss.pt")
+        torch.save(cross_entropy, "cross_entropy.pt")
+        print("Saved tensors")
 
     return (
         loss,
