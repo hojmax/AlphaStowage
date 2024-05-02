@@ -5,7 +5,7 @@ import os
 import pandas as pd
 from NeuralNetwork import NeuralNetwork
 from main import get_config
-from Train import play_episode
+from EpisodePlayer import EpisodePlayer
 import torch.multiprocessing as mp
 from tqdm import tqdm
 
@@ -98,14 +98,14 @@ def gpu_process(model, device, conn):
 if __name__ == "__main__":
     config = get_config("config.json")
     model = NeuralNetwork(config=config, device="cpu")
-    model.load_state_dict(torch.load("model900000.pt", map_location="cpu"))
+    model.load_state_dict(torch.load("bigrun6.pt", map_location="cpu"))
     testset = get_benchmarking_data("benchmark/set_2")
 
     gpu_conn, cpu_conn = mp.Pipe()
     gpu_device = "cuda:1" if torch.cuda.is_available() else "mps"
 
     mp.Process(target=gpu_process, args=(model, gpu_device, gpu_conn)).start()
-    for n in range(4, 17, 2):
+    for n in range(6, 17, 2):
 
         sub_testset = [e for e in testset if e["N"] == n]
         scores = []
@@ -126,9 +126,8 @@ if __name__ == "__main__":
                 strict_mask=True,
             )
             env.reset_to_transportation(transportation_matrix)
-            _, value, reshuffles, _ = play_episode(
-                env, cpu_conn, config, deterministic=True
-            )
+            player = EpisodePlayer(env, cpu_conn, config, deterministic=False)
+            _, _, reshuffles, _ = player.run_episode()
             e["result"] = reshuffles
             scores.append(reshuffles)
 

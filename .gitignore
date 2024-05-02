@@ -1,6 +1,6 @@
 __pycache__
 wandb
-model*.pt
+*.pt
 shared_model.pt
 benchmark
 dirichlet.ipynb
