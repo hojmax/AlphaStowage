@@ -41,4 +41,5 @@ for R in range(6, 12 + 1, 2):
                 env = Env(R=R, C=C, N=N, skip_last_port=True, strict_mask=True)
                 env.reset()
                 total += run_episode(env)
+                env.close()
             print(f"R={R}, C={C}, N={N}, Avg={total / repeats}")

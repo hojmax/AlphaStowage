@@ -73,7 +73,7 @@ def train_batch(model, buffer, optimizer, scheduler, config):
         config=config,
     )
 
-    if loss > 50:
+    if loss > 70:
         current_time = time.time()
         time_stamp = time.strftime("%Y-%m-%d-%H-%M-%S", time.gmtime(current_time))
         print("Loss larger than 50")

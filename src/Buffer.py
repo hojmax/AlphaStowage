@@ -56,7 +56,7 @@ class ReplayBuffer:
             "ptr": self.ptr.value,
             "size": self.size.value,
         }
-        torch.save(data, f"replay_buffer_checkpointV2.pt")
+        torch.save(data, f"replay_buffer_checkpoint.pt")
 
     def extend(
         self,

@@ -205,7 +205,7 @@ def alpha_zero_search(
     transposition_table: dict[Env, tuple[np.ndarray, np.ndarray]] = {},
 ) -> tuple[torch.Tensor, Node, dict[Env, tuple[np.ndarray, np.ndarray]]]:
     root_node = reused_tree if reused_tree else Node(root_env.copy(), config)
-    moves_upper_bound = root_env.N * root_env.C * root_env.R
+    moves_upper_bound = root_env.moves_upper_bound
     best_score = float("-inf")
     for _ in range(config["mcts"]["search_iterations"]):
         node = find_leaf(root_node, best_score, moves_upper_bound)

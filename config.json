@@ -9,8 +9,8 @@
     "pretrained_run": "",
     "pretrained_model": "",
     "artifact": "",
-    "entity": "hojmax",
-    "project": "AlphaStowage"
+    "entity": "pocs",
+    "project": "alphastowage"
   },
   "train": {
     "l2_weight_reg": 0.0001,
