@@ -2,7 +2,7 @@
 #SBATCH --job-name=rl
 #SBATCH --output=%j.txt  # Use %j to denote the job ID
 #SBATCH --gres=gpu:2
-#SBATCH --time=90:00:00
+#SBATCH --time=270:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=96
 #SBATCH --mem-per-cpu=4G
