@@ -3,6 +3,7 @@ import torch
 from MPSPEnv import Env
 from multiprocessing.connection import Connection
 from Node import Node
+from Lookup import moves_upper_bound
 
 
 def get_np_bay(env: Env, config: dict) -> np.ndarray:
@@ -176,20 +177,20 @@ def prune_and_move_back_up(node: Node) -> Node:
     return node.parent
 
 
-def should_prune(node: Node, best_score: float, moves_upper_bound: int) -> bool:
-    moves_upper_bound = node.env.N * node.env.C * node.env.R
+def should_prune(node: Node, best_score: float) -> bool:
+    bound = moves_upper_bound[(node.env.R, node.env.C, node.env.N)]
     return (
         node.no_valid_children
         or -node.env.moves_to_solve < best_score
-        or -node.env.moves_to_solve <= -moves_upper_bound
+        or -node.env.moves_to_solve <= -bound
     )
 
 
-def find_leaf(root_node: Node, best_score: float, moves_upper_bound: int) -> Node:
+def find_leaf(root_node: Node, best_score: float) -> Node:
     node = root_node
 
     while node.children:
-        if should_prune(node, best_score, moves_upper_bound):
+        if should_prune(node, best_score):
             node = prune_and_move_back_up(node)
         else:
             node = node.select_child()
@@ -205,10 +206,9 @@ def alpha_zero_search(
     transposition_table: dict[Env, tuple[np.ndarray, np.ndarray]] = {},
 ) -> tuple[torch.Tensor, Node, dict[Env, tuple[np.ndarray, np.ndarray]]]:
     root_node = reused_tree if reused_tree else Node(root_env.copy(), config)
-    moves_upper_bound = root_env.moves_upper_bound
     best_score = float("-inf")
     for _ in range(config["mcts"]["search_iterations"]):
-        node = find_leaf(root_node, best_score, moves_upper_bound)
+        node = find_leaf(root_node, best_score)
 
         state_value = evaluate(
             node,

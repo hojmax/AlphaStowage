@@ -36,10 +36,6 @@ class ReplayBuffer:
             self.flat_T = data["flat_T"]
             self.prob = data["prob"]
             self.value = data["value"]
-            if "ptr" not in data:
-                data["ptr"] = len(data["bay"]) % self.max_size
-            if "size" not in data:
-                data["size"] = len(data["bay"])
             self.ptr.value = data["ptr"]
             self.size.value = data["size"]
         except FileNotFoundError:
