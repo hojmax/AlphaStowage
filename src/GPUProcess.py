@@ -16,6 +16,8 @@ class GPUProcess:
         pretrained: PretrainedModel,
         config: dict,
     ) -> None:
+
+        print("GPUProcess")
         self.device = device
         self.update_event = update_event
         self.config = config

@@ -98,8 +98,10 @@ def train_batch(model, buffer, optimizer, scheduler, config):
 
 def get_model_weights_path(pretrained: PretrainedModel):
     if pretrained["local_model"]:
+        print("Using local model...")
         return pretrained["local_model"] + ".pt"
     elif pretrained["artifact"]:
+        print("Downloading artifact...")
         download_path = os.path.join(
             "artifacts",
             pretrained["artifact"].split("/")[-1],
@@ -113,6 +115,7 @@ def get_model_weights_path(pretrained: PretrainedModel):
         path = artifact.download()
         return os.path.join(path, pretrained["wandb_model"])
     else:
+        print("Downloading model...")
         api = wandb.Api()
         run = api.run(pretrained["wandb_run"])
         file = run.file(pretrained["wandb_model"])
@@ -125,9 +128,14 @@ def init_model(
 ) -> NeuralNetwork:
     model = NeuralNetwork(config, device).to(device)
 
-    if pretrained["wandb_model"] and (
-        pretrained["wandb_run"] or pretrained["artifact"] or pretrained["local_model"]
+    print("Model initialized")
+
+    if (
+        pretrained["wandb_model"]
+        and (pretrained["wandb_run"] or pretrained["artifact"])
+        or pretrained["local_model"]
     ):
+        print("Loading model weights...")
         model_weights_path = get_model_weights_path(pretrained)
         model.load_state_dict(torch.load(model_weights_path, map_location=device))
 
