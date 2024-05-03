@@ -104,13 +104,14 @@ class Node:
     def add_child(
         self, action: int, new_env: Env, prior: float, state_value: float, config: dict
     ) -> None:
+        new_depth = self.depth + 1 if action < new_env.C else self.depth
         self.children[action] = Node(
             env=new_env,
             config=config,
             prior_prob=prior,
             estimated_value=state_value,
             parent=self,
-            depth=self.depth + 1,
+            depth=new_depth,
             action=action,
         )
 
