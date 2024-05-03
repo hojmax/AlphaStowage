@@ -4,13 +4,14 @@ import torch
 from Train import PretrainedModel
 import torch.multiprocessing as mp
 import time
+from typing import Union
 
 
 class GPUProcess:
     def __init__(
         self,
         pipes: list,
-        update_event: mp.Event,
+        update_event: Union[mp.Event, None],
         device: torch.device,
         pretrained: PretrainedModel,
         config: dict,
@@ -26,7 +27,8 @@ class GPUProcess:
     def loop(self):
         with torch.no_grad():
             while True:
-                self._pull_model_update()
+                if self.update_event is not None:
+                    self._pull_model_update()
                 self._receive_data()
 
                 if self._queue_is_full():
