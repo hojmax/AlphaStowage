@@ -18,6 +18,7 @@ class PretrainedModel(TypedDict):
     wandb_run: str = None
     wandb_model: str = None
     artifact: str = None
+    local_model: str = None
 
 
 def loss_fn(pred_value, value, pred_prob, prob, config):
@@ -96,7 +97,9 @@ def train_batch(model, buffer, optimizer, scheduler, config):
 
 
 def get_model_weights_path(pretrained: PretrainedModel):
-    if pretrained["artifact"]:
+    if pretrained["local_model"]:
+        return pretrained["local_model"] + ".pt"
+    elif pretrained["artifact"]:
         download_path = os.path.join(
             "artifacts",
             pretrained["artifact"].split("/")[-1],
@@ -123,7 +126,7 @@ def init_model(
     model = NeuralNetwork(config, device).to(device)
 
     if pretrained["wandb_model"] and (
-        pretrained["wandb_run"] or pretrained["artifact"]
+        pretrained["wandb_run"] or pretrained["artifact"] or pretrained["local_model"]
     ):
         model_weights_path = get_model_weights_path(pretrained)
         model.load_state_dict(torch.load(model_weights_path, map_location=device))
