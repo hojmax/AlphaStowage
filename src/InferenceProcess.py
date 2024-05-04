@@ -36,7 +36,13 @@ class InferenceProcess:
 
             try:
                 player = EpisodePlayer(env, self.conn, self.config, deterministic=False)
-                observations, value, reshuffles, remove_fraction = player.run_episode()
+                (
+                    observations,
+                    value,
+                    reshuffles,
+                    remove_fraction,
+                    avg_options_considered,
+                ) = player.run_episode()
             except TruncatedEpisodeError:
                 continue
             finally:
@@ -50,6 +56,7 @@ class InferenceProcess:
                     "value": value,
                     "reshuffles": reshuffles,
                     "remove_fraction": remove_fraction,
+                    "avg_options_considered": avg_options_considered,
                 }
             )
             self.episode_count += 1

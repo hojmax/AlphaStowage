@@ -39,7 +39,8 @@
     "temperature": 0.6,
     "search_iterations": 100,
     "dirichlet_weight": 0.25,
-    "dirichlet_alpha": 0.2
+    "dirichlet_alpha": 0.2,
+    "value_smoothing": 0.9
   },
   "nn": {
     "blocks": 20,

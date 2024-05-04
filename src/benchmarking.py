@@ -169,7 +169,7 @@ class InferenceProcess:
 
             try:
                 player = EpisodePlayer(env, self.conn, self.config, deterministic=False)
-                _, _, reshuffles, _ = player.run_episode()
+                _, _, reshuffles, _, _ = player.run_episode()
             except TruncatedEpisodeError:
                 reshuffles = -10000
             finally:

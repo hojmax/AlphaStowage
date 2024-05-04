@@ -1,5 +1,6 @@
 import numpy as np
 from MPSPEnv import Env
+import warnings
 
 
 class TruncatedEpisodeError(Exception):
@@ -18,19 +19,19 @@ class Node:
         action: int = None,
     ) -> None:
         self._env = env
-        self.pruned = False
-        self.visit_count = 0
-        self.total_action_value = 0
-        self.mean_action_value = None
-        self.estimated_value = estimated_value
-        self.prior_prob = prior_prob
+        self._pruned = False
+        self.visit_count = np.float16(0)
+        self.total_action_value = np.float16(0)
+        self.mean_action_value = np.float16(estimated_value)
+        self.prior_prob = np.float16(prior_prob)
         self.children = {}
         self.parent = parent
         self.depth = depth
-        self.c_puct = self.get_c_puct(env, config)
+        self.c_puct = np.float16(self.get_c_puct(env, config))
         self._uct = None
         self.children_pruned = 0
         self.needed_action = action
+        self.value_smoothing = np.float16(config["mcts"]["value_smoothing"])
 
     def get_c_puct(self, env: Env, config: dict) -> float:
         return config["mcts"]["c_puct_constant"] * env.remaining_ports * env.R * env.C
@@ -47,24 +48,20 @@ class Node:
         self._env.close()
 
     @property
-    def Q(self) -> float:
-        return (
-            self.mean_action_value
-            if self.mean_action_value is not None
-            else self.estimated_value
-        )
+    def Q(self) -> np.float16:
+        return self.mean_action_value
 
     @property
-    def U(self) -> float:
+    def U(self) -> np.float16:
         return (
             self.c_puct
             * self.prior_prob
-            * np.sqrt(self.parent.visit_count)
-            / (1 + self.visit_count)
+            * np.sqrt(self.parent.visit_count, dtype=np.float16)
+            / (np.float16(1) + self.visit_count)
         )
 
     @property
-    def uct(self) -> float:
+    def uct(self) -> np.float16:
         if self._uct == None:
             self._uct = self.Q + self.U
 
@@ -74,21 +71,26 @@ class Node:
         if self.parent == None:
             raise TruncatedEpisodeError
 
-        if not self.pruned:
+        if not self._pruned:
             self.parent.children_pruned += 1
 
-        self.pruned = True
+        self._pruned = True
 
     def unprune(self) -> None:
-        if self.parent != None and self.pruned:
+        if self.parent != None and self._pruned:
             self.parent.children_pruned -= 1
 
-        self.pruned = False
+        self._pruned = False
 
     def increment_value(self, value: float) -> None:
-        self.total_action_value += value
-        self.visit_count += 1
-        self.mean_action_value = self.total_action_value / self.visit_count
+        self.mean_action_value = self.value_smoothing * self.mean_action_value + (
+            np.float16(1) - self.value_smoothing
+        ) * np.float16(value)
+
+        if self.visit_count < np.finfo(np.float16).max:
+            self.visit_count += np.float16(1)
+        else:
+            warnings.warn("visit count overflow")
 
         self._uct = None
         for child in self.children.values():
@@ -99,7 +101,7 @@ class Node:
         return self.children_pruned == len(self.children)
 
     def get_valid_children(self) -> list["Node"]:
-        return [child for child in self.children.values() if not child.pruned]
+        return [child for child in self.children.values() if not child._pruned]
 
     def add_child(
         self, action: int, new_env: Env, prior: float, state_value: float, config: dict
@@ -116,12 +118,18 @@ class Node:
         )
 
     def select_child(self) -> "Node":
-        return max(self.get_valid_children(), key=lambda x: x.uct)
+        best_child = None
+
+        for child in self.get_valid_children():
+            if best_child is None or child.uct > best_child.uct:
+                best_child = child
+
+        return best_child
 
     def __str__(self) -> str:
         output = f"{self.env.bay}\n{self.env.T}\nN={self.visit_count}, Q={self.Q:.2f}\nMoves={self.env.moves_to_solve}"
         if self.prior_prob is not None:
             output += f" P={self.prior_prob:.2f}\nQ+U={self.uct:.2f}"
-        if self.pruned:
+        if self._pruned:
             output = "pruned\n" + output
         return output

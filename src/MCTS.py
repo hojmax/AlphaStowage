@@ -177,25 +177,25 @@ def prune_and_move_back_up(node: Node) -> Node:
     return node.parent
 
 
-def should_prune(node: Node, best_score: float) -> bool:
+def too_many_moves(node: Node, best_score: float) -> bool:
     bound = moves_upper_bound[(node.env.R, node.env.C, node.env.N)]
-    return (
-        node.no_valid_children
-        or -node.env.moves_to_solve < best_score
-        or -node.env.moves_to_solve <= -bound
-    )
+    return -node.env.moves_to_solve < best_score or -node.env.moves_to_solve <= -bound
 
 
 def find_leaf(root_node: Node, best_score: float) -> Node:
     node = root_node
 
     while node.children:
-        if should_prune(node, best_score):
+        if node.no_valid_children:
             node = prune_and_move_back_up(node)
         else:
             node = node.select_child()
 
-    return node
+    if too_many_moves(node, best_score):
+        node = prune_and_move_back_up(node)
+        return find_leaf(node, best_score)
+    else:
+        return node
 
 
 def alpha_zero_search(

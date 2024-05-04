@@ -8,6 +8,7 @@ from MPSPEnv import Env
 from multiprocessing.connection import Connection
 import torch
 import numpy as np
+from StepLogger import StepLogger
 
 
 class EpisodePlayer:
@@ -26,6 +27,7 @@ class EpisodePlayer:
         self.reused_tree = None
         self.transposition_table = {}
         self.n_removes = 0
+        self.total_options_considered = 0
 
         if self.deterministic:
             np.random.seed(0)
@@ -46,6 +48,7 @@ class EpisodePlayer:
             self.final_value,
             self.reshuffles,
             self.n_removes / len(actions),
+            self.total_options_considered / len(actions),
         )
 
     def _cleanup(self, actions: list[int]):
@@ -62,6 +65,10 @@ class EpisodePlayer:
             [torch.tensor(bay), torch.tensor(flat_T), probabilities]
         )
 
+    def _update_considered_options(self, probabilities: torch.Tensor) -> None:
+        n_options_considered = torch.sum(probabilities > 0).item()
+        self.total_options_considered += n_options_considered
+
     def _get_action(self):
         probabilities, self.reused_tree, self.transposition_table = alpha_zero_search(
             self.env,
@@ -70,6 +77,7 @@ class EpisodePlayer:
             self.reused_tree,
             self.transposition_table,
         )
+        self._update_considered_options(probabilities)
         self._add_observation(probabilities, self.env)
         action = self._probs_to_action(probabilities)
         self._update_tree(action)
