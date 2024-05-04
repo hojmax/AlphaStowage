@@ -19,10 +19,11 @@ class Node:
         action: int = None,
     ) -> None:
         self._env = env
+        self.config = config
         self._pruned = False
         self.visit_count = np.float16(0)
         self.total_action_value = np.float16(0)
-        self.mean_action_value = np.float16(estimated_value)
+        self.Q = np.float16(estimated_value)
         self.prior_prob = np.float16(prior_prob)
         self.children = {}
         self.parent = parent
@@ -36,6 +37,15 @@ class Node:
     def get_c_puct(self, env: Env, config: dict) -> float:
         return config["mcts"]["c_puct_constant"] * env.remaining_ports * env.R * env.C
 
+    def add_noise(self) -> None:
+        noise = np.random.dirichlet(
+            np.full(self._env.C * 2, self.config["mcts"]["dirichlet_alpha"])
+        )
+        weight = self.config["mcts"]["dirichlet_weight"]
+
+        for action, child in self.children.items():
+            child.prior_prob = noise[action] * weight + child.prior_prob * (1 - weight)
+
     @property
     def env(self) -> Env:
         if self.needed_action is not None:
@@ -46,10 +56,6 @@ class Node:
 
     def close(self):
         self._env.close()
-
-    @property
-    def Q(self) -> np.float16:
-        return self.mean_action_value
 
     @property
     def U(self) -> np.float16:
@@ -83,7 +89,7 @@ class Node:
         self._pruned = False
 
     def increment_value(self, value: float) -> None:
-        self.mean_action_value = self.value_smoothing * self.mean_action_value + (
+        self.Q = self.value_smoothing * self.Q + (
             np.float16(1) - self.value_smoothing
         ) * np.float16(value)
 

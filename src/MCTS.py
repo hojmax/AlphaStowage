@@ -63,15 +63,6 @@ def get_prob_and_value(
     return probabilities, state_value - node.depth  # Counting the already made moves
 
 
-def add_dirichlet_noise(
-    probabilities: np.ndarray, dirichlet_weight: float, dirichlet_alpha: float
-) -> np.ndarray:
-    """Add dirichlet noise to prior probabilities for more exploration"""
-    noise = np.random.dirichlet(np.zeros_like(probabilities) + dirichlet_alpha)
-    probabilities = (1 - dirichlet_weight) * probabilities + dirichlet_weight * noise
-    return probabilities
-
-
 def is_root(node: Node) -> bool:
     return node.parent == None
 
@@ -86,15 +77,10 @@ def expand_node(
     probabilities, state_value = get_prob_and_value(
         node, conn, transposition_table, config
     )
+    add_children(probabilities, state_value, node, config)
 
     if is_root(node):
-        probabilities = add_dirichlet_noise(
-            probabilities,
-            config["mcts"]["dirichlet_weight"],
-            config["mcts"]["dirichlet_alpha"],
-        )
-
-    add_children(probabilities, state_value, node, config)
+        node.add_noise()
 
     return state_value
 
@@ -133,7 +119,7 @@ def add_children(
         else range(2 * node.env.C)
     )
     for action in possible_actions:
-        is_legal = node.env.action_masks()[action]
+        is_legal = node.env.mask[action]
         if not is_legal:
             continue
         prior = (
@@ -204,6 +190,16 @@ def find_leaf(root_node: Node, best_score: float) -> Node:
     return node
 
 
+def get_new_root_node(root_env: Env, reused_tree: Node, config: dict) -> Node:
+    if reused_tree is not None:
+        if len(reused_tree.children) > 0:
+            reused_tree.add_noise()
+
+        return reused_tree
+    else:
+        return Node(root_env.copy(), config)
+
+
 def alpha_zero_search(
     root_env: Env,
     conn: Connection,
@@ -211,7 +207,8 @@ def alpha_zero_search(
     reused_tree: Node = None,
     transposition_table: dict[Env, tuple[np.ndarray, np.ndarray]] = {},
 ) -> tuple[torch.Tensor, Node, dict[Env, tuple[np.ndarray, np.ndarray]]]:
-    root_node = reused_tree if reused_tree else Node(root_env.copy(), config)
+    root_node = get_new_root_node(root_env, reused_tree, config)
+
     best_score = float("-inf")
     for _ in range(config["mcts"]["search_iterations"]):
         node = find_leaf(root_node, best_score)
