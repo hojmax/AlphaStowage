@@ -46,6 +46,7 @@ class Node:
             child.prior_prob = np.float16(noise[action]) * weight + child.prior_prob * (
                 np.float16(1) - weight
             )
+            child._uct = None
 
     @property
     def env(self) -> Env:

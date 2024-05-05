@@ -3,7 +3,6 @@ import numpy as np
 import torch
 from Train import PretrainedModel
 import torch.multiprocessing as mp
-import time
 from typing import Union
 
 

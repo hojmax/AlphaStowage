@@ -8,7 +8,6 @@ from MPSPEnv import Env
 from multiprocessing.connection import Connection
 import torch
 import numpy as np
-from StepLogger import StepLogger
 
 
 class EpisodePlayer:

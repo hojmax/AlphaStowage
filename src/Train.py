@@ -54,8 +54,6 @@ def optimize_model(
 
 
 def train_batch(model, buffer, optimizer, scheduler, config):
-    global printed_once
-
     bay, flat_T, prob, value = buffer.sample(config["train"]["batch_size"])
     bay = bay.to(model.device)
     flat_T = flat_T.to(model.device)

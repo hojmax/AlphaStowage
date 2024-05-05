@@ -3,7 +3,7 @@ import torch
 from MPSPEnv import Env
 from multiprocessing.connection import Connection
 from Node import Node
-from Lookup import moves_upper_bound
+from Lookup import reshuffles_upper_bound
 
 
 def get_np_bay(env: Env, config: dict) -> np.ndarray:
@@ -166,8 +166,11 @@ def prune_and_move_back_up(node: Node) -> Node:
 
 
 def too_many_moves(node: Node, best_score: float) -> bool:
-    bound = moves_upper_bound[(node.env.R, node.env.C, node.env.N)]
-    return -node.env.moves_to_solve < best_score or -node.env.moves_to_solve <= -bound
+    reshuffles_bound = reshuffles_upper_bound[(node.env.R, node.env.C, node.env.N)]
+    return (
+        -node.env.total_reward < best_score
+        or -node.env.total_reward <= -reshuffles_bound
+    )
 
 
 def is_leaf_node(node: Node) -> bool:
@@ -225,7 +228,7 @@ def alpha_zero_search(
         backup(node, state_value)
 
         if node.env.terminal:
-            best_score = max(best_score, state_value)
+            best_score = max(best_score, node.env.total_reward)
 
     return (
         get_tree_probs(root_node, config),
