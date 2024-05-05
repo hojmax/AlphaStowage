@@ -12,7 +12,7 @@ class Node:
         self,
         env: Env,
         config: dict,
-        prior_prob: float = None,
+        prior_prob: float = 0,
         estimated_value: float = 0,
         parent: "Node" = None,
         depth: int = 0,
@@ -22,8 +22,8 @@ class Node:
         self.config = config
         self._pruned = False
         self.visit_count = np.float16(0)
-        self.total_action_value = np.float16(0)
-        self.Q = np.float16(estimated_value)
+        self.total_action_value = None
+        self.estimated_value = np.float16(estimated_value)
         self.prior_prob = np.float16(prior_prob)
         self.children = {}
         self.parent = parent
@@ -32,7 +32,6 @@ class Node:
         self._uct = None
         self.children_pruned = 0
         self.needed_action = action
-        self.value_smoothing = np.float16(config["mcts"]["value_smoothing"])
 
     def get_c_puct(self, env: Env, config: dict) -> float:
         return config["mcts"]["c_puct_constant"] * env.remaining_ports * env.R * env.C
@@ -41,10 +40,12 @@ class Node:
         noise = np.random.dirichlet(
             np.full(self._env.C * 2, self.config["mcts"]["dirichlet_alpha"])
         )
-        weight = self.config["mcts"]["dirichlet_weight"]
+        weight = np.float16(self.config["mcts"]["dirichlet_weight"])
 
         for action, child in self.children.items():
-            child.prior_prob = noise[action] * weight + child.prior_prob * (1 - weight)
+            child.prior_prob = np.float16(noise[action]) * weight + child.prior_prob * (
+                np.float16(1) - weight
+            )
 
     @property
     def env(self) -> Env:
@@ -56,6 +57,13 @@ class Node:
 
     def close(self):
         self._env.close()
+
+    @property
+    def Q(self) -> np.float16:
+        if self.total_action_value == None:
+            return self.estimated_value
+        else:
+            return np.float16(self.total_action_value / np.float32(self.visit_count))
 
     @property
     def U(self) -> np.float16:
@@ -89,9 +97,10 @@ class Node:
         self._pruned = False
 
     def increment_value(self, value: float) -> None:
-        self.Q = self.value_smoothing * self.Q + (
-            np.float16(1) - self.value_smoothing
-        ) * np.float16(value)
+        if self.total_action_value == None:
+            self.total_action_value = np.float32(value)
+        else:
+            self.total_action_value += np.float32(value)
 
         if self.visit_count < np.finfo(np.float16).max:
             self.visit_count += np.float16(1)
@@ -131,11 +140,3 @@ class Node:
                 best_child = child
 
         return best_child
-
-    def __str__(self) -> str:
-        output = f"{self.env.bay}\n{self.env.T}\nN={self.visit_count}, Q={self.Q:.2f}\nMoves={self.env.moves_to_solve}"
-        if self.prior_prob is not None:
-            output += f" P={self.prior_prob:.2f}\nQ+U={self.uct:.2f}"
-        if self._pruned:
-            output = "pruned\n" + output
-        return output

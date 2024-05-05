@@ -53,14 +53,17 @@ def get_prob_and_value(
     conn: Connection,
     transposition_table: dict[Env, tuple[np.ndarray, np.ndarray]],
     config: dict,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[torch.Tensor, float]:
     if node.env in transposition_table:
         probabilities, state_value = transposition_table[node.env]
     else:
         probabilities, state_value = run_network(node, conn, config)
         transposition_table[node.env] = (probabilities, state_value)
 
-    return probabilities, state_value - node.depth  # Counting the already made moves
+    return (
+        probabilities,
+        state_value.item() - node.depth,
+    )  # Counting the already made moves
 
 
 def is_root(node: Node) -> bool:
@@ -72,7 +75,7 @@ def expand_node(
     conn: Connection,
     transposition_table: dict[Env, tuple[np.ndarray, np.ndarray]],
     config: dict,
-) -> np.ndarray:
+) -> float:
 
     probabilities, state_value = get_prob_and_value(
         node, conn, transposition_table, config
@@ -119,8 +122,7 @@ def add_children(
         else range(2 * node.env.C)
     )
     for action in possible_actions:
-        is_legal = node.env.mask[action]
-        if not is_legal:
+        if not node.env.mask[action]:
             continue
         prior = (
             probabilities[action]
