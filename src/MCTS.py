@@ -165,11 +165,10 @@ def prune_and_move_back_up(node: Node) -> Node:
     return node.parent
 
 
-def too_many_moves(node: Node, best_score: float) -> bool:
+def too_many_reshuffles(node: Node, best_score: float) -> bool:
     reshuffles_bound = reshuffles_upper_bound[(node.env.R, node.env.C, node.env.N)]
     return (
-        -node.env.total_reward < best_score
-        or -node.env.total_reward <= -reshuffles_bound
+        node.env.total_reward < best_score or node.env.total_reward <= -reshuffles_bound
     )
 
 
@@ -179,7 +178,7 @@ def is_leaf_node(node: Node) -> bool:
 
 def should_prune(node: Node, best_score: float) -> bool:
     return node.no_valid_children or (
-        is_leaf_node(node) and too_many_moves(node, best_score)
+        is_leaf_node(node) and too_many_reshuffles(node, best_score)
     )
 
 
