@@ -3,7 +3,6 @@ import torch
 from MPSPEnv import Env
 from multiprocessing.connection import Connection
 from Node import Node
-from Lookup import reshuffles_upper_bound
 
 
 def get_np_bay(env: Env, config: dict) -> np.ndarray:
@@ -166,9 +165,9 @@ def prune_and_move_back_up(node: Node) -> Node:
 
 
 def too_many_reshuffles(node: Node, best_score: float) -> bool:
-    reshuffles_bound = reshuffles_upper_bound[(node.env.R, node.env.C, node.env.N)]
     return (
-        node.env.total_reward < best_score or node.env.total_reward <= -reshuffles_bound
+        node.env.total_reward < best_score
+        or node.env.reshuffles_per_port < -(node.env.R * node.env.C) // 2
     )
 
 

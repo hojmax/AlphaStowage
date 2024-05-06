@@ -34,7 +34,7 @@ class Node:
         self.needed_action = action
 
     def get_c_puct(self, env: Env, config: dict) -> float:
-        return config["mcts"]["c_puct_constant"] * env.remaining_ports * env.R * env.C
+        return config["mcts"]["c_puct_constant"] * env.N * env.R * env.C
 
     def add_noise(self) -> None:
         noise = np.random.dirichlet(
