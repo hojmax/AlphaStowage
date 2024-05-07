@@ -38,8 +38,8 @@ class GPUProcess:
                     self._reset_queue()
 
     def _reset_queue(self) -> None:
-        self.bays = []
-        self.flat_ts = []
+        self.bays = None
+        self.flat_ts = None
         self.conns = []
 
     def _pull_model_update(self) -> None:
@@ -54,33 +54,31 @@ class GPUProcess:
             if not parent_conn.poll():
                 continue
             bay, flat_T = parent_conn.recv()
-            self.bays.append(bay)
-            self.flat_ts.append(flat_T)
+            if self.bays is None:
+                self.bays = bay
+            else:
+                self.bays = torch.cat((self.bays, bay), dim=0)
+
+            if self.flat_ts is None:
+                self.flat_ts = flat_T
+            else:
+                self.flat_ts = torch.cat((self.flat_ts, flat_T), dim=0)
+
             self.conns.append(parent_conn)
 
     def _queue_is_full(self) -> bool:
-        return len(self.bays) >= self.config["inference"]["batch_size"]
-
-    def _process_bays(self):
-        bays = np.stack(self.bays)
-        bays = torch.tensor(bays)
-        bays = bays.unsqueeze(1)  # Add channel dimension
-        bays = bays.to(self.device)
-        return bays
-
-    def _process_flat_ts(self):
-        flat_ts = np.stack(self.flat_ts)
-        flat_ts = torch.tensor(flat_ts)
-        flat_ts = flat_ts.to(self.device)
-        return flat_ts
+        if self.bays is None or self.flat_ts is None:
+            return False
+        return self.bays.shape[0] >= self.config["inference"]["batch_size"]
 
     def _process_data(self) -> None:
-        bays = self._process_bays()
-        flat_ts = self._process_flat_ts()
+
         with torch.no_grad():
+            bays = self.bays.to(self.device)
+            flat_ts = self.flat_ts.to(self.device)
             policies, values = self.model(bays, flat_ts)
-            policies = policies.detach().cpu().numpy()
-            values = values.detach().cpu().numpy()
+            policies = policies.detach().cpu()
+            values = values.detach().cpu()
 
         return policies, values
 

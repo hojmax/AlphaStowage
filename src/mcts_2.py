@@ -2,7 +2,6 @@ import torch
 import numpy as np
 from MPSPEnv import Env
 from Node import Node
-from multiprocessing.connection import Connection
 
 
 def get_np_bay(env: Env, config: dict) -> np.ndarray:
@@ -44,15 +43,12 @@ class MCTS:
     def __init__(
         self,
         model: torch.nn.Module,
-        env: Env,
         config: dict,
-        gpu_conn: Connection | None = None,
     ):
         self.model = model
         self.config = config
-        self.transposition_table: dict[Env, tuple[np.ndarray, np.float32]] = {}
+        self.transposition_table: dict[Env, tuple[np.ndarray, float]] = {}
         self.best_score = float("-inf")
-        self.gpu_conn = gpu_conn
 
     def run(self, root: Node, add_exploration_noise: bool = True) -> int:
 
@@ -150,21 +146,16 @@ class MCTS:
 
         #     node.add_child(action, node.env.copy(), p, state_value, self.config)
 
-    def _run_model(self, env: Env) -> tuple[np.ndarray, np.float32]:
+    def _run_model(self, env: Env) -> tuple[np.ndarray, float]:
         bay, flat_T = get_np_obs(env, self.config)
-        if self.gpu_conn:
-            self.gpu_conn.send((bay, flat_T))
-            policy, state_value = self.gpu_conn.recv()
-            state_value = state_value[0]
 
-        else:
-            bay = torch.tensor(bay)
-            flat_T = torch.tensor(flat_T)
-            bay = bay.unsqueeze(0)
-            flat_T = flat_T.unsqueeze(0)
-            with torch.no_grad():
-                policy, state_value = self.model(bay, flat_T)
-                policy = policy.detach().cpu().numpy().squeeze()
-                state_value = state_value.item()
+        bay = torch.tensor(bay)
+        flat_T = torch.tensor(flat_T)
+        bay = bay.unsqueeze(0).unsqueeze(0)
+        flat_T = flat_T.unsqueeze(0)
+        with torch.no_grad():
+            policy, state_value = self.model(bay, flat_T)
+            policy = policy.detach().cpu().numpy().squeeze()
+            state_value = state_value.item()
 
         return policy, state_value

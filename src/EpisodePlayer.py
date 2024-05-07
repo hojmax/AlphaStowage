@@ -6,6 +6,15 @@ import numpy as np
 from mcts_2 import MCTS, Node
 
 
+class GPUModel:
+    def __init__(self, conn: Connection) -> None:
+        self.conn = conn
+
+    def __call__(self, bay: torch.Tensor, flat_T: torch.Tensor) -> torch.Tensor:
+        self.conn.send([bay, flat_T])
+        return self.conn.recv()
+
+
 class EpisodePlayer:
     def __init__(
         self,
@@ -23,7 +32,7 @@ class EpisodePlayer:
         self.transposition_table = {}
         self.n_removes = 0
         self.total_options_considered = 0
-        self.mcts = MCTS(None, env, config, conn)
+        self.mcts = MCTS(GPUModel(conn), config)
 
         if self.deterministic:
             np.random.seed(0)
