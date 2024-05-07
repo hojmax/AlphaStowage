@@ -1,13 +1,9 @@
-from MCTS import (
-    remove_all_pruning,
-    close_envs_in_tree,
-    get_np_obs,
-    alpha_zero_search,
-)
+from MCTS import remove_all_pruning, close_envs_in_tree, get_np_obs
 from MPSPEnv import Env
 from multiprocessing.connection import Connection
 import torch
 import numpy as np
+from mcts_2 import MCTS, Node
 
 
 class EpisodePlayer:
@@ -23,10 +19,11 @@ class EpisodePlayer:
         self.config = config
         self.deterministic = deterministic
         self.observations = []
-        self.reused_tree = None
+        self.reused_tree = Node(self.env.copy(), self.config)
         self.transposition_table = {}
         self.n_removes = 0
         self.total_options_considered = 0
+        self.mcts = MCTS(None, env, config, conn)
 
         if self.deterministic:
             np.random.seed(0)
@@ -69,16 +66,17 @@ class EpisodePlayer:
         self.total_options_considered += n_options_considered
 
     def _get_action(self):
-        probabilities, self.reused_tree, self.transposition_table = alpha_zero_search(
-            self.env,
-            self.conn,
-            self.config,
-            self.reused_tree,
-            self.transposition_table,
-        )
-        self._update_considered_options(probabilities)
-        self._add_observation(probabilities, self.env)
-        action = self._probs_to_action(probabilities)
+        self.mcts.run(self.reused_tree)
+        action_probs = torch.zeros(2 * self.config["env"]["C"], dtype=torch.float64)
+        for i, child in self.reused_tree.children.items():
+            value = np.power(child.visit_count, 1 / self.config["mcts"]["temperature"])
+            index = i if i < self.env.C else i + self.config["env"]["C"] - self.env.C
+            action_probs[index] = value
+
+        probs = action_probs / torch.sum(action_probs)
+        self._update_considered_options(probs)
+        self._add_observation(probs, self.env)
+        action = self._probs_to_action(probs)
         self._update_tree(action)
 
         return action

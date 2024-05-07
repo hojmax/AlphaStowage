@@ -37,6 +37,10 @@ class Node:
         return config["mcts"]["c_puct_constant"] * env.N * env.R * env.C
 
     def add_noise(self) -> None:
+
+        if len(self.children) == 0:
+            return
+
         noise = np.random.dirichlet(
             np.full(self._env.C * 2, self.config["mcts"]["dirichlet_alpha"])
         )
