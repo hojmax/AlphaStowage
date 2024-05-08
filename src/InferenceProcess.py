@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import random
-from MPSPEnv import Env
+from padded_env import PaddedEnv
 from Node import TruncatedEpisodeError
 from Buffer import ReplayBuffer
 from multiprocessing.connection import Connection
@@ -61,8 +61,8 @@ class InferenceProcess:
             )
             self.episode_count += 1
 
-    def _get_env(self) -> Env:
-        env = Env(
+    def _get_env(self) -> PaddedEnv:
+        env = PaddedEnv(
             random.choice(range(6, self.config["env"]["R"] + 1, 2)),
             random.choice(range(2, self.config["env"]["C"] + 1, 2)),
             random.choice(range(4, self.config["env"]["N"] + 1, 2)),
@@ -70,6 +70,9 @@ class InferenceProcess:
             take_first_action=True,
             strict_mask=True,
             speedy=True,
+            max_C=self.config["env"]["C"],
+            max_R=self.config["env"]["R"],
+            max_N=self.config["env"]["N"],
         )
         env.reset(np.random.randint(1e9))
         return env
