@@ -18,11 +18,15 @@ class ReplayBuffer:
         )
         prob_size = (self.max_size, 2 * config["env"]["C"])
         value_size = (self.max_size, 1)
+        was_resuffled_size = (self.max_size, config["env"]["R"], config["env"]["C"])
 
         self.bay = torch.zeros(bay_size, dtype=torch.float32).share_memory_()
         self.flat_T = torch.zeros(flat_T_size, dtype=torch.float32).share_memory_()
         self.prob = torch.zeros(prob_size, dtype=torch.float32).share_memory_()
         self.value = torch.zeros(value_size, dtype=torch.float32).share_memory_()
+        self.was_reshuffled = torch.zeros(
+            was_resuffled_size, dtype=torch.float32
+        ).share_memory_()
 
         if config["train"]["buffer_checkpoint_path"]:
             self.load_from_disk(config)
@@ -36,6 +40,7 @@ class ReplayBuffer:
             self.flat_T = data["flat_T"]
             self.prob = data["prob"]
             self.value = data["value"]
+            self.was_reshuffled = data["was_reshuffled"]
             self.ptr.value = data["ptr"]
             self.size.value = data["size"]
         except FileNotFoundError:
@@ -49,6 +54,7 @@ class ReplayBuffer:
             "flat_T": self.flat_T,
             "prob": self.prob,
             "value": self.value,
+            "was_reshuffled": self.was_reshuffled,
             "ptr": self.ptr.value,
             "size": self.size.value,
         }
@@ -60,12 +66,14 @@ class ReplayBuffer:
         flat_T: torch.Tensor,
         prob: torch.Tensor,
         value: torch.Tensor,
+        was_reshuffled: torch.Tensor,
     ) -> None:
         with self.lock:
             self.bay[self.ptr.value] = bay
             self.flat_T[self.ptr.value] = flat_T
             self.prob[self.ptr.value] = prob
             self.value[self.ptr.value] = value
+            self.was_reshuffled[self.ptr.value] = was_reshuffled
             self.ptr.value = (self.ptr.value + 1) % self.max_size
             self.size.value = min(self.size.value + 1, self.max_size)
 
@@ -84,6 +92,7 @@ class ReplayBuffer:
                 self.flat_T[indices],
                 self.prob[indices],
                 self.value[indices],
+                self.was_reshuffled[indices],
             )
 
     def __len__(self):

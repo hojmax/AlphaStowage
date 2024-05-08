@@ -21,25 +21,47 @@ class PretrainedModel(TypedDict):
     local_model: str = None
 
 
-def loss_fn(pred_value, value, pred_prob, prob, config):
+def loss_fn(
+    pred_value, value, pred_prob, prob, pred_was_reshuffled, was_reshuffled, config
+):
+    pred_was_reshuffled = torch.clamp(pred_was_reshuffled, min=1e-9)
     pred_prob = torch.clamp(pred_prob, min=1e-9)
     pred_value = torch.clamp(pred_value, min=-1e6, max=1e6)
     value_error = torch.mean(torch.square(value - pred_value))
     cross_entropy = (
         -torch.sum(prob.flatten() * torch.log(pred_prob.flatten())) / prob.shape[0]
     )
-    loss = config["train"]["value_scaling"] * value_error + cross_entropy
-    return loss, value_error, cross_entropy
+    reshuffle = (
+        -torch.sum(was_reshuffled.flatten() * torch.log(pred_was_reshuffled.flatten()))
+        / was_reshuffled.shape[0]
+    )
+    loss = (
+        config["train"]["value_scaling"] * value_error
+        + config["train"]["was_reshuffled_scaling"] * reshuffle
+        + cross_entropy
+    )
+    return loss, value_error, cross_entropy, reshuffle
 
 
 def optimize_model(
-    model, pred_value, value, pred_prob, prob, optimizer, scheduler, config
+    model,
+    pred_value,
+    value,
+    pred_prob,
+    prob,
+    pred_was_reshuffled,
+    was_reshuffled,
+    optimizer,
+    scheduler,
+    config,
 ):
-    loss, value_loss, cross_entropy = loss_fn(
+    loss, value_loss, cross_entropy, reshuffle_loss = loss_fn(
         pred_value=pred_value,
         value=value,
         pred_prob=pred_prob,
         prob=prob,
+        pred_was_reshuffled=pred_was_reshuffled,
+        was_reshuffled=was_reshuffled,
         config=config,
     )
     optimizer.zero_grad()
@@ -50,23 +72,28 @@ def optimize_model(
     optimizer.step()
     scheduler.step()
 
-    return loss.item(), value_loss.item(), cross_entropy.item()
+    return loss.item(), value_loss.item(), cross_entropy.item(), reshuffle_loss.item()
 
 
 def train_batch(model, buffer, optimizer, scheduler, config):
-    bay, flat_T, prob, value = buffer.sample(config["train"]["batch_size"])
+    bay, flat_T, prob, value, was_reshuffled = buffer.sample(
+        config["train"]["batch_size"]
+    )
     bay = bay.to(model.device)
     flat_T = flat_T.to(model.device)
     prob = prob.to(model.device)
     value = value.to(model.device)
+    was_reshuffled = was_reshuffled.to(model.device)
 
-    pred_prob, pred_value = model(bay, flat_T)
-    loss, value_loss, cross_entropy = optimize_model(
+    pred_prob, pred_value, pred_was_reshuffled = model(bay, flat_T)
+    loss, value_loss, cross_entropy, reshuffle_loss = optimize_model(
         model=model,
         pred_value=pred_value,
         value=value,
         pred_prob=pred_prob,
         prob=prob,
+        pred_was_reshuffled=pred_was_reshuffled,
+        was_reshuffled=was_reshuffled,
         optimizer=optimizer,
         scheduler=scheduler,
         config=config,
@@ -91,13 +118,14 @@ def train_batch(model, buffer, optimizer, scheduler, config):
         loss,
         value_loss,
         cross_entropy,
+        reshuffle_loss,
     )
 
 
 def get_model_weights_path(pretrained: PretrainedModel):
     if pretrained["local_model"]:
         print("Using local model...")
-        return pretrained["local_model"] + ".pt"
+        return pretrained["local_model"]
     elif pretrained["artifact"]:
         print("Downloading artifact...")
         download_path = os.path.join(

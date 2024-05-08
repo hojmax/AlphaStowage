@@ -128,7 +128,9 @@ def add_children(
             if action < node.env.C
             else probabilities[action + config["env"]["C"] - node.env.C]
         )
-        node.add_child(action, node.env.copy(), prior, state_value, config)
+        node.add_child(
+            action, node.env.copy(track_history=False), prior, state_value, config
+        )
 
 
 def backup(node: Node, value: float) -> None:
@@ -168,6 +170,7 @@ def too_many_reshuffles(node: Node, best_score: float) -> bool:
     return (
         node.env.total_reward < best_score
         or node.env.reshuffles_per_port < -(node.env.R * node.env.C) // 2
+        or node.env.moves_to_solve >= node.env.R * node.env.C * (node.env.N - 1)
     )
 
 
@@ -200,7 +203,7 @@ def get_new_root_node(root_env: Env, reused_tree: Node, config: dict) -> Node:
 
         return reused_tree
     else:
-        return Node(root_env.copy(), config)
+        return Node(root_env.copy(track_history=False), config)
 
 
 def alpha_zero_search(

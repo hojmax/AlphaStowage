@@ -12,32 +12,11 @@ import wandb
 import os
 import warnings
 import pandas as pd
-from main import PretrainedModel
-
-
-# def test_network(conn, testset, config):
-#     avg_error = 0
-#     avg_reshuffles = 0
-
-#     for env in testset:
-#         copy_env = env.copy()
-#         try:
-#             _, value, reshuffles = play_episode(
-#                 copy_env, conn, config, deterministic=True
-#             )
-#             avg_error += value
-#             avg_reshuffles += reshuffles
-#         except TruncatedEpisodeError:
-#             warnings.warn("Episode was truncated during evaluation.")
-#             avg_error += -1e9
-#             avg_reshuffles += -1e9
-
-#         copy_env.close()
-
-#     avg_error /= len(testset)
-#     avg_reshuffles /= len(testset)
-
-#     return avg_error, avg_reshuffles
+from main import start_process_loop, PretrainedModel
+from GPUProcess import GPUProcess
+import torch.multiprocessing as mp
+from MCTS import alpha_zero_search
+import time
 
 
 def _draw_tree_recursive(graph, node):
@@ -51,7 +30,7 @@ def _draw_tree_recursive(graph, node):
 
 
 def draw_tree(node):
-    graph = nx.DiGraph()
+    graph = nx.DiGraph(ratio="fill", size="10,10")
     graph.add_node(str(hash(node)), label=str(node))
 
     _draw_tree_recursive(graph, node)
@@ -60,235 +39,152 @@ def draw_tree(node):
     labels = nx.get_node_attributes(graph, "label")
     edge_labels = nx.get_edge_attributes(graph, "label")
 
+    fig = plt.figure(1, figsize=(24, 17), dpi=60)
+
     nx.draw(
         graph,
         pos,
         labels=labels,
         with_labels=True,
-        node_size=4000,
+        node_size=60,
         font_size=9,
         node_color="#00000000",
     )
     nx.draw_networkx_edge_labels(graph, pos, edge_labels=edge_labels, font_size=9)
 
-    plt.gcf().set_size_inches(12, 7)
+    # plt.gcf().set_size_inches(12, 7)
     plt.show()
 
 
-def get_benchmarking_data(path):
-    """Go through all files in the directory and return a list of dictionaries with:
-    N, R, C, seed, transportation_matrix, paper_result"""
-
-    output = []
-    df = pd.read_excel(
-        os.path.join(path, "paper_results.xlsx"),
+def run_search(iters, env, conn, config):
+    np.random.seed(0)
+    config["mcts"]["search_iterations"] = iters
+    probabilities, reused_tree, transposition_table = alpha_zero_search(
+        env, conn, config
     )
-
-    for file in os.listdir(path):
-        if file.endswith(".txt"):
-            with open(os.path.join(path, file), "r") as f:
-                lines = f.readlines()
-                N = int(lines[0].split(": ")[1])
-                R = int(lines[1].split(": ")[1])
-                C = int(lines[2].split(": ")[1])
-                seed = int(lines[3].split(": ")[1])
-
-                paper_result = df[
-                    (df["N"] == N)
-                    & (df["R"] == R)
-                    & (df["C"] == C)
-                    & (df["seed"] == seed)
-                ]["res"].values
-
-                assert len(paper_result) == 1
-                paper_result = paper_result[0]
-
-                output.append(
-                    {
-                        "N": N,
-                        "R": R,
-                        "C": C,
-                        "seed": seed,
-                        "transportation_matrix": np.loadtxt(lines[4:], dtype=np.int32),
-                        "paper_result": paper_result,
-                    }
-                )
-
-    return output
+    draw_tree(reused_tree)
+    print("search probs", probabilities)
 
 
-def transform_benchmarking_data(data):
-    testset = []
-    for instance in data:
-        env = Env(
-            instance["R"],
-            instance["C"],
-            instance["N"],
-            skip_last_port=True,
-            take_first_action=True,
-            strict_mask=True,
-        )
-        env.reset_to_transportation(instance["transportation_matrix"])
-        testset.append(env)
-    return testset
+class BaselinePolicy:
+    def __init__(self, env):
+        self.C = env.C
+        self.N = env.N
 
+    def predict(self, env):
+        """Place the container in the rightmost non-filled column."""
+        j = self.C - 1
 
-# def test_on_benchmark(conn, config):
-#     testset = get_benchmarking_data("benchmark/set_2")
-#     testset = [e for e in testset if e["N"] == 6 and e["R"] == 6 and e["C"] == 2]
-#     testset = transform_benchmarking_data(testset)
-#     avg_error, avg_reshuffles = test_network(conn, testset, config)
-#     print("Average Error:", avg_error, "Average Reshuffles:", avg_reshuffles)
+        while j >= 1:
+            if env.mask[j]:
+                return j
+            j -= 1
 
-
-def get_pretrained_model(pretrained: PretrainedModel):
-    api = wandb.Api()
-    run = api.run(pretrained["wandb_run"])
-    file = run.file(pretrained["wandb_model"])
-    file.download(replace=True)
-    config = run.config
-    config["inference"]["can_only_add"] = False
-
-    model = NeuralNetwork(config=config, device="cpu")
-    model.load_state_dict(torch.load(pretrained["wandb_model"], map_location="cpu"))
-
-    return model
+        return j
 
 
 if __name__ == "__main__":
-    pretrained = PretrainedModel(
-        wandb_run="hojmax/AlphaStowage/esmw5y6x", wandb_model="model86000.pt"
-    )
-    print("Pretrained Model:", pretrained)
-    config = get_config("config.json")
-    model = get_pretrained_model(pretrained)
-    # test_on_benchmark(model, config)
-
+    print("Started...")
     env = Env(
-        6,
-        2,
-        6,
+        R=10,
+        C=12,
+        N=16,
         skip_last_port=True,
         take_first_action=True,
         strict_mask=True,
+        speedy=True,
     )
     env.reset_to_transportation(
         np.array(
             [
-                [0, 10, 2, 0, 0, 0],
-                [0, 0, 0, 0, 0, 10],
-                [0, 0, 0, 0, 2, 0],
-                [0, 0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0, 2],
-                [0, 0, 0, 0, 0, 0],
+                [0, 12, 19, 11, 8, 8, 4, 1, 1, 43, 1, 2, 0, 0, 10, 0],
+                [0, 0, 2, 2, 0, 1, 0, 0, 0, 3, 0, 1, 0, 0, 0, 3],
+                [0, 0, 0, 4, 0, 2, 0, 4, 2, 0, 0, 3, 1, 1, 2, 2],
+                [0, 0, 0, 0, 3, 3, 2, 2, 0, 0, 0, 0, 2, 0, 3, 2],
+                [0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 4, 0, 1, 0, 3],
+                [0, 0, 0, 0, 0, 0, 0, 1, 4, 1, 5, 3, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 2, 0, 2, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 1, 0, 4, 1],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 3, 3, 1, 1],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 4, 0, 13, 5, 6],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 5, 10, 4],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 9, 3],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 5],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 25],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 65],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             ],
             dtype=np.int32,
         )
     )
-    env.step(0)
-    env.step(0)
-    env.step(0)
-    env.step(0)
-    env.step(0)
-    env.step(0)
-    env.step(0)
-    env.step(0)
-    env.step(0)
-    env.step(0)
-    env.step(0)
-    env.step(2)
-    env.step(3)
-    # root, probs, transposition_table = alpha_zero_search(env, model, "cpu", config)
-    bay, flat_t = get_np_obs(env, config)
-    flat_t = torch.tensor(flat_t).unsqueeze(0)
-    bay = torch.tensor(bay).unsqueeze(0).unsqueeze(0)
-    print(bay.shape)
-    print(flat_t.shape)
-    probabilities, state_value = model(bay, flat_t)
-    print("Bay:", bay, "Flat T:", flat_t)
-    print("Bay:")
+    baseline_policy = BaselinePolicy(env)
+    action = baseline_policy.predict(env)
+
+    while not env.remaining_ports == 9:
+        action = baseline_policy.predict(env)
+        env.step(action)
+
+    for _ in range(19):
+        action = baseline_policy.predict(env)
+        env.step(action)
+
     print(env.bay)
-    print("T:")
     print(env.T)
-    print("Net Probs:", probabilities, "Net Value:", state_value)
-    # print("MCTS Probs:", probs)
-    # draw_tree(root)
-    # config["mcts"]["search_iterations"] = 100
-    # root, probs, transposition_table = alpha_zero_search(env, net, "cpu", config)
-    # print("MCTS Probs 2:", probs)
+
+    config = get_config("config.json")
+    gpu_update_event = mp.Event()
+    inference_pipes = [mp.Pipe()]
+
+    gpu_process = mp.Process(
+        target=start_process_loop,
+        args=(
+            GPUProcess,
+            inference_pipes,
+            gpu_update_event,
+            "mps",
+            PretrainedModel(
+                local_model="07-05.pt", wandb_model="", artifact="", wandb_run=""
+            ),
+            config,
+        ),
+    )
+    gpu_process.start()
+    print("GPU Process Started...")
+
+    _, conn = inference_pipes[0]
+    for i in range(1, 50):
+        run_search(i, env, conn, config)
+
     env.close()
 
+
 # env = Env(
-#     config["env"]["R"],
-#     config["env"]["C"],
-#     config["env"]["N"],
+#     12,
+#     6,
+#     14,
 #     skip_last_port=True,
 #     take_first_action=True,
 #     strict_mask=True,
+#     speedy=True,
 # )
 # env.reset_to_transportation(
 #     np.array(
 #         [
-#             [0, 10, 0, 0, 0, 2],
-#             [0, 0, 5, 5, 0, 0],
-#             [0, 0, 0, 0, 5, 0],
-#             [0, 0, 0, 0, 0, 5],
-#             [0, 0, 0, 0, 0, 5],
-#             [0, 0, 0, 0, 0, 0],
+#             [0, 0, 3, 7, 4, 6, 0, 27, 0, 8, 10, 5, 1, 0],
+#             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+#             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 1],
+#             [0, 0, 0, 0, 1, 0, 2, 1, 1, 0, 0, 1, 1, 0],
+#             [0, 0, 0, 0, 0, 1, 0, 0, 0, 3, 1, 0, 0, 0],
+#             [0, 0, 0, 0, 0, 0, 3, 1, 1, 1, 1, 0, 0, 0],
+#             [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 3],
+#             [0, 0, 0, 0, 0, 0, 0, 0, 7, 3, 2, 13, 4, 0],
+#             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6, 2, 0],
+#             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 8, 4, 3],
+#             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 15, 2],
+#             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 21],
+#             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 42],
+#             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 #         ],
 #         dtype=np.int32,
 #     )
 # )
-
-# root, probs, transposition_table = alpha_zero_search(
-#     env,
-#     net,
-#     100,
-#     config["mcts"]["c_puct"],
-#     config["mcts"]["temperature"],
-#     config["mcts"]["dirichlet_weight"],
-#     config["mcts"]["dirichlet_alpha"],
-#     device="cpu",
-#     config=config,
-# )
-# env.print()
-# torch.set_printoptions(precision=3, sci_mode=False)
-# bay, flat_t = get_torch_obs(env)
-# probabilities, state_value = net(bay, flat_t)
-# print("Net Probs:", probabilities, "Net Value:", state_value)
-# print("MCTS Probs:", probs)
-
-
-# output_data, real_value, reshuffles = play_episode(
-#     env, net, config, "cpu", deterministic=True
-# )
-
-# print("Real Value:", real_value, "Reshuffles:", reshuffles)
-# for e in output_data:
-#     with open("test.txt", "a") as f:
-#         f.write(str(e[0][0].numpy()))
-#         f.write("\n")
-#         f.write(str(e[0][1].numpy()))
-#         f.write("\n")
-#         f.write(str(e[1].numpy()))
-#         f.write("\n")
-#         f.write(str(e[2]))
-#         f.write("\n")
-#         f.write("\n")
-
-# for i in range(99, 100):
-#     np.random.seed(13)
-#     root, probs, transposition_table = alpha_zero_search(
-#         env,
-#         net,
-#         i,
-#         config["mcts"]["c_puct"],
-#         config["mcts"]["temperature"],
-#         config["mcts"]["dirichlet_weight"],
-#         config["mcts"]["dirichlet_alpha"],
-#         device="cpu",
-#         config=config,
-#     )
-#     draw_tree(root)
-
-# env.close()

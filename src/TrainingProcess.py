@@ -46,7 +46,7 @@ class TrainingProcess:
             self.batch += 1
 
     def _handle_batch(self) -> None:
-        loss, value_loss, cross_entropy_loss = train_batch(
+        loss, value_loss, cross_entropy_loss, reshuffle_loss = train_batch(
             self.model, self.buffer, self.optimizer, self.scheduler, self.config
         )
         self.logger.log(
@@ -54,6 +54,7 @@ class TrainingProcess:
                 "loss": loss,
                 "value_loss": value_loss,
                 "cross_entropy_loss": cross_entropy_loss,
+                "reshuffle_loss": reshuffle_loss,
                 "lr": self.scheduler.current_lr(),
             }
         )

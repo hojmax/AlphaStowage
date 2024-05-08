@@ -78,7 +78,7 @@ class GPUProcess:
         bays = self._process_bays()
         flat_ts = self._process_flat_ts()
         with torch.no_grad():
-            policies, values = self.model(bays, flat_ts)
+            policies, values, _ = self.model(bays, flat_ts)
             policies = policies.detach().cpu().numpy()
             values = values.detach().cpu().numpy()
 

@@ -40,7 +40,7 @@ class EpisodePlayer:
             actions.append(action)
             self.env.step(action)
 
-        self._cleanup(actions)
+        self._cleanup(actions, self.env.history)
 
         return (
             self.observations,
@@ -50,13 +50,14 @@ class EpisodePlayer:
             self.total_options_considered / len(actions),
         )
 
-    def _cleanup(self, actions: list[int]):
+    def _cleanup(self, actions: list[int], history: np.ndarray) -> None:
         close_envs_in_tree(self.reused_tree)
 
         self.final_value = -self.env.moves_to_solve
         self.reshuffles = self.env.total_reward
 
         self._add_value_to_observations(actions)
+        self._add_history_to_observations(history)
 
     def _add_observation(self, probabilities: torch.Tensor, env: Env) -> None:
         bay, flat_T = get_np_obs(env, self.config)
@@ -120,3 +121,20 @@ class EpisodePlayer:
 
             if actions[i] >= self.env.C:
                 cummulative_removes += 1
+
+    def _add_history_to_observations(self, history: np.ndarray) -> None:
+        history = np.pad(
+            history,
+            (
+                (0, len(history)),
+                (0, self.config["env"]["R"] - history.shape[1]),
+                (0, self.config["env"]["C"] - history.shape[2]),
+            ),
+            mode="constant",
+            constant_values=0,
+        )
+
+        offset = 1 if self.env.take_first_action else 0
+
+        for i in range(len(self.observations)):
+            self.observations[i] += [torch.tensor(history[i + offset])]

@@ -125,7 +125,7 @@ def gpu_process(model, device, conn):
 
             bay, flat_T = conn.recv()
 
-            policy, value = model(
+            policy, value, _ = model(
                 torch.from_numpy(bay).to(device), torch.from_numpy(flat_T).to(device)
             )
             policy = policy.cpu()[0]
