@@ -100,20 +100,20 @@ def train_batch(model, buffer, optimizer, scheduler, config):
         config=config,
     )
 
-    if loss > 70:
-        current_time = time.time()
-        time_stamp = time.strftime("%Y-%m-%d-%H-%M-%S", time.gmtime(current_time))
-        print("Loss larger than 50")
-        torch.save(bay, f"bay_{time_stamp}.pt")
-        torch.save(flat_T, f"flat_T_{time_stamp}.pt")
-        torch.save(prob, f"prob_{time_stamp}.pt")
-        torch.save(value, f"value_{time_stamp}.pt")
-        torch.save(pred_prob, f"pred_prob_{time_stamp}.pt")
-        torch.save(pred_value, f"pred_value_{time_stamp}.pt")
-        torch.save(loss, f"loss_{time_stamp}.pt")
-        torch.save(value_loss, f"value_loss_{time_stamp}.pt")
-        torch.save(cross_entropy, f"cross_entropy_{time_stamp}.pt")
-        print("Saved tensors")
+    # if loss > 70:
+    #     current_time = time.time()
+    #     time_stamp = time.strftime("%Y-%m-%d-%H-%M-%S", time.gmtime(current_time))
+    #     print("Loss larger than 50")
+    #     torch.save(bay, f"bay_{time_stamp}.pt")
+    #     torch.save(flat_T, f"flat_T_{time_stamp}.pt")
+    #     torch.save(prob, f"prob_{time_stamp}.pt")
+    #     torch.save(value, f"value_{time_stamp}.pt")
+    #     torch.save(pred_prob, f"pred_prob_{time_stamp}.pt")
+    #     torch.save(pred_value, f"pred_value_{time_stamp}.pt")
+    #     torch.save(loss, f"loss_{time_stamp}.pt")
+    #     torch.save(value_loss, f"value_loss_{time_stamp}.pt")
+    #     torch.save(cross_entropy, f"cross_entropy_{time_stamp}.pt")
+    #     print("Saved tensors")
 
     return (
         loss,
