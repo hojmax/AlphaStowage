@@ -122,6 +122,8 @@ class MCTS:
 
             self.transposition_table[node.env] = (policy, state_value)
 
+        state_value -= node.depth
+
         self._add_children(node, policy, state_value)
 
         return state_value
