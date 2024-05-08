@@ -76,7 +76,7 @@ def optimize_model(
 
 
 def train_batch(model, buffer, optimizer, scheduler, config):
-    bay, flat_T, prob, value, was_reshuffled = buffer.sample(
+    bay, flat_T, prob, value, was_reshuffled, containers_left = buffer.sample(
         config["train"]["batch_size"]
     )
     bay = bay.to(model.device)
@@ -84,8 +84,9 @@ def train_batch(model, buffer, optimizer, scheduler, config):
     prob = prob.to(model.device)
     value = value.to(model.device)
     was_reshuffled = was_reshuffled.to(model.device)
+    containers_left = containers_left.to(model.device)
 
-    pred_prob, pred_value, pred_was_reshuffled = model(bay, flat_T)
+    pred_prob, pred_value, pred_was_reshuffled = model(bay, flat_T, containers_left)
     loss, value_loss, cross_entropy, reshuffle_loss = optimize_model(
         model=model,
         pred_value=pred_value,

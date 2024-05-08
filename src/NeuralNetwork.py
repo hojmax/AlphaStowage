@@ -145,8 +145,13 @@ class NeuralNetwork(nn.Module):
             nn.SiLU(),
             nn.Linear(nn_config["value_hidden"], 1),
         )
+        self.containers_left_embedding = nn.Sequential(
+            nn.Linear(1, nn_config["embedding_hidden_size"]),
+            nn.SiLU(),
+            nn.Linear(nn_config["embedding_hidden_size"], nn_config["hidden_channels"]),
+        )
 
-    def forward(self, bay, flat_T):
+    def forward(self, bay, flat_T, containers_left):
         flat_T = self.flat_T_reshaper(flat_T)
         flat_T = flat_T.view(-1, 1, self.env_config["R"], self.env_config["C"])
         if bay.dim() == 2:
@@ -154,6 +159,10 @@ class NeuralNetwork(nn.Module):
 
         x = torch.cat([bay, flat_T], dim=1)
         out = self.layers(x)
+
+        channel_embedding = self.containers_left_embedding(containers_left)
+        out = out + channel_embedding.unsqueeze(-1).unsqueeze(-1)
+
         policy = self.policy_head(out)
         value = self.value_head(out)
         was_reshuffled = self.was_reshuffled_head(out)

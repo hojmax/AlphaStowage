@@ -62,7 +62,12 @@ class EpisodePlayer:
     def _add_observation(self, probabilities: torch.Tensor, env: Env) -> None:
         bay, flat_T = get_np_obs(env, self.config)
         self.observations.append(
-            [torch.tensor(bay), torch.tensor(flat_T), probabilities]
+            [
+                torch.tensor(bay),
+                torch.tensor(flat_T),
+                probabilities,
+                torch.tensor([env.containers_left]),
+            ]
         )
 
     def _update_considered_options(self, probabilities: torch.Tensor) -> None:

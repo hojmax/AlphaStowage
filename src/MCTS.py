@@ -42,7 +42,9 @@ def get_np_obs(env: Env, config: dict) -> tuple[np.ndarray, np.ndarray]:
 def run_network(
     node: Node, conn: Connection, config: dict
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    conn.send(get_np_obs(node.env, config))
+    bay, flat_T = get_np_obs(node.env, config)
+    containers_left = np.array([node.env.containers_left], dtype=np.float32)
+    conn.send((bay, flat_T, containers_left))
     probabilities, value = conn.recv()
     return torch.tensor(probabilities), torch.tensor(value)
 
@@ -167,10 +169,12 @@ def prune_and_move_back_up(node: Node) -> Node:
 
 
 def too_many_reshuffles(node: Node, best_score: float) -> bool:
+    move_bound = node.env.R * node.env.C * (node.env.N - 1)
     return (
         node.env.total_reward < best_score
         or node.env.reshuffles_per_port < -(node.env.R * node.env.C) // 2
-        or node.env.moves_to_solve >= node.env.R * node.env.C * (node.env.N - 1)
+        or node.env.moves_to_solve > move_bound
+        or node.env.steps_taken > move_bound
     )
 
 
@@ -179,7 +183,7 @@ def is_leaf_node(node: Node) -> bool:
 
 
 def should_prune(node: Node, best_score: float) -> bool:
-    return node.no_valid_children or (
+    return (not is_leaf_node(node) and node.no_valid_children) or (
         is_leaf_node(node) and too_many_reshuffles(node, best_score)
     )
 
@@ -187,13 +191,13 @@ def should_prune(node: Node, best_score: float) -> bool:
 def find_leaf(root_node: Node, best_score: float) -> Node:
     node = root_node
 
-    while node.children:
+    while True:
         if should_prune(node, best_score):
             node = prune_and_move_back_up(node)
+        elif is_leaf_node(node):
+            return node
         else:
             node = node.select_child()
-
-    return node
 
 
 def get_new_root_node(root_env: Env, reused_tree: Node, config: dict) -> Node:
