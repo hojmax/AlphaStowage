@@ -4,6 +4,9 @@ from MPSPEnv import Env
 from Node import Node
 
 
+# TODO: Move a lot of this logic to Env wrapper
+
+
 def get_np_bay(env: Env, config: dict) -> np.ndarray:
     bay = env.bay
     bay = bay.astype(np.float32)
@@ -56,7 +59,6 @@ class MCTS:
 
         if len(root.children) == 0:
             self.best_score = self._evaluate(root)
-
             self._backpropagate(root, self.best_score)
 
         if add_exploration_noise:
@@ -125,26 +127,17 @@ class MCTS:
         return state_value
 
     def _add_children(self, node: Node, policy: np.ndarray, state_value: float):
-        possible_actions = (
-            range(node.env.C)
-            if self.config["inference"]["can_only_add"]
-            else range(2 * node.env.C)
-        )
-        for action in possible_actions:
+
+        # Hack since model produces 2 * max C policy
+        add_policy = policy[: node.env.C]
+        remove_policy = policy[len(policy) // 2 : len(policy) // 2 + node.env.C]
+        policy = add_policy + remove_policy
+
+        for action, p in enumerate(policy):
             if not node.env.mask[action]:
                 continue
-            prior = (
-                policy[action]
-                if action < node.env.C
-                else policy[action + self.config["env"]["C"] - node.env.C]
-            )
-            node.add_child(action, node.env.copy(), prior, state_value, self.config)
-        # for action, p in enumerate(policy):  # TODO: Take care of max C to actual C
 
-        #     if not node.env.mask[action]:
-        #         continue
-
-        #     node.add_child(action, node.env.copy(), p, state_value, self.config)
+            node.add_child(action, node.env.copy(), p, state_value, self.config)
 
     def _run_model(self, env: Env) -> tuple[np.ndarray, float]:
         bay, flat_T = get_np_obs(env, self.config)

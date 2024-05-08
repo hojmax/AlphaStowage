@@ -10,7 +10,9 @@ class GPUModel:
     def __init__(self, conn: Connection) -> None:
         self.conn = conn
 
-    def __call__(self, bay: torch.Tensor, flat_T: torch.Tensor) -> torch.Tensor:
+    def __call__(
+        self, bay: torch.Tensor, flat_T: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         self.conn.send([bay, flat_T])
         return self.conn.recv()
 
