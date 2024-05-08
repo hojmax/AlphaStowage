@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from MPSPEnv import Env
+from padded_env import PaddedEnv
 import os
 import pandas as pd
 from main import get_config
@@ -96,22 +96,6 @@ class BenchmarkLogger:
             df.to_excel("benchmark_results.xlsx", index=False)
 
 
-def transform_benchmarking_data(data):
-    testset = []
-    for instance in data:
-        env = Env(
-            instance["R"],
-            instance["C"],
-            instance["N"],
-            skip_last_port=True,
-            take_first_action=True,
-            strict_mask=True,
-        )
-        env.reset_to_transportation(instance["transportation_matrix"])
-        testset.append(env)
-    return testset
-
-
 def gpu_process(model, device, conn):
 
     model.eval()
@@ -157,13 +141,16 @@ class InferenceProcess:
 
             e = self.env_queue.get()
 
-            env = Env(
+            env = PaddedEnv(
                 e["R"],
                 e["C"],
                 e["N"],
                 skip_last_port=True,
                 take_first_action=True,
                 strict_mask=True,
+                max_C=config["env"]["C"],
+                max_R=config["env"]["R"],
+                max_N=config["env"]["N"],
             )
             env.reset_to_transportation(e["transportation_matrix"])
 

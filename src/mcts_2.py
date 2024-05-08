@@ -4,43 +4,6 @@ from MPSPEnv import Env
 from Node import Node
 
 
-# TODO: Move a lot of this logic to Env wrapper
-
-
-def get_np_bay(env: Env, config: dict) -> np.ndarray:
-    bay = env.bay
-    bay = bay.astype(np.float32)
-    bay = bay / env.remaining_ports
-    bay = np.pad(
-        bay,
-        ((0, config["env"]["R"] - env.R), (0, config["env"]["C"] - env.C)),
-        mode="constant",
-        constant_values=-1,
-    )
-    return bay
-
-
-def get_np_flat_T(env: Env, config: dict) -> np.ndarray:
-    T = env.T
-    T = T.astype(np.float32)
-    T = np.pad(
-        T,
-        ((0, config["env"]["N"] - env.N), (0, config["env"]["N"] - env.N)),
-        mode="constant",
-        constant_values=0,
-    )
-    i, j = np.triu_indices(n=T.shape[0], k=1)
-    flat_T = T[i, j]
-    flat_T = flat_T / (env.R * env.C)
-    return flat_T
-
-
-def get_np_obs(env: Env, config: dict) -> tuple[np.ndarray, np.ndarray]:
-    bay = get_np_bay(env, config)
-    flat_T = get_np_flat_T(env, config)
-    return bay, flat_T
-
-
 class MCTS:
 
     def __init__(
@@ -53,7 +16,11 @@ class MCTS:
         self.transposition_table: dict[Env, tuple[np.ndarray, float]] = {}
         self.best_score = float("-inf")
 
-    def run(self, root: Node, add_exploration_noise: bool = True) -> int:
+    def run(
+        self,
+        root: Node,
+        add_exploration_noise: bool = True,
+    ) -> int:
 
         self.best_score = float("-inf")
 
@@ -128,12 +95,14 @@ class MCTS:
 
         return state_value
 
-    def _add_children(self, node: Node, policy: np.ndarray, state_value: float):
+    def _reduce_policy(self, p: np.ndarray, C: int) -> np.ndarray:
+        """Hack since model produces 2 * max C policy"""
+        add_policy = p[:C]
+        remove_policy = p[len(p) // 2 : len(p) // 2 + C]
+        return add_policy + remove_policy
 
-        # Hack since model produces 2 * max C policy
-        add_policy = policy[: node.env.C]
-        remove_policy = policy[len(policy) // 2 : len(policy) // 2 + node.env.C]
-        policy = add_policy + remove_policy
+    def _add_children(self, node: Node, policy: np.ndarray, state_value: float):
+        policy = self._reduce_policy(policy, node.env.C)
 
         for action, p in enumerate(policy):
             if not node.env.mask[action]:
@@ -142,12 +111,13 @@ class MCTS:
             node.add_child(action, node.env.copy(), p, state_value, self.config)
 
     def _run_model(self, env: Env) -> tuple[np.ndarray, float]:
-        bay, flat_T = get_np_obs(env, self.config)
+        bay, flat_T = env.bay, env.flat_T
 
         bay = torch.tensor(bay)
         flat_T = torch.tensor(flat_T)
         bay = bay.unsqueeze(0).unsqueeze(0)
         flat_T = flat_T.unsqueeze(0)
+
         with torch.no_grad():
             policy, state_value = self.model(bay, flat_T)
             policy = policy.detach().cpu().numpy().squeeze()
