@@ -43,7 +43,7 @@ class InferenceProcess:
                     remove_fraction,
                     avg_options_considered,
                 ) = player.run_episode()
-            except TruncatedEpisodeError:
+            except (TruncatedEpisodeError, KeyError):
                 continue
             finally:
                 env.close()

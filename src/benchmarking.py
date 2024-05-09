@@ -170,7 +170,7 @@ class InferenceProcess:
             try:
                 player = EpisodePlayer(env, self.conn, self.config, deterministic=False)
                 _, _, reshuffles, _, _ = player.run_episode()
-            except TruncatedEpisodeError:
+            except (TruncatedEpisodeError, KeyError):
                 reshuffles = -10000
             finally:
                 env.close()

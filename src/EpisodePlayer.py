@@ -8,6 +8,7 @@ from MPSPEnv import Env
 from multiprocessing.connection import Connection
 import torch
 import numpy as np
+from Node import TruncatedEpisodeError
 
 
 class EpisodePlayer:
@@ -128,6 +129,9 @@ class EpisodePlayer:
                 cummulative_removes += 1
 
     def _add_history_to_observations(self, history: np.ndarray) -> None:
+        if len(history) == 0:
+            raise TruncatedEpisodeError
+
         history = np.pad(
             history,
             (

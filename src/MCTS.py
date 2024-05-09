@@ -173,8 +173,8 @@ def too_many_reshuffles(node: Node, best_score: float) -> bool:
     return (
         node.env.total_reward < best_score
         or node.env.reshuffles_per_port < -(node.env.R * node.env.C) // 2
-        or node.env.moves_to_solve > move_bound
-        or node.env.steps_taken > move_bound
+        or node.env.moves_to_solve >= move_bound
+        or node.env.steps_taken >= move_bound
     )
 
 
