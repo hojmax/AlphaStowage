@@ -49,6 +49,24 @@ class PaddedEnv(Env):
 
         return new_env
 
+    def step(self, action: int):
+        if action >= self.max_C:
+            action = action - (self.max_C - self.C)
+
+        super().step(action)
+
+    @property
+    def mask(self) -> np.ndarray:
+        mask = self.mask_store.ndarray.copy()
+
+        add_mask = np.pad(
+            mask[: self.C], (0, self.max_C - self.C), mode="constant", constant_values=0
+        )
+        remove_mask = np.pad(
+            mask[self.C :], (0, self.max_C - self.C), mode="constant", constant_values=0
+        )
+        return np.concatenate([add_mask, remove_mask])
+
     @property
     def bay(self) -> np.ndarray:
         bay = self.bay_store.ndarray.copy()

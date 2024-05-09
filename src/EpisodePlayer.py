@@ -30,11 +30,16 @@ class EpisodePlayer:
         self.config = config
         self.deterministic = deterministic
         self.observations = []
-        self.reused_tree = Node(self.env.copy(), self.config)
+        self.reused_tree = Node(
+            self.env.copy(),
+            c_puct_constant=config["mcts"]["c_puct_constant"],
+            dirichlet_weight=config["mcts"]["dirichlet_weight"],
+            dirichlet_alpha=config["mcts"]["dirichlet_alpha"],
+        )
         self.transposition_table = {}
         self.n_removes = 0
         self.total_options_considered = 0
-        self.mcts = MCTS(GPUModel(conn), config)
+        self.mcts = MCTS(GPUModel(conn))
 
         if self.deterministic:
             np.random.seed(0)
@@ -43,8 +48,6 @@ class EpisodePlayer:
         actions = []
         while not self.env.terminal:
             action = self._get_action()
-            if action >= self.env.C:
-                self.n_removes += 1
             actions.append(action)
             self.env.step(action)
 
@@ -67,7 +70,7 @@ class EpisodePlayer:
         self._add_value_to_observations(actions)
 
     def _add_observation(self, probabilities: torch.Tensor, env: Env) -> None:
-        bay, flat_T = get_np_obs(env, self.config)
+        bay, flat_T = env.bay, env.flat_T
         self.observations.append(
             [torch.tensor(bay), torch.tensor(flat_T), probabilities]
         )
@@ -77,12 +80,13 @@ class EpisodePlayer:
         self.total_options_considered += n_options_considered
 
     def _get_action(self):
-        self.mcts.run(self.reused_tree)
+        self.mcts.run(
+            self.reused_tree, search_iterations=self.config["mcts"]["search_iterations"]
+        )
         action_probs = torch.zeros(2 * self.config["env"]["C"], dtype=torch.float64)
         for i, child in self.reused_tree.children.items():
             value = np.power(child.visit_count, 1 / self.config["mcts"]["temperature"])
-            index = i if i < self.env.C else i + self.config["env"]["C"] - self.env.C
-            action_probs[index] = value
+            action_probs[i] = value
 
         probs = action_probs / torch.sum(action_probs)
         self._update_considered_options(probs)
@@ -96,13 +100,7 @@ class EpisodePlayer:
         if self.deterministic:
             action = torch.argmax(probabilities).item()
         else:
-            action = np.random.choice(2 * self.config["env"]["C"], p=probabilities)
-
-        action = (
-            action
-            if action < self.env.C
-            else action + self.env.C - self.config["env"]["C"]
-        )
+            action = np.random.choice(len(probabilities), p=probabilities)
 
         return action
 

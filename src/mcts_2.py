@@ -9,10 +9,8 @@ class MCTS:
     def __init__(
         self,
         model: torch.nn.Module,
-        config: dict,
     ):
         self.model = model
-        self.config = config
         self.transposition_table: dict[Env, tuple[np.ndarray, float]] = {}
         self.best_score = float("-inf")
 
@@ -20,6 +18,7 @@ class MCTS:
         self,
         root: Node,
         add_exploration_noise: bool = True,
+        search_iterations: int = 100,
     ) -> int:
 
         self.best_score = float("-inf")
@@ -31,7 +30,7 @@ class MCTS:
         if add_exploration_noise:
             root.add_noise()
 
-        for _ in range(self.config["mcts"]["search_iterations"]):
+        for _ in range(search_iterations):
             node = self._find_leaf(root)
             value = self._evaluate(node)
 
@@ -95,20 +94,12 @@ class MCTS:
 
         return state_value
 
-    def _reduce_policy(self, p: np.ndarray, C: int) -> np.ndarray:
-        """Hack since model produces 2 * max C policy"""
-        add_policy = p[:C]
-        remove_policy = p[len(p) // 2 : len(p) // 2 + C]
-        return add_policy + remove_policy
-
     def _add_children(self, node: Node, policy: np.ndarray, state_value: float):
-        policy = self._reduce_policy(policy, node.env.C)
-
         for action, p in enumerate(policy):
             if not node.env.mask[action]:
                 continue
 
-            node.add_child(action, node.env.copy(), p, state_value, self.config)
+            node.add_child(action, node.env.copy(), p, state_value)
 
     def _run_model(self, env: Env) -> tuple[np.ndarray, float]:
         bay, flat_T = env.bay, env.flat_T
