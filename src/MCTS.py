@@ -149,9 +149,7 @@ def get_tree_probs(node: Node, config: dict) -> torch.Tensor:
     action_probs = torch.zeros(2 * config["env"]["C"], dtype=torch.float64)
 
     for i in node.children:
-        value = np.power(
-            node.children[i].visit_count, 1 / config["mcts"]["temperature"]
-        )
+        value = np.power(node.children[i].N, 1 / config["mcts"]["temperature"])
         index = i if i < node.env.C else i + config["env"]["C"] - node.env.C
         action_probs[index] = value
 

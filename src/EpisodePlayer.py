@@ -85,7 +85,7 @@ class EpisodePlayer:
         )
         action_probs = torch.zeros(2 * self.config["env"]["C"], dtype=torch.float64)
         for i, child in self.reused_tree.children.items():
-            value = np.power(child.visit_count, 1 / self.config["mcts"]["temperature"])
+            value = np.power(child.N, 1 / self.config["mcts"]["temperature"])
             action_probs[i] = value
 
         probs = action_probs / torch.sum(action_probs)

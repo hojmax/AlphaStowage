@@ -20,16 +20,21 @@ class Node:
         dirichlet_weight: float = 0.25,
         dirichlet_alpha: float = 1,
     ) -> None:
+        self.Q = 0
+        self.N = 0
+
+        # action -> (child, number of edge_visits)
+        self.children_and_edge_visits: dict[int, tuple["Node", int]] = {}
+
         self._env = env
         self._pruned = False
-        self.visit_count = np.float16(0)
+
         self.total_action_value = None
         self.estimated_value = np.float16(estimated_value)
         self.prior_prob = np.float16(prior_prob)
         self.children = {}
         self.parent = parent
         self.depth = depth
-        self._uct = None
         self.children_pruned = 0
         self.needed_action = action
         self.c_puct_constant = c_puct_constant
@@ -49,7 +54,6 @@ class Node:
             ) * self.dirichlet_weight + child.prior_prob * (
                 np.float16(1) - self.dirichlet_weight
             )
-            child._uct = None
 
     @property
     def env(self) -> Env:
@@ -61,29 +65,6 @@ class Node:
 
     def close(self):
         self._env.close()
-
-    @property
-    def Q(self) -> np.float16:
-        if self.total_action_value == None:
-            return self.estimated_value
-        else:
-            return np.float16(self.total_action_value / np.float32(self.visit_count))
-
-    @property
-    def U(self) -> np.float16:
-        return (
-            self.c_puct
-            * self.prior_prob
-            * np.sqrt(self.parent.visit_count, dtype=np.float16)
-            / (np.float16(1) + self.visit_count)
-        )
-
-    @property
-    def uct(self) -> np.float16:
-        if self._uct == None:
-            self._uct = self.Q + self.U
-
-        return self._uct
 
     def prune(self) -> None:
         if self.parent == None:
@@ -106,14 +87,10 @@ class Node:
         else:
             self.total_action_value += np.float32(value)
 
-        if self.visit_count < np.finfo(np.float16).max:
-            self.visit_count += np.float16(1)
+        if self.N < np.finfo(np.float16).max:
+            self.N += 1
         else:
             warnings.warn("visit count overflow")
-
-        self._uct = None
-        for child in self.children.values():
-            child._uct = None
 
     @property
     def no_valid_children(self) -> bool:
@@ -137,12 +114,3 @@ class Node:
             dirichlet_weight=self.dirichlet_weight,
             dirichlet_alpha=self.dirichlet_alpha,
         )
-
-    def select_child(self) -> "Node":
-        best_child = None
-
-        for child in self.get_valid_children():
-            if best_child is None or child.uct > best_child.uct:
-                best_child = child
-
-        return best_child

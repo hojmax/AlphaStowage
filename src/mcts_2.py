@@ -53,9 +53,22 @@ class MCTS:
             if self._should_prune(node):
                 node = self._prune_and_move_back_up(node)
             else:
-                node = node.select_child()
+                node = self.select_child(node)
 
         return node
+
+    def select_child(self, node: Node) -> Node:
+
+        def calc_uct(child: Node) -> float:
+            if node.total_action_value == None:
+                Q = node.estimated_value
+            else:
+                Q = node.total_action_value / node.N
+            return Q + child.c_puct * child.prior_prob * np.sqrt(node.N) / (1 + child.N)
+
+        children = node.get_valid_children()
+        action = np.argmax([calc_uct(child) for child in children])
+        return children[action]
 
     def _should_prune(self, node: Node) -> bool:
 
