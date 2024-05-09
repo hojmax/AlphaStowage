@@ -43,7 +43,9 @@ class MCTS:
 
     def _backpropagate(self, node: Node, value: float):
         while node.parent is not None:  # As long as not root
-            node.increment_value(value)
+            node.total_utility += value
+            node.N += 1
+
             node = node.parent
 
     def _find_leaf(self, root: Node) -> Node:
@@ -60,10 +62,10 @@ class MCTS:
     def select_child(self, node: Node) -> Node:
 
         def calc_uct(child: Node) -> float:
-            if node.total_action_value == None:
+            if node.N == 0:
                 Q = node.estimated_value
             else:
-                Q = node.total_action_value / node.N
+                Q = node.total_utility / node.N
             return Q + child.c_puct * child.prior_prob * np.sqrt(node.N) / (1 + child.N)
 
         children = node.get_valid_children()

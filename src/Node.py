@@ -29,7 +29,7 @@ class Node:
         self._env = env
         self._pruned = False
 
-        self.total_action_value = None
+        self.total_utility = 0
         self.estimated_value = np.float16(estimated_value)
         self.prior_prob = np.float16(prior_prob)
         self.children = {}
@@ -80,17 +80,6 @@ class Node:
             self.parent.children_pruned -= 1
 
         self._pruned = False
-
-    def increment_value(self, value: float) -> None:
-        if self.total_action_value == None:
-            self.total_action_value = np.float32(value)
-        else:
-            self.total_action_value += np.float32(value)
-
-        if self.N < np.finfo(np.float16).max:
-            self.N += 1
-        else:
-            warnings.warn("visit count overflow")
 
     @property
     def no_valid_children(self) -> bool:
