@@ -91,10 +91,11 @@ class EpisodePlayer:
         return action
 
     def _probs_to_action(self, probabilities: torch.Tensor) -> int:
-        if self.deterministic:
-            action = torch.argmax(probabilities).item()
-        else:
-            action = np.random.choice(2 * self.config["env"]["C"], p=probabilities)
+        # if self.deterministic:
+        #     action = torch.argmax(probabilities).item()
+        # else:
+        #     action = np.random.choice(2 * self.config["env"]["C"], p=probabilities)
+        action = torch.argmax(probabilities).item()
 
         action = (
             action
