@@ -1,4 +1,3 @@
-from MCTS import remove_all_pruning, close_envs_in_tree, get_np_obs
 from MPSPEnv import Env
 from multiprocessing.connection import Connection
 import torch
@@ -30,16 +29,16 @@ class EpisodePlayer:
         self.config = config
         self.deterministic = deterministic
         self.observations = []
-        self.reused_tree = Node(
-            self.env.copy(),
-            c_puct_constant=config["mcts"]["c_puct_constant"],
-            dirichlet_weight=config["mcts"]["dirichlet_weight"],
-            dirichlet_alpha=config["mcts"]["dirichlet_alpha"],
-        )
+        self.tree = Node(self.env.copy())
         self.transposition_table = {}
         self.n_removes = 0
         self.total_options_considered = 0
-        self.mcts = MCTS(GPUModel(conn))
+        self.mcts = MCTS(
+            GPUModel(conn),
+            c_puct=config["mcts"]["c_puct_constant"] * env.N * env.R * env.C,
+            dirichlet_alpha=config["mcts"]["dirichlet_alpha"],
+            dirichlet_weight=config["mcts"]["dirichlet_weight"],
+        )
 
         if self.deterministic:
             np.random.seed(0)
@@ -48,10 +47,15 @@ class EpisodePlayer:
         actions = []
         while not self.env.terminal:
             action = self._get_action()
+
             actions.append(action)
             self.env.step(action)
+            self.tree = self.tree.children_and_edge_visits[action][0]
 
-        self._cleanup(actions)
+        self.final_value = -self.env.moves_to_solve
+        self.reshuffles = self.env.total_reward
+
+        self._add_value_to_observations(actions)
 
         return (
             self.observations,
@@ -60,14 +64,6 @@ class EpisodePlayer:
             self.n_removes / len(actions),
             self.total_options_considered / len(actions),
         )
-
-    def _cleanup(self, actions: list[int]):
-        close_envs_in_tree(self.reused_tree)
-
-        self.final_value = -self.env.moves_to_solve
-        self.reshuffles = self.env.total_reward
-
-        self._add_value_to_observations(actions)
 
     def _add_observation(self, probabilities: torch.Tensor, env: Env) -> None:
         bay, flat_T = env.bay, env.flat_T
@@ -81,19 +77,17 @@ class EpisodePlayer:
 
     def _get_action(self):
         self.mcts.run(
-            self.reused_tree, search_iterations=self.config["mcts"]["search_iterations"]
+            self.tree, search_iterations=self.config["mcts"]["search_iterations"]
         )
-        action_probs = torch.zeros(2 * self.config["env"]["C"], dtype=torch.float64)
-        for i, child in self.reused_tree.children.items():
-            value = np.power(child.N, 1 / self.config["mcts"]["temperature"])
+        action_probs = torch.zeros(len(self.tree.P), dtype=torch.float64)
+        for i, (_, edge_visits) in self.tree.children_and_edge_visits.items():
+            value = np.power(edge_visits, 1 / self.config["mcts"]["temperature"])
             action_probs[i] = value
 
         probs = action_probs / torch.sum(action_probs)
         self._update_considered_options(probs)
         self._add_observation(probs, self.env)
         action = self._probs_to_action(probs)
-        self._update_tree(action)
-
         return action
 
     def _probs_to_action(self, probabilities: torch.Tensor) -> int:
@@ -103,20 +97,6 @@ class EpisodePlayer:
             action = np.random.choice(len(probabilities), p=probabilities)
 
         return action
-
-    def _close_other_branches(self, action: int) -> None:
-        for a in range(2 * self.env.C):
-            if a != action and a in self.reused_tree.children:
-                close_envs_in_tree(self.reused_tree.children[a])
-
-    def _update_tree(self, action: int) -> None:
-        self._close_other_branches(action)
-
-        self.reused_tree.env.close()
-        self.reused_tree = self.reused_tree.children[action]
-        self.reused_tree.parent = None
-        self.reused_tree.prior_prob = None
-        remove_all_pruning(self.reused_tree)
 
     def _add_value_to_observations(self, actions: list[int]) -> None:
         cummulative_removes = 0

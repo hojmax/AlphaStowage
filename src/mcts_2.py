@@ -5,14 +5,20 @@ from Node import Node
 
 
 class MCTS:
+    """Monte Carlo Graph Search algorithm. The algorithm is used to estimate the utility of a given state by simulating n times"""
 
     def __init__(
         self,
         model: torch.nn.Module,
+        c_puct: float = 1,
+        dirichlet_weight: float = 0.03,
+        dirichlet_alpha: float = 0.25,
     ):
         self.model = model
-        self.transposition_table: dict[Env, tuple[np.ndarray, float]] = {}
-        self.best_score = float("-inf")
+        self.nodes_by_hash: dict[Env, Node] = {}
+        self.c_puct = c_puct
+        self.dirichlet_weight = dirichlet_weight
+        self.dirichlet_alpha = dirichlet_alpha
 
     def run(
         self,
@@ -20,103 +26,108 @@ class MCTS:
         add_exploration_noise: bool = True,
         search_iterations: int = 100,
     ) -> int:
-
-        self.best_score = float("-inf")
-
-        if len(root.children) == 0:
-            self.best_score = self._evaluate(root)
-            self._backpropagate(root, self.best_score)
+        """Run the Monte Carlo Graph Search algorithm from the root node for a given number of iterations."""
 
         if add_exploration_noise:
-            root.add_noise()
+            self._add_noise(root)
 
         for _ in range(search_iterations):
-            node = self._find_leaf(root)
-            value = self._evaluate(node)
-
-            self._backpropagate(node, value)
-
-            if node.env.terminal:
-                self.best_score = max(self.best_score, -node.env.moves_to_solve)
+            search_path = self._find_leaf(root)
+            node = search_path[-1]
+            self._evaluate(node)
+            self._backpropagate(search_path)
 
         return root
 
-    def _backpropagate(self, node: Node, value: float):
-        while node.parent is not None:  # As long as not root
-            node.total_utility += value
-            node.N += 1
+    def _add_noise(self, node: Node) -> None:
+        """Add noise to the policy of a node."""
+        if node.P is None:  # Node hasn't been evaluated yet. Don't add noise
+            return
 
-            node = node.parent
+        n = len(node.P)
+        noise = np.random.dirichlet([self.dirichlet_alpha] * n)
 
-    def _find_leaf(self, root: Node) -> Node:
-        node = root
+        node.P = (1 - self.dirichlet_weight) * node.P + self.dirichlet_weight * noise
+        node.P *= node.game_state.mask
 
-        while node.children:
-            if self._should_prune(node):
-                node = self._prune_and_move_back_up(node)
+    def _backpropagate(self, search_path: list[Node]) -> None:
+        """Backpropagate the utility of the leaf node up the search path."""
+
+        for node in reversed(search_path):
+            children_and_edge_visits = node.children_and_edge_visits.values()
+            node.N = 1 + sum(
+                edge_visits for (_, edge_visits) in children_and_edge_visits
+            )
+            node.Q = (1 / node.N) * (
+                node.U
+                + sum(
+                    child.Q * edge_visits
+                    for (child, edge_visits) in children_and_edge_visits
+                )
+                - 1  # account for minimize moves
+            )
+
+    def _find_leaf(self, node: Node) -> list[Node]:
+        search_path = [node]
+        while node.U and not node.game_state.terminal:  # Has been evaluated
+            action = self._select_action(node)
+
+            if action in node.children_and_edge_visits:
+                child, edge_visits = node.children_and_edge_visits[action]
             else:
-                node = self.select_child(node)
+                state = node.game_state.copy()
+                state.step(action)
+                edge_visits = 0
+                if state in self.nodes_by_hash:
+                    child = self.nodes_by_hash[state]
 
-        return node
+                else:
+                    child = Node(state)
+                    self.nodes_by_hash[state] = child
 
-    def select_child(self, node: Node) -> Node:
+                node.children_and_edge_visits[action] = (child, 0)
 
-        def calc_uct(child: Node) -> float:
-            if node.N == 0:
-                Q = node.estimated_value
-            else:
-                Q = node.total_utility / node.N
-            return Q + child.c_puct * child.prior_prob * np.sqrt(node.N) / (1 + child.N)
+            node.children_and_edge_visits[action] = (child, edge_visits + 1)
+            node = child
+            search_path.append(node)
 
-        children = node.get_valid_children()
-        action = np.argmax([calc_uct(child) for child in children])
-        return children[action]
+        return search_path
 
-    def _should_prune(self, node: Node) -> bool:
+    def _select_action(self, node: Node) -> int:
+        """Select an action based on the revised PUCT formula."""
+        n = len(node.P)
+        Q = np.zeros(n)
+        N = np.zeros(n)
+        for a, (child, edge_visits) in node.children_and_edge_visits.items():
+            Q[a] = child.Q
+            N[a] = edge_visits
 
-        is_leaf = len(node.children) == 0
+        U = self.c_puct * node.P * np.sqrt(node.N) / (1 + N)
 
-        too_many_reshuffles = (
-            node.env.total_reward < self.best_score
-            or node.env.reshuffles_per_port < -(node.env.R * node.env.C) // 2
-        )
+        Q_plus_U = Q + U
+        Q_plus_U[Q_plus_U == 0] = -np.inf  # Q values are negative
+        action = np.argmax(Q_plus_U)
 
-        return node.no_valid_children or (is_leaf and too_many_reshuffles)
+        if node.game_state.mask[action] == 0:
+            print(N)
+            print(node.P)
+            print(U, Q)
+            print(Q_plus_U[action], Q[action], U[action], node.P[action])
+            print(Q_plus_U)
 
-    def _prune_and_move_back_up(self, node: Node) -> Node:
-        node.prune()
-        return node.parent
+        return action
 
-    def _evaluate(self, node: Node) -> float:
-        if node.env.terminal:
-            return -node.env.moves_to_solve
+    def _evaluate(self, node: Node) -> None:
+        """Calculate the utility of an unexplored node."""
+        if node.game_state.terminal:
+            node.U = -node.game_state.moves_to_solve
         else:
-            value = self._expand_node(node)
-            return value
-
-    def _expand_node(self, node: Node) -> float:
-        if node.env in self.transposition_table:
-            policy, state_value = self.transposition_table[node.env]
-
-        else:
-            policy, state_value = self._run_model(node.env)
-
-            self.transposition_table[node.env] = (policy, state_value)
-
-        state_value -= node.depth
-
-        self._add_children(node, policy, state_value)
-
-        return state_value
-
-    def _add_children(self, node: Node, policy: np.ndarray, state_value: float):
-        for action, p in enumerate(policy):
-            if not node.env.mask[action]:
-                continue
-
-            node.add_child(action, node.env.copy(), p, state_value)
+            policy, value = self._run_model(node.game_state)
+            node.P = policy * node.game_state.mask
+            node.U = value
 
     def _run_model(self, env: Env) -> tuple[np.ndarray, float]:
+        """Estimate the utility and policy of a given state based on the neural network."""
         bay, flat_T = env.bay, env.flat_T
 
         bay = torch.tensor(bay)

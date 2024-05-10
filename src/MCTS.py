@@ -87,13 +87,6 @@ def expand_node(
     return state_value
 
 
-def close_envs_in_tree(node: Node) -> None:
-    node.close()
-
-    for child in node.children.values():
-        close_envs_in_tree(child)
-
-
 def evaluate(
     node: Node,
     conn: Connection,
