@@ -21,6 +21,9 @@ class PretrainedModel(TypedDict):
     local_model: str = None
 
 
+bceloss = torch.nn.BCEWithLogitsLoss()
+
+
 def loss_fn(
     pred_value, value, pred_prob, prob, pred_was_reshuffled, was_reshuffled, config
 ):
@@ -31,10 +34,7 @@ def loss_fn(
     cross_entropy = (
         -torch.sum(prob.flatten() * torch.log(pred_prob.flatten())) / prob.shape[0]
     )
-    reshuffle = (
-        -torch.sum(was_reshuffled.flatten() * torch.log(pred_was_reshuffled.flatten()))
-        / was_reshuffled.shape[0]
-    )
+    reshuffle = bceloss(pred_was_reshuffled, was_reshuffled)
     loss = (
         config["train"]["value_scaling"] * value_error
         + config["train"]["was_reshuffled_scaling"] * reshuffle
@@ -87,6 +87,9 @@ def train_batch(model, buffer, optimizer, scheduler, config):
     containers_left = containers_left.to(model.device)
 
     pred_prob, pred_value, pred_was_reshuffled = model(bay, flat_T, containers_left)
+    # Because pred_was_reshuffled has shape [B, 1, R, C] we need to squeeze it to [B, R, C] to match was_reshuffled
+    pred_was_reshuffled = pred_was_reshuffled.squeeze(1)
+
     loss, value_loss, cross_entropy, reshuffle_loss = optimize_model(
         model=model,
         pred_value=pred_value,

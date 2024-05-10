@@ -104,7 +104,7 @@ class NeuralNetwork(nn.Module):
                 kernel_size=nn_config["reshuffle_kernel_size"],
                 stride=nn_config["reshuffle_stride"],
             ),
-            nn.Sigmoid(),
+            # No sigmoid here, as the loss is computed with nn.BCEWithLogitsLoss()
         )
 
         self.policy_head = nn.Sequential(
