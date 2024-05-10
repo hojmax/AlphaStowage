@@ -2,7 +2,7 @@ from MPSPEnv import Env
 from multiprocessing.connection import Connection
 import torch
 import numpy as np
-from mcts_2 import MCTS, Node
+from mcgs import MCGS, Node
 
 
 class GPUModel:
@@ -33,7 +33,7 @@ class EpisodePlayer:
         self.transposition_table = {}
         self.n_removes = 0
         self.total_options_considered = 0
-        self.mcts = MCTS(
+        self.mcgs = MCGS(
             GPUModel(conn),
             c_puct=config["mcts"]["c_puct_constant"] * env.N * env.R * env.C,
             dirichlet_alpha=config["mcts"]["dirichlet_alpha"],
@@ -76,7 +76,7 @@ class EpisodePlayer:
         self.total_options_considered += n_options_considered
 
     def _get_action(self):
-        self.mcts.run(
+        self.mcgs.run(
             self.tree, search_iterations=self.config["mcts"]["search_iterations"]
         )
         action_probs = torch.zeros(len(self.tree.P), dtype=torch.float64)

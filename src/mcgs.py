@@ -4,7 +4,7 @@ from MPSPEnv import Env
 from Node import Node
 
 
-class MCTS:
+class MCGS:
     """Monte Carlo Graph Search algorithm. The algorithm is used to estimate the utility of a given state by simulating n times"""
 
     def __init__(
