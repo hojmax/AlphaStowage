@@ -108,13 +108,6 @@ class MCGS:
         Q_plus_U[Q_plus_U == 0] = -np.inf  # Q values are negative
         action = np.argmax(Q_plus_U)
 
-        if node.game_state.mask[action] == 0:
-            print(N)
-            print(node.P)
-            print(U, Q)
-            print(Q_plus_U[action], Q[action], U[action], node.P[action])
-            print(Q_plus_U)
-
         return action
 
     def _evaluate(self, node: Node) -> None:
