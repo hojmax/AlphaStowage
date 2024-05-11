@@ -21,11 +21,15 @@ class PretrainedModel(TypedDict):
     local_model: str = None
 
 
-bceloss = torch.nn.BCEWithLogitsLoss()
-
-
 def loss_fn(
-    pred_value, value, pred_prob, prob, pred_was_reshuffled, was_reshuffled, config
+    pred_value,
+    value,
+    pred_prob,
+    prob,
+    pred_was_reshuffled,
+    was_reshuffled,
+    bceloss,
+    config,
 ):
     pred_was_reshuffled = torch.clamp(pred_was_reshuffled, min=1e-9)
     pred_prob = torch.clamp(pred_prob, min=1e-9)
@@ -53,6 +57,7 @@ def optimize_model(
     was_reshuffled,
     optimizer,
     scheduler,
+    bceloss,
     config,
 ):
     loss, value_loss, cross_entropy, reshuffle_loss = loss_fn(
@@ -62,6 +67,7 @@ def optimize_model(
         prob=prob,
         pred_was_reshuffled=pred_was_reshuffled,
         was_reshuffled=was_reshuffled,
+        bceloss=bceloss,
         config=config,
     )
     optimizer.zero_grad()
@@ -75,7 +81,7 @@ def optimize_model(
     return loss.item(), value_loss.item(), cross_entropy.item(), reshuffle_loss.item()
 
 
-def train_batch(model, buffer, optimizer, scheduler, config):
+def train_batch(model, buffer, optimizer, scheduler, bceloss, config):
     bay, flat_T, prob, value, was_reshuffled, containers_left = buffer.sample(
         config["train"]["batch_size"]
     )
@@ -100,6 +106,7 @@ def train_batch(model, buffer, optimizer, scheduler, config):
         was_reshuffled=was_reshuffled,
         optimizer=optimizer,
         scheduler=scheduler,
+        bceloss=bceloss,
         config=config,
     )
 
@@ -187,3 +194,7 @@ def get_scheduler(optimizer, config):
         config["train"]["scheduler_gamma"],
         config["train"]["min_lr"],
     )
+
+
+def get_bceloss():
+    return torch.nn.BCELoss()

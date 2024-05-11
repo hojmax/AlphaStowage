@@ -104,7 +104,7 @@ class NeuralNetwork(nn.Module):
                 kernel_size=nn_config["reshuffle_kernel_size"],
                 stride=nn_config["reshuffle_stride"],
             ),
-            # No sigmoid here, as the loss is computed with nn.BCEWithLogitsLoss()
+            nn.Sigmoid(),
         )
 
         self.policy_head = nn.Sequential(
@@ -160,10 +160,11 @@ class NeuralNetwork(nn.Module):
         x = torch.cat([bay, flat_T], dim=1)
         out = self.layers(x)
 
-        channel_embedding = self.containers_left_embedding(containers_left)
-        out = out + channel_embedding.unsqueeze(-1).unsqueeze(-1)
+        containers_left_embedding = (
+            self.containers_left_embedding(containers_left).unsqueeze(-1).unsqueeze(-1)
+        )
 
         policy = self.policy_head(out)
-        value = self.value_head(out)
+        value = self.value_head(out + containers_left_embedding)
         was_reshuffled = self.was_reshuffled_head(out)
         return policy, value, was_reshuffled

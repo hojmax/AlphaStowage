@@ -70,6 +70,7 @@ class InferenceProcess:
             take_first_action=True,
             strict_mask=True,
             speedy=True,
+            should_reorder=False,
         )
         env.reset(np.random.randint(1e9))
         return env

@@ -1,4 +1,11 @@
-from Train import init_model, PretrainedModel, get_optimizer, get_scheduler, train_batch
+from Train import (
+    init_model,
+    PretrainedModel,
+    get_optimizer,
+    get_scheduler,
+    train_batch,
+    get_bceloss,
+)
 import torch
 from Buffer import ReplayBuffer
 import torch.multiprocessing as mp
@@ -32,6 +39,7 @@ class TrainingProcess:
         self.model = init_model(config, device, pretrained)
         self.optimizer = get_optimizer(self.model, config)
         self.scheduler = get_scheduler(self.optimizer, config)
+        self.bceloss = get_bceloss()
         self.model.train()
         self.batch = 1
 
@@ -47,7 +55,12 @@ class TrainingProcess:
 
     def _handle_batch(self) -> None:
         loss, value_loss, cross_entropy_loss, reshuffle_loss = train_batch(
-            self.model, self.buffer, self.optimizer, self.scheduler, self.config
+            self.model,
+            self.buffer,
+            self.optimizer,
+            self.scheduler,
+            self.bceloss,
+            self.config,
         )
         self.logger.log(
             {
