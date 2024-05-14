@@ -47,7 +47,6 @@ class EpisodePlayer:
         actions = []
         while not self.env.terminal:
             action = self._get_action()
-
             actions.append(action)
             self.env.step(action)
             self.tree = self.tree.children_and_edge_visits[action][0]

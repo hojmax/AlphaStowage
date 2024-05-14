@@ -31,6 +31,8 @@ class MCGS:
         if add_exploration_noise:
             self._add_noise(root)
 
+        self._find_best_depths(root)
+
         for _ in range(search_iterations):
             search_path = self._find_leaf(root)
             node = search_path[-1]
@@ -38,6 +40,24 @@ class MCGS:
             self._backpropagate(search_path)
 
         return root
+
+    def _find_best_depths(self, root: Node) -> None:
+        """Do BFS to find the best depth for each node"""
+        queue = [(root, 0)]
+        nodes = set([root])
+        reverse_queue = [root]
+        while queue:
+            node, depth = queue.pop(0)
+            node.best_depth = min(node.best_depth, depth)
+            for child, _ in node._children_and_edge_visits.values():
+                if child in nodes:
+                    continue
+                nodes.add(child)
+                queue.append((child, depth + 1))
+                reverse_queue.append(child)
+        while reverse_queue:
+            node = reverse_queue.pop()
+            self._update_Q_and_N(node)
 
     def _add_noise(self, node: Node) -> None:
         """Add noise to the policy of a node."""
@@ -48,24 +68,29 @@ class MCGS:
         noise = np.random.dirichlet([self.dirichlet_alpha] * n)
 
         node.P = (1 - self.dirichlet_weight) * node.P + self.dirichlet_weight * noise
-        node.P *= node.game_state.mask
 
     def _backpropagate(self, search_path: list[Node]) -> None:
         """Backpropagate the utility of the leaf node up the search path."""
 
-        for node in reversed(search_path):
-            children_and_edge_visits = node.children_and_edge_visits.values()
-            node.N = 1 + sum(
-                edge_visits for (_, edge_visits) in children_and_edge_visits
+        for i, node in enumerate(reversed(search_path)):
+            self._update_Q_and_N(node)
+            depth = len(search_path) - i - 1
+            node.best_depth = min(depth, node.best_depth)
+
+    def _update_Q_and_N(self, node: Node) -> None:
+        """Update the average utility Q and number of visits N of a node."""
+        if node.U is None:  # Node hasn't been evaluated yet
+            return
+
+        children_and_edge_visits = node.children_and_edge_visits.values()
+        node.N = 1 + sum(edge_visits for (_, edge_visits) in children_and_edge_visits)
+        node.Q = (1 / node.N) * (
+            node.U
+            + sum(
+                (child.Q - 1) * edge_visits  # -1 = account for minimize moves
+                for (child, edge_visits) in children_and_edge_visits
             )
-            node.Q = (1 / node.N) * (
-                node.U
-                + sum(
-                    child.Q * edge_visits
-                    for (child, edge_visits) in children_and_edge_visits
-                )
-                - 1  # account for minimize moves
-            )
+        )
 
     def _find_leaf(self, node: Node) -> list[Node]:
         search_path = [node]
@@ -73,21 +98,20 @@ class MCGS:
             action = self._select_action(node)
 
             if action in node.children_and_edge_visits:
-                child, edge_visits = node.children_and_edge_visits[action]
+                child, _ = node.children_and_edge_visits[action]
             else:
+
                 state = node.game_state.copy()
                 state.step(action)
-                edge_visits = 0
                 if state in self.nodes_by_hash:
                     child = self.nodes_by_hash[state]
-
                 else:
                     child = Node(state)
                     self.nodes_by_hash[state] = child
 
-                node.children_and_edge_visits[action] = (child, 0)
+                node.add_child(action, child)
 
-            node.children_and_edge_visits[action] = (child, edge_visits + 1)
+            node.increment_visits(action)
             node = child
             search_path.append(node)
 
@@ -95,6 +119,10 @@ class MCGS:
 
     def _select_action(self, node: Node) -> int:
         """Select an action based on the revised PUCT formula."""
+        assert (
+            node.P is not None and node.U is not None
+        ), "Node has not been evaluated yet."
+
         n = len(node.P)
         Q = np.zeros(n)
         N = np.zeros(n)
@@ -106,8 +134,8 @@ class MCGS:
 
         Q_plus_U = Q + U
         Q_plus_U[Q_plus_U == 0] = -np.inf  # Q values are negative
-        action = np.argmax(Q_plus_U)
 
+        action = np.argmax(Q_plus_U)
         return action
 
     def _evaluate(self, node: Node) -> None:
