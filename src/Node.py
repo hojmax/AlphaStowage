@@ -25,9 +25,7 @@ class Node:
         # Filter out children where there is a quicker path to the same state
         valid_children = {}
         for action, (child, edge_visits) in self._children_and_edge_visits.items():
-            has_valid_children = child.P is not None and child.P.sum() > 0
-            is_quickest_path = child.best_depth > self.best_depth
-            if has_valid_children and is_quickest_path:
+            if child.best_depth > self.best_depth:
                 valid_children[action] = (child, edge_visits)
 
         return valid_children
@@ -50,8 +48,7 @@ class Node:
         # Filter out actions that has a quicker path to the same state
         quickest_path = np.ones(len(self._P))
         for action, (child, _) in self._children_and_edge_visits.items():
-            is_quickest_path = child.best_depth > self.best_depth
-            if not is_quickest_path:
+            if child.best_depth <= self.best_depth:
                 quickest_path[action] = 0
 
         P = self._P * quickest_path
