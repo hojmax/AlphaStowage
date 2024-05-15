@@ -108,14 +108,12 @@ class NeuralNetwork(nn.Module):
         )
 
         self.policy_head = nn.Sequential(
-            nn.Conv2d(
+            Convolutional_Block(
                 in_channels=nn_config["hidden_channels"],
                 out_channels=nn_config["policy_channels"],
                 kernel_size=nn_config["policy_kernel_size"],
                 stride=nn_config["policy_stride"],
             ),
-            nn.BatchNorm2d(nn_config["policy_channels"]),
-            nn.SiLU(),
             nn.Flatten(),
             nn.Linear(
                 nn_config["policy_channels"]
@@ -127,14 +125,12 @@ class NeuralNetwork(nn.Module):
         )
 
         self.value_head = nn.Sequential(
-            nn.Conv2d(
+            Convolutional_Block(
                 in_channels=nn_config["hidden_channels"],
                 out_channels=nn_config["value_channels"],
                 kernel_size=nn_config["value_kernel_size"],
                 stride=nn_config["value_stride"],
             ),
-            nn.BatchNorm2d(nn_config["value_channels"]),
-            nn.SiLU(),
             nn.Flatten(),
             nn.Linear(
                 nn_config["value_channels"]
