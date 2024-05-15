@@ -4,6 +4,26 @@ from MPSPEnv import Env
 from Node import Node
 
 
+class MinMaxStats:
+    """
+    A class that holds the min-max values of the tree.
+    """
+
+    def __init__(self):
+        self.maximum = -float("inf")
+        self.minimum = float("inf")
+
+    def update(self, value):
+        self.maximum = max(self.maximum, value)
+        self.minimum = min(self.minimum, value)
+
+    def normalize(self, values: np.ndarray) -> np.ndarray:
+        if self.maximum > self.minimum:
+            # We normalize only when we have set the maximum and minimum values
+            return (values - self.minimum) / (self.maximum - self.minimum)
+        return values
+
+
 class MCGS:
     """Monte Carlo Graph Search algorithm. The algorithm is used to estimate the utility of a given state by simulating n times"""
 
@@ -19,6 +39,7 @@ class MCGS:
         self.c_puct = c_puct
         self.dirichlet_weight = dirichlet_weight
         self.dirichlet_alpha = dirichlet_alpha
+        self.min_max_stats = MinMaxStats()
 
     def run(
         self,
@@ -33,6 +54,7 @@ class MCGS:
 
         self._find_best_depths(root)
 
+        self.min_max_stats = MinMaxStats()
         for _ in range(search_iterations):
             search_path = self._find_leaf(root)
             node = search_path[-1]
@@ -92,6 +114,8 @@ class MCGS:
             )
         )
 
+        self.min_max_stats.update(node.Q)
+
     def _find_leaf(self, node: Node) -> list[Node]:
         search_path = [node]
         while node.U and not node.game_state.terminal:  # Has been evaluated
@@ -126,14 +150,16 @@ class MCGS:
         n = len(node.P)
         Q = np.zeros(n)
         N = np.zeros(n)
+
         for a, (child, edge_visits) in node.children_and_edge_visits.items():
             Q[a] = child.Q
             N[a] = edge_visits
 
         U = self.c_puct * node.P * np.sqrt(node.N) / (1 + N)
 
+        Q = self.min_max_stats.normalize(Q)
         Q_plus_U = Q + U
-        Q_plus_U[Q_plus_U == 0] = -np.inf  # Q values are negative
+        Q_plus_U[node.P == 0] = -np.inf  # Q values are negative
 
         action = np.argmax(Q_plus_U)
         return action

@@ -3,6 +3,7 @@ from multiprocessing.connection import Connection
 import torch
 import numpy as np
 from mcgs import MCGS, Node
+from draw_tree import draw_tree
 
 
 class GPUModel:
@@ -35,7 +36,7 @@ class EpisodePlayer:
         self.total_options_considered = 0
         self.mcgs = MCGS(
             GPUModel(conn),
-            c_puct=config["mcts"]["c_puct_constant"] * env.N * env.R * env.C,
+            c_puct=config["mcts"]["c_puct_constant"],
             dirichlet_alpha=config["mcts"]["dirichlet_alpha"],
             dirichlet_weight=config["mcts"]["dirichlet_weight"],
         )
@@ -50,6 +51,7 @@ class EpisodePlayer:
             actions.append(action)
             self.env.step(action)
             self.tree = self.tree.children_and_edge_visits[action][0]
+            # draw_tree(self.tree)
 
         self.final_value = -self.env.moves_to_solve
         self.reshuffles = self.env.total_reward
