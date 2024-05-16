@@ -55,10 +55,13 @@ class MCGS:
         self._find_best_depths(root)
 
         self.min_max_stats = MinMaxStats()
-        for _ in range(search_iterations):
+        for i in range(search_iterations):
+            # print(i)
             search_path = self._find_leaf(root)
             node = search_path[-1]
-            self._evaluate(node)
+            is_leaf = len(node.children_and_edge_visits) == 0
+            if is_leaf:
+                self._evaluate(node)
             self._backpropagate(search_path)
 
         return root
@@ -71,11 +74,12 @@ class MCGS:
         while queue:
             node, depth = queue.pop(0)
             node.best_depth = min(node.best_depth, depth)
-            for child, _ in node._children_and_edge_visits.values():
+            for action, (child, _) in node._children_and_edge_visits.items():
                 if child in nodes:
                     continue
                 nodes.add(child)
-                queue.append((child, depth + 1))
+                is_add = action < len(node.P) / 2
+                queue.append((child, depth + 1 if is_add else depth))
                 reverse_queue.append(child)
         while reverse_queue:
             node = reverse_queue.pop()
@@ -109,7 +113,7 @@ class MCGS:
         node.Q = (1 / node.N) * (
             node.U
             + sum(
-                (child.Q - 1) * edge_visits  # -1 = account for minimize moves
+                child.Q * edge_visits
                 for (child, edge_visits) in children_and_edge_visits
             )
         )
@@ -121,6 +125,10 @@ class MCGS:
         while node.U and not node.game_state.terminal:  # Has been evaluated
             action = self._select_action(node)
 
+            # TODO: Prune nodes recursively with no valid children
+            if node.game_state.mask[action] == 0:
+                break
+
             if action in node.children_and_edge_visits:
                 child, _ = node.children_and_edge_visits[action]
             else:
@@ -131,6 +139,8 @@ class MCGS:
                     child = self.nodes_by_hash[state]
                 else:
                     child = Node(state)
+                    is_add = action < len(node.P) / 2
+                    child.best_depth = node.best_depth + int(is_add)
                     self.nodes_by_hash[state] = child
 
                 node.add_child(action, child)
@@ -151,6 +161,9 @@ class MCGS:
         Q = np.zeros(n)
         N = np.zeros(n)
 
+        if np.isnan(node.P).any():
+            print("nan in node.P", node.P)
+
         for a, (child, edge_visits) in node.children_and_edge_visits.items():
             Q[a] = child.Q
             N[a] = edge_visits
@@ -162,6 +175,7 @@ class MCGS:
         Q_plus_U[node.P == 0] = -np.inf  # Q values are negative
 
         action = np.argmax(Q_plus_U)
+
         return action
 
     def _evaluate(self, node: Node) -> None:

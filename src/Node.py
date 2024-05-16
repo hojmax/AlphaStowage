@@ -12,7 +12,7 @@ class Node:
         self.Q = 0
         self.N = 0
         self.best_depth = np.inf
-        self.U: float | None = None
+        self._U: float | None = None
         self._P: np.ndarray | None = None
         self._children_and_edge_visits: dict[int, tuple["Node", int]] = {}
 
@@ -56,9 +56,19 @@ class Node:
 
         P = self._P * quickest_path
         P *= self.game_state.mask
-        P /= P.sum()
+        if P.sum() != 0:
+            P /= P.sum()
+
         return P
 
     @P.setter
     def P(self, value):
         self._P = value
+
+    @property
+    def U(self) -> float:
+        return self._U - self.best_depth if self._U else None
+
+    @U.setter
+    def U(self, value: float) -> None:
+        self._U = value

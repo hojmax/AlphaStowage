@@ -47,7 +47,10 @@ def draw_tree(node: Node):
     graph.add_node(str(hash(node)))
 
     node_colors = {str(hash(node)): node.Q}
-    node_data = {str(hash(node)): {"U": node.U, "Q": node.Q}}
+    node_data = {str(hash(node)): {"U": node.U,
+            "Q": node.Q,
+            "N": node.N,
+            "best_depth": node.best_depth,}}
     edge_data = {}
 
     _draw_tree_recursive(graph, node, nodes, node_colors, node_data, edge_data)

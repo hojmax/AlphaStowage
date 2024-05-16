@@ -51,7 +51,7 @@ class EpisodePlayer:
             actions.append(action)
             self.env.step(action)
             self.tree = self.tree.children_and_edge_visits[action][0]
-            # draw_tree(self.tree)
+            draw_tree(self.tree)
 
         self.final_value = -self.env.moves_to_solve
         self.reshuffles = self.env.total_reward
