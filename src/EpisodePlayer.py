@@ -1,5 +1,4 @@
 from MCTS import (
-    remove_all_pruning,
     close_envs_in_tree,
     get_np_obs,
     alpha_zero_search,
@@ -41,7 +40,7 @@ class EpisodePlayer:
             actions.append(action)
             self.env.step(action)
 
-        self._cleanup(actions, self.env.history)
+        self._cleanup(actions)
 
         return (
             self.observations,
@@ -51,14 +50,13 @@ class EpisodePlayer:
             self.total_options_considered / len(actions),
         )
 
-    def _cleanup(self, actions: list[int], history: np.ndarray) -> None:
+    def _cleanup(self, actions: list[int]) -> None:
         close_envs_in_tree(self.reused_tree)
 
         self.final_value = -self.env.moves_to_solve
         self.reshuffles = self.env.total_reward
 
         self._add_value_to_observations(actions)
-        self._add_history_to_observations(history)
 
     def _add_observation(self, probabilities: torch.Tensor, env: Env) -> None:
         bay, flat_T = get_np_obs(env, self.config)
@@ -117,7 +115,6 @@ class EpisodePlayer:
         self.reused_tree = self.reused_tree.children[action]
         self.reused_tree.parent = None
         self.reused_tree.prior_prob = None
-        remove_all_pruning(self.reused_tree)
 
     def _add_value_to_observations(self, actions: list[int]) -> None:
         cummulative_removes = 0
@@ -128,23 +125,3 @@ class EpisodePlayer:
 
             if actions[i] >= self.env.C:
                 cummulative_removes += 1
-
-    def _add_history_to_observations(self, history: np.ndarray) -> None:
-        if len(history) == 0:
-            raise TruncatedEpisodeError
-
-        history = np.pad(
-            history,
-            (
-                (0, len(history)),
-                (0, self.config["env"]["R"] - history.shape[1]),
-                (0, self.config["env"]["C"] - history.shape[2]),
-            ),
-            mode="constant",
-            constant_values=0,
-        )
-
-        offset = 1 if self.env.take_first_action else 0
-
-        for i in range(len(self.observations)):
-            self.observations[i] += [torch.tensor(history[i + offset])]

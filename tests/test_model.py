@@ -34,8 +34,7 @@ def node_to_str(node: Node) -> str:
     output = f"{node.env.bay}\n{node.env.T}\nN={node.visit_count},Q={node.Q:.2f}\nMoves={node.env.moves_to_solve}"
     if node.prior_prob is not None and node.parent != None:
         output += f" P={node.prior_prob:.2f}\nU={node.U},Q+U={node.uct:.2f}"
-    if node._pruned:
-        output = "pruned\n" + output
+
     return output
 
 
@@ -94,110 +93,86 @@ class BaselinePolicy:
 
 
 if __name__ == "__main__":
-    print("Started...")
-    env = Env(
-        R=8,
-        C=4,
-        N=6,
-        skip_last_port=True,
-        take_first_action=True,
-        strict_mask=True,
-        speedy=True,
-        should_reorder=False,
-    )
-    env.reset_to_transportation(
-        np.array(
-            [
-                [0, 14, 9, 2, 4, 3],
-                [0, 0, 2, 6, 1, 5],
-                [0, 0, 0, 2, 9, 0],
-                [0, 0, 0, 0, 2, 8],
-                [0, 0, 0, 0, 0, 16],
-                [0, 0, 0, 0, 0, 0],
-            ],
-            dtype=np.int32,
-        )
-    )
-    env.step(0)
-    env.step(1)
-    env.step(0)
-    env.step(0)
-    env.step(0)
-    env.step(0)
-    env.step(0)
-    env.step(0)
-    env.step(2)
-    env.step(2)
-    env.step(2)
-    env.step(2)
-    env.step(2)
-    env.step(2)
-    env.step(2)
-    env.step(3)
-    env.step(3)
-    env.step(3)
-    env.step(3)
-    env.step(3)
-    env.step(3)
-    env.step(1)
-    env.step(1)
-    env.step(1)
-    env.step(1)
-    env.step(1)
-    env.step(6)
-    env.step(1)
-    config = get_config("local_config.json")
+    # print("Started...")
+    # env = Env(
+    #     R=8,
+    #     C=4,
+    #     N=6,
+    #     skip_last_port=True,
+    #     take_first_action=True,
+    #     strict_mask=True,
+    #     speedy=True,
+    #     should_reorder=False,
+    # )
+    # env.reset_to_transportation(
+    #     np.array(
+    #         [
+    #             [0, 14, 9, 2, 4, 3],
+    #             [0, 0, 2, 6, 1, 5],
+    #             [0, 0, 0, 2, 9, 0],
+    #             [0, 0, 0, 0, 2, 8],
+    #             [0, 0, 0, 0, 0, 16],
+    #             [0, 0, 0, 0, 0, 0],
+    #         ],
+    #         dtype=np.int32,
+    #     )
+    # )
+    # env.step(0)
+    # env.step(1)
+    # env.step(0)
+    # env.step(0)
+    # env.step(0)
+    # env.step(0)
+    # env.step(0)
+    # env.step(0)
+    # env.step(2)
+    # env.step(2)
+    # env.step(2)
+    # env.step(2)
+    # env.step(2)
+    # env.step(2)
+    # env.step(2)
+    # env.step(3)
+    # env.step(3)
+    # env.step(3)
+    # env.step(3)
+    # env.step(3)
+    # env.step(3)
+    # env.step(1)
+    # env.step(1)
+    # env.step(1)
+    # env.step(1)
+    # env.step(1)
+    # env.step(6)
+    # env.step(1)
+    config = get_config("config.json")
     device = torch.device("mps")
     model = NeuralNetwork(config, device)
-    model.load_state_dict(torch.load("shared_model.pt", map_location=device))
-    bceloss = torch.nn.BCELoss()
-
-    bay_input, flat_T_input = get_np_obs(env, config)
-    bay_input = torch.tensor(bay_input).unsqueeze(0).unsqueeze(0).float()
-    flat_T_input = torch.tensor(flat_T_input).unsqueeze(0).float()
-    containers_left = torch.tensor([[env.containers_left]]).float()
-    print(bay_input.device, flat_T_input.device, containers_left.device, model.device)
-    print(bay_input.shape, flat_T_input.shape, containers_left.shape)
-
-    with torch.no_grad():
-        model.eval()
-        print(env.bay)
-        print(bay_input)
-        print(env.T)
-        print(flat_T_input)
-        policy, value, reshuffle = model(bay_input, flat_T_input, containers_left)
-        policy = policy.squeeze()
-        value = value.squeeze()
-        print("policy", policy)
-        print("value", value)
-        print("reshuffle", reshuffle)
-    example1 = torch.zeros_like(reshuffle, device=device)
-    print(example1)
-    example1[0, 0, 1, 1] = 1
-    print(
-        bceloss(
-            reshuffle.to(device),
-            torch.zeros_like(reshuffle, device=device),
-        )
+    model.load_state_dict(
+        torch.load("shared_model-6.pt", map_location=device), strict=False
     )
-    # print(
-    #     bceloss(
-    #         torch.zeros_like(reshuffle, device=device),
-    #         torch.zeros_like(reshuffle, device=device),
-    #     )
-    # )
-    print(
-        bceloss(
-            reshuffle.to(device),
-            example1,
-        )
-    )
-    # print(
-    #     bceloss(
-    #         torch.ones_like(reshuffle, device=device),
-    #         torch.zeros_like(reshuffle, device=device),
-    #     )
-    # )
+
+    # bay_input, flat_T_input = get_np_obs(env, config)
+    # bay_input = torch.tensor(bay_input).unsqueeze(0).unsqueeze(0).float()
+    # flat_T_input = torch.tensor(flat_T_input).unsqueeze(0).float()
+    # containers_left = torch.tensor([[env.containers_left]]).float()
+    # print(bay_input.device, flat_T_input.device, containers_left.device, model.device)
+    # print(bay_input.shape, flat_T_input.shape, containers_left.shape)
+
+    # with torch.no_grad():
+    #     model.eval()
+    #     print(env.bay)
+    #     print(bay_input)
+    #     print(env.T)
+    #     print(flat_T_input)
+    #     policy, value, reshuffle = model(bay_input, flat_T_input, containers_left)
+    #     policy = policy.squeeze()
+    #     value = value.squeeze()
+    #     print("policy", policy)
+    #     print("value", value)
+    #     print("reshuffle", reshuffle)
+    # example1 = torch.zeros_like(reshuffle, device=device)
+    # print(example1)
 
     # gpu_update_event = mp.Event()
     # inference_pipes = [mp.Pipe()]

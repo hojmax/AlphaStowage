@@ -142,13 +142,6 @@ def backup(node: Node, value: float) -> None:
         backup(node.parent, value)
 
 
-def remove_all_pruning(node: Node) -> None:
-    node.unprune()
-
-    for child in node.children.values():
-        remove_all_pruning(child)
-
-
 def get_tree_probs(node: Node, config: dict) -> torch.Tensor:
     action_probs = torch.zeros(2 * config["env"]["C"], dtype=torch.float64)
 
@@ -162,42 +155,17 @@ def get_tree_probs(node: Node, config: dict) -> torch.Tensor:
     return action_probs / torch.sum(action_probs)
 
 
-def prune_and_move_back_up(node: Node) -> Node:
-    node.prune()
-
-    return node.parent
-
-
-def too_many_reshuffles(node: Node, best_score: float) -> bool:
-    move_bound = node.env.R * node.env.C * (node.env.N - 1)
-    return (
-        node.env.total_reward < best_score
-        or node.env.reshuffles_per_port < -(node.env.R * node.env.C) // 2
-        or node.env.moves_to_solve >= move_bound
-        or node.env.steps_taken >= move_bound
-    )
-
-
 def is_leaf_node(node: Node) -> bool:
     return len(node.children) == 0
 
 
-def should_prune(node: Node, best_score: float) -> bool:
-    return (not is_leaf_node(node) and node.no_valid_children) or (
-        is_leaf_node(node) and too_many_reshuffles(node, best_score)
-    )
-
-
-def find_leaf(root_node: Node, best_score: float) -> Node:
+def find_leaf(root_node: Node) -> Node:
     node = root_node
 
-    while True:
-        if should_prune(node, best_score):
-            node = prune_and_move_back_up(node)
-        elif is_leaf_node(node):
-            return node
-        else:
-            node = node.select_child()
+    while not is_leaf_node(node):
+        node = node.select_child()
+
+    return node
 
 
 def get_new_root_node(root_env: Env, reused_tree: Node, config: dict) -> Node:
@@ -219,9 +187,8 @@ def alpha_zero_search(
 ) -> tuple[torch.Tensor, Node, dict[Env, tuple[np.ndarray, np.ndarray]]]:
     root_node = get_new_root_node(root_env, reused_tree, config)
 
-    best_score = float("-inf")
     for _ in range(config["mcts"]["search_iterations"]):
-        node = find_leaf(root_node, best_score)
+        node = find_leaf(root_node)
 
         state_value = evaluate(
             node,
@@ -231,9 +198,6 @@ def alpha_zero_search(
         )
 
         backup(node, state_value)
-
-        if node.env.terminal:
-            best_score = max(best_score, node.env.total_reward)
 
     return (
         get_tree_probs(root_node, config),

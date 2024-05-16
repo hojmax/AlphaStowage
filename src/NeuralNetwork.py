@@ -91,29 +91,15 @@ class NeuralNetwork(nn.Module):
             nn.Sigmoid(),
         )
 
-        self.was_reshuffled_head = nn.Sequential(
-            Residual_Block(
-                in_channels=nn_config["hidden_channels"],
-                out_channels=nn_config["hidden_channels"],
-                kernel_size=nn_config["hidden_kernel_size"],
-                stride=nn_config["hidden_stride"],
-            ),
-            nn.Conv2d(
-                in_channels=nn_config["hidden_channels"],
-                out_channels=nn_config["reshuffle_channels"],
-                kernel_size=nn_config["reshuffle_kernel_size"],
-                stride=nn_config["reshuffle_stride"],
-            ),
-            nn.Sigmoid(),
-        )
-
         self.policy_head = nn.Sequential(
-            Convolutional_Block(
+            nn.Conv2d(
                 in_channels=nn_config["hidden_channels"],
                 out_channels=nn_config["policy_channels"],
                 kernel_size=nn_config["policy_kernel_size"],
                 stride=nn_config["policy_stride"],
             ),
+            nn.SiLU(),
+            nn.BatchNorm2d(nn_config["policy_channels"]),
             nn.Flatten(),
             nn.Linear(
                 nn_config["policy_channels"]
@@ -125,12 +111,14 @@ class NeuralNetwork(nn.Module):
         )
 
         self.value_head = nn.Sequential(
-            Convolutional_Block(
+            nn.Conv2d(
                 in_channels=nn_config["hidden_channels"],
                 out_channels=nn_config["value_channels"],
                 kernel_size=nn_config["value_kernel_size"],
                 stride=nn_config["value_stride"],
             ),
+            nn.BatchNorm2d(nn_config["value_channels"]),
+            nn.SiLU(),
             nn.Flatten(),
             nn.Linear(
                 nn_config["value_channels"]
@@ -162,5 +150,4 @@ class NeuralNetwork(nn.Module):
 
         policy = self.policy_head(out)
         value = self.value_head(out + containers_left_embedding)
-        was_reshuffled = self.was_reshuffled_head(out)
-        return policy, value, was_reshuffled
+        return policy, value
