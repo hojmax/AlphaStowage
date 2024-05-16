@@ -25,7 +25,7 @@ class PaddedEnv(Env):
         self.max_R = max_R
         self.max_N = max_N
 
-    def copy(self, track_history: bool = True) -> "PaddedEnv":
+    def copy(self, track_history: bool = False) -> "PaddedEnv":
         new_env = PaddedEnv(
             self.R,
             self.C,
