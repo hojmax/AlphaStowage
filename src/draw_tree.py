@@ -34,7 +34,7 @@ def _draw_tree_recursive(
         node_colors[str(hash(child))] = child.Q  # Store the Q value
         node_data[str(hash(child))] = {
             "U": child.U,
-            "Q": child.Q,
+            "Q": child.Q - child.best_depth,
             "N": child.N,
             "best_depth": child.best_depth,
         }  # Store additional data
@@ -48,7 +48,7 @@ def draw_tree(node: Node):
 
     node_colors = {str(hash(node)): node.Q}
     node_data = {str(hash(node)): {"U": node.U,
-            "Q": node.Q,
+            "Q": node.Q - node.best_depth,
             "N": node.N,
             "best_depth": node.best_depth,}}
     edge_data = {}
