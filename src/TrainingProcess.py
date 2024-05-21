@@ -82,5 +82,5 @@ class TrainingProcess:
         self.gpu_update_event.set()
 
     def _wait_for_buffer(self):
-        while len(self.buffer) < self.config["train"]["batch_size"]:
+        while len(self.buffer) < 5:
             time.sleep(1)

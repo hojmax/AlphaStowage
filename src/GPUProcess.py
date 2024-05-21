@@ -42,6 +42,7 @@ class GPUProcess:
         self.flat_ts = []
         self.containers_left = []
         self.conns = []
+        self.masks = []
 
     def _pull_model_update(self) -> None:
         if self.update_event.is_set():
@@ -54,10 +55,11 @@ class GPUProcess:
         for parent_conn, _ in self.pipes:
             if not parent_conn.poll():
                 continue
-            bay, flat_T, containers_left = parent_conn.recv()
+            bay, flat_T, containers_left, mask = parent_conn.recv()
             self.bays.append(bay)
             self.flat_ts.append(flat_T)
             self.containers_left.append(containers_left)
+            self.masks.append(mask)
             self.conns.append(parent_conn)
 
     def _queue_is_full(self) -> bool:
@@ -76,6 +78,12 @@ class GPUProcess:
         flat_ts = flat_ts.to(self.device)
         return flat_ts
 
+    def _process_masks(self):
+        masks = np.stack(self.masks)
+        masks = torch.tensor(masks)
+        masks = masks.to(self.device)
+        return masks
+
     def _process_containers_left(self):
         containers_left = np.stack(self.containers_left)
         containers_left = torch.tensor(containers_left)
@@ -85,9 +93,11 @@ class GPUProcess:
     def _process_data(self) -> None:
         bays = self._process_bays()
         flat_ts = self._process_flat_ts()
+        masks = self._process_masks()
         containers_left = self._process_containers_left()
+
         with torch.no_grad():
-            policies, values = self.model(bays, flat_ts, containers_left)
+            policies, values = self.model(bays, flat_ts, containers_left, masks)
             policies = policies.detach().cpu().numpy()
             values = values.detach().cpu().numpy()
 

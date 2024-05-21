@@ -31,8 +31,6 @@
     "save_buffer_every_n_observations": 1e5
   },
   "inference": {
-    "n_episodes_with_only_add": 25,
-    "can_only_add": false,
     "n_processes": 80,
     "batch_size": 1,
     "log_interval": 200

@@ -105,10 +105,10 @@ class NeuralNetwork(nn.Module):
                 nn_config["policy_channels"]
                 * self.env_config["R"]
                 * self.env_config["C"],
-                2 * self.env_config["C"],
+                2 * self.env_config["R"] * self.env_config["C"],
             ),
-            nn.Softmax(dim=1),
         )
+        self.softmax = nn.Softmax(dim=1)
 
         self.value_head = nn.Sequential(
             nn.Conv2d(
@@ -135,7 +135,7 @@ class NeuralNetwork(nn.Module):
             nn.Linear(nn_config["embedding_hidden_size"], nn_config["hidden_channels"]),
         )
 
-    def forward(self, bay, flat_T, containers_left):
+    def forward(self, bay, flat_T, containers_left, mask):
         flat_T = self.flat_T_reshaper(flat_T)
         flat_T = flat_T.view(-1, 1, self.env_config["R"], self.env_config["C"])
         if bay.dim() == 2:
@@ -149,5 +149,8 @@ class NeuralNetwork(nn.Module):
         )
 
         policy = self.policy_head(out)
+        policy = policy - (1 - mask) * 1e9  # mask out invalid moves
+        policy = self.softmax(policy)
+
         value = self.value_head(out + containers_left_embedding)
         return policy, value

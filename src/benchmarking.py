@@ -104,7 +104,6 @@ def transform_benchmarking_data(data):
             instance["C"],
             instance["N"],
             skip_last_port=True,
-            take_first_action=True,
             strict_mask=True,
         )
         env.reset_to_transportation(instance["transportation_matrix"])
@@ -162,7 +161,6 @@ class InferenceProcess:
                 e["C"],
                 e["N"],
                 skip_last_port=True,
-                take_first_action=True,
                 strict_mask=True,
             )
             env.reset_to_transportation(e["transportation_matrix"])

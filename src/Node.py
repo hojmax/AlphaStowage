@@ -3,10 +3,6 @@ from MPSPEnv import Env
 import warnings
 
 
-class TruncatedEpisodeError(Exception):
-    pass
-
-
 class Node:
     def __init__(
         self,
@@ -36,14 +32,14 @@ class Node:
 
     def add_noise(self) -> None:
         noise = np.random.dirichlet(
-            np.full(self._env.C * 2, self.config["mcts"]["dirichlet_alpha"])
+            np.full(len(self.children), self.config["mcts"]["dirichlet_alpha"])
         )
         weight = np.float16(self.config["mcts"]["dirichlet_weight"])
 
-        for action, child in self.children.items():
-            child.prior_prob = np.float16(noise[action]) * weight + child.prior_prob * (
-                np.float16(1) - weight
-            )
+        for child_index, child in enumerate(self.children.values()):
+            child.prior_prob = np.float16(
+                noise[child_index]
+            ) * weight + child.prior_prob * (np.float16(1) - weight)
             child._uct = None
 
     @property

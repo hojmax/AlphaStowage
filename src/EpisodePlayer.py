@@ -1,13 +1,11 @@
 from MCTS import (
     close_envs_in_tree,
-    get_np_obs,
     alpha_zero_search,
 )
 from MPSPEnv import Env
 from multiprocessing.connection import Connection
 import torch
 import numpy as np
-from Node import TruncatedEpisodeError
 
 
 class EpisodePlayer:
@@ -32,40 +30,37 @@ class EpisodePlayer:
             np.random.seed(0)
 
     def run_episode(self):
-        actions = []
+        placed = []
         while not self.env.terminal:
             action = self._get_action()
             if action >= self.env.C:
                 self.n_removes += 1
-            actions.append(action)
+            placed.append(self.env.containers_placed)
             self.env.step(action)
 
-        self._cleanup(actions)
+        self._cleanup(placed)
 
         return (
             self.observations,
-            self.final_value,
-            self.reshuffles,
-            self.n_removes / len(actions),
-            self.total_options_considered / len(actions),
+            -self.env.containers_placed,
+            self.env.total_reward,
+            self.n_removes / len(placed),
+            self.total_options_considered / len(placed),
         )
 
-    def _cleanup(self, actions: list[int]) -> None:
+    def _cleanup(self, placed: list[int]) -> None:
         close_envs_in_tree(self.reused_tree)
 
-        self.final_value = -self.env.moves_to_solve
-        self.reshuffles = self.env.total_reward
-
-        self._add_value_to_observations(actions)
+        self._add_value_to_observations(placed)
 
     def _add_observation(self, probabilities: torch.Tensor, env: Env) -> None:
-        bay, flat_T = get_np_obs(env, self.config)
         self.observations.append(
             [
-                torch.tensor(bay),
-                torch.tensor(flat_T),
+                torch.tensor(env.bay),
+                torch.tensor(env.flat_T),
                 probabilities,
                 torch.tensor([env.containers_left]),
+                torch.tensor(env.mask),
             ]
         )
 
@@ -74,6 +69,7 @@ class EpisodePlayer:
         self.total_options_considered += n_options_considered
 
     def _get_action(self):
+        assert not self.env.terminal
         probabilities, self.reused_tree, self.transposition_table = alpha_zero_search(
             self.env,
             self.conn,
@@ -83,30 +79,19 @@ class EpisodePlayer:
         )
         self._update_considered_options(probabilities)
         self._add_observation(probabilities, self.env)
-        action = self._probs_to_action(probabilities)
+        action = torch.argmax(probabilities).item()
+        # assert that some probability is non-zero
+        assert (
+            probabilities[action] > 0
+        ), f"{self.env.mask}, {probabilities}, {self.env.bay}, {self.env.flat_T}, {self.env.containers_left}, {self.env.containers_placed}"
         self._update_tree(action)
 
         return action
 
-    def _probs_to_action(self, probabilities: torch.Tensor) -> int:
-        # if self.deterministic:
-        #     action = torch.argmax(probabilities).item()
-        # else:
-        #     action = np.random.choice(2 * self.config["env"]["C"], p=probabilities)
-        action = torch.argmax(probabilities).item()
-
-        action = (
-            action
-            if action < self.env.C
-            else action + self.env.C - self.config["env"]["C"]
-        )
-
-        return action
-
     def _close_other_branches(self, action: int) -> None:
-        for a in range(2 * self.env.C):
-            if a != action and a in self.reused_tree.children:
-                close_envs_in_tree(self.reused_tree.children[a])
+        for key in self.reused_tree.children.keys():
+            if key != action:
+                close_envs_in_tree(self.reused_tree.children[key])
 
     def _update_tree(self, action: int) -> None:
         self._close_other_branches(action)
@@ -116,12 +101,10 @@ class EpisodePlayer:
         self.reused_tree.parent = None
         self.reused_tree.prior_prob = None
 
-    def _add_value_to_observations(self, actions: list[int]) -> None:
-        cummulative_removes = 0
-        offset = 1 if self.env.take_first_action else 0
+    def _add_value_to_observations(self, placed: list[int]) -> None:
+        overall_placed = -self.env.containers_placed
+        cummulative_placed = 0
         for i in range(len(self.observations)):
-            value = self.final_value + i - cummulative_removes + offset
-            self.observations[i] += [torch.tensor(value)]
+            self.observations[i] += [torch.tensor(overall_placed + cummulative_placed)]
 
-            if actions[i] >= self.env.C:
-                cummulative_removes += 1
+            cummulative_placed += placed[i]

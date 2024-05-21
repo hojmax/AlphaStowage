@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import torch.multiprocessing as mp
 import warnings
-import gc
 
 
 class ReplayBuffer:
@@ -18,6 +17,7 @@ class ReplayBuffer:
             self.prob,
             self.value,
             self.containers_left,
+            self.mask,
         ) = self._create_buffers(self.max_size, config)
 
         if config["replay_buffer"]["checkpoint_path"]:
@@ -31,9 +31,10 @@ class ReplayBuffer:
             max_size,
             config["env"]["N"] * (config["env"]["N"] - 1) // 2,
         )
-        prob_size = (max_size, 2 * config["env"]["C"])
+        prob_size = (max_size, 2 * config["env"]["R"] * config["env"]["C"])
         value_size = (max_size, 1)
         container_left_size = (max_size, 1)
+        mask_size = (max_size, 2 * config["env"]["R"] * config["env"]["C"])
 
         bay = torch.zeros(bay_size, dtype=torch.float32).share_memory_()
         flat_T = torch.zeros(flat_T_size, dtype=torch.float32).share_memory_()
@@ -42,8 +43,9 @@ class ReplayBuffer:
         containers_left = torch.zeros(
             container_left_size, dtype=torch.float32
         ).share_memory_()
+        mask = torch.zeros(mask_size, dtype=torch.float32).share_memory_()
 
-        return bay, flat_T, prob, value, containers_left
+        return bay, flat_T, prob, value, containers_left, mask
 
     def load_from_disk(self, config):
         try:
@@ -53,6 +55,7 @@ class ReplayBuffer:
             self.prob = data["prob"]
             self.value = data["value"]
             self.containers_left = data["containers_left"]
+            self.mask = data["mask"]
             self.ptr.value = data["ptr"]
             self.size.value = data["size"]
         except FileNotFoundError:
@@ -67,6 +70,7 @@ class ReplayBuffer:
             "prob": self.prob,
             "value": self.value,
             "containers_left": self.containers_left,
+            "mask": self.mask,
             "ptr": self.ptr.value,
             "size": self.size.value,
         }
@@ -74,27 +78,26 @@ class ReplayBuffer:
 
     def extend(
         self,
-        bay: torch.Tensor,
-        flat_T: torch.Tensor,
-        prob: torch.Tensor,
-        containers_left: torch.Tensor,
-        value: torch.Tensor,
+        observations: list,
     ) -> None:
         with self.lock:
-            self.bay[self.ptr.value] = bay
-            self.flat_T[self.ptr.value] = flat_T
-            self.prob[self.ptr.value] = prob
-            self.value[self.ptr.value] = value
-            self.containers_left[self.ptr.value] = containers_left
-            self.ptr.value = (self.ptr.value + 1) % self.max_size
-            self.size.value = min(self.size.value + 1, self.max_size)
+            for obs in observations:
+                (bay, flat_T, prob, containers_left, mask, value) = obs
+                self.bay[self.ptr.value] = bay
+                self.flat_T[self.ptr.value] = flat_T
+                self.prob[self.ptr.value] = prob
+                self.value[self.ptr.value] = value
+                self.containers_left[self.ptr.value] = containers_left
+                self.mask[self.ptr.value] = mask
+                self.ptr.value = (self.ptr.value + 1) % self.max_size
+                self.size.value = min(self.size.value + 1, self.max_size)
 
-            if (
-                self.ptr.value
-                % self.config["train"]["save_buffer_every_n_observations"]
-                == 0
-            ):
-                self.save_to_disk()
+                if (
+                    self.ptr.value
+                    % self.config["train"]["save_buffer_every_n_observations"]
+                    == 0
+                ):
+                    self.save_to_disk()
 
     def sample(self, batch_size: int) -> tuple:
         with self.lock:
@@ -105,6 +108,7 @@ class ReplayBuffer:
                 self.prob[indices],
                 self.value[indices],
                 self.containers_left[indices],
+                self.mask[indices],
             )
 
     def __len__(self):
