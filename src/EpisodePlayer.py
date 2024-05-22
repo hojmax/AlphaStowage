@@ -32,7 +32,7 @@ class EpisodePlayer:
         placed = []
         while not self.env.terminated:
             action = self._get_action()
-            if action >= self.env.C:
+            if action >= self.env.C * self.env.R:
                 self.n_removes += 1
             placed.append(self.env.containers_placed)
             self.env.step(action)
@@ -73,6 +73,7 @@ class EpisodePlayer:
         )
         self._add_observation(probabilities, self.env)
         action = torch.argmax(probabilities).item()
+        self._update_tree(action)
         return action
 
     def _close_other_branches(self, action: int) -> None:
