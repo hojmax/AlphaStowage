@@ -9,3 +9,4 @@ local_config.json
 open_fds.log
 .DS_Store
 test.ipynb
+venv
