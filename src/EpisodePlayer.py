@@ -43,7 +43,7 @@ class EpisodePlayer:
             self.observations,
             -self.env.containers_placed,
             self.env.total_reward,
-            self.n_removes / len(placed),
+            self.n_removes / len(placed) if len(placed) > 0 else 0,
         )
 
     def _cleanup(self, placed: list[int]) -> None:
@@ -91,8 +91,5 @@ class EpisodePlayer:
 
     def _add_value_to_observations(self, placed: list[int]) -> None:
         overall_placed = -self.env.containers_placed
-        cummulative_placed = 0
         for i in range(len(self.observations)):
-            self.observations[i] += [torch.tensor(overall_placed + cummulative_placed)]
-
-            cummulative_placed += placed[i]
+            self.observations[i] += [torch.tensor(overall_placed + placed[i])]
