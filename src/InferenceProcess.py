@@ -36,7 +36,6 @@ class InferenceProcess:
                 value,
                 reshuffles,
                 remove_fraction,
-                avg_options_considered,
             ) = player.run_episode()
 
             self.buffer.extend(observations)
@@ -46,7 +45,6 @@ class InferenceProcess:
                     "value": value,
                     "reshuffles": reshuffles,
                     "remove_fraction": remove_fraction,
-                    "avg_options_considered": avg_options_considered,
                 }
             )
             self.episode_count += 1

@@ -24,7 +24,7 @@ class BaselinePolicy:
 
 
 def run_episode(env):
-    while not env.terminal:
+    while not env.terminated:
         action = baseline_policy.predict(env.one_hot_bay)
         env.step(action)
     return env.moves_to_solve

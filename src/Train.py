@@ -67,7 +67,7 @@ def optimize_model(
 
 
 def train_batch(model, buffer, optimizer, scheduler, config):
-    bay, flat_T, prob, value, containers_left = buffer.sample(
+    bay, flat_T, prob, value, containers_left, mask = buffer.sample(
         config["train"]["batch_size"]
     )
     bay = bay.to(model.device)
@@ -75,8 +75,9 @@ def train_batch(model, buffer, optimizer, scheduler, config):
     prob = prob.to(model.device)
     value = value.to(model.device)
     containers_left = containers_left.to(model.device)
+    mask = mask.to(model.device)
 
-    pred_prob, pred_value = model(bay, flat_T, containers_left)
+    pred_prob, pred_value = model(bay, flat_T, containers_left, mask)
 
     loss, value_loss, cross_entropy = optimize_model(
         model=model,

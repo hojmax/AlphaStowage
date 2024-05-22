@@ -99,7 +99,12 @@ class ReplayBuffer:
                 ):
                     self.save_to_disk()
 
+            print(f"Buffer size: {self.size.value}")
+
     def sample(self, batch_size: int) -> tuple:
+        if self.size.value < batch_size:
+            batch_size = self.size.value
+
         with self.lock:
             indices = np.random.choice(self.size.value, batch_size, replace=False)
             return (

@@ -24,14 +24,13 @@ class EpisodePlayer:
         self.reused_tree = None
         self.transposition_table = {}
         self.n_removes = 0
-        self.total_options_considered = 0
 
         if self.deterministic:
             np.random.seed(0)
 
     def run_episode(self):
         placed = []
-        while not self.env.terminal:
+        while not self.env.terminated:
             action = self._get_action()
             if action >= self.env.C:
                 self.n_removes += 1
@@ -45,11 +44,11 @@ class EpisodePlayer:
             -self.env.containers_placed,
             self.env.total_reward,
             self.n_removes / len(placed),
-            self.total_options_considered / len(placed),
         )
 
     def _cleanup(self, placed: list[int]) -> None:
-        close_envs_in_tree(self.reused_tree)
+        if self.reused_tree is not None:
+            close_envs_in_tree(self.reused_tree)
 
         self._add_value_to_observations(placed)
 
@@ -64,12 +63,7 @@ class EpisodePlayer:
             ]
         )
 
-    def _update_considered_options(self, probabilities: torch.Tensor) -> None:
-        n_options_considered = torch.sum(probabilities > 0).item()
-        self.total_options_considered += n_options_considered
-
     def _get_action(self):
-        assert not self.env.terminal
         probabilities, self.reused_tree, self.transposition_table = alpha_zero_search(
             self.env,
             self.conn,
@@ -77,15 +71,8 @@ class EpisodePlayer:
             self.reused_tree,
             self.transposition_table,
         )
-        self._update_considered_options(probabilities)
         self._add_observation(probabilities, self.env)
         action = torch.argmax(probabilities).item()
-        # assert that some probability is non-zero
-        assert (
-            probabilities[action] > 0
-        ), f"{self.env.mask}, {probabilities}, {self.env.bay}, {self.env.flat_T}, {self.env.containers_left}, {self.env.containers_placed}"
-        self._update_tree(action)
-
         return action
 
     def _close_other_branches(self, action: int) -> None:

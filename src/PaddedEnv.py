@@ -33,7 +33,6 @@ class PaddedEnv(Env):
             self.speedy,
         )
         new_env._env = c_lib.copy_env(self._env)
-        new_env.terminal = self.terminal
         new_env._set_stores()
 
         return new_env

@@ -65,7 +65,7 @@ def evaluate(
     transposition_table: dict[Env, tuple[np.ndarray, np.ndarray]],
     config: dict,
 ) -> float:
-    if node.env.terminal:
+    if node.env.terminated:
         return -node.env.containers_placed
     else:
         state_value = expand_node(
