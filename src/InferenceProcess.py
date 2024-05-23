@@ -21,12 +21,14 @@ class InferenceProcess:
         torch.manual_seed(seed)
         np.random.seed(seed)
         self.buffer = buffer
+        self.seed = seed
         self.conn = conn
         self.log_episode_queue = log_episode_queue
         self.config = config
         self.episode_count = 0
 
     def loop(self):
+        games = []
         while True:
             env = self._get_env()
 
@@ -48,6 +50,12 @@ class InferenceProcess:
                 }
             )
             self.episode_count += 1
+            games.append(reshuffles)
+            if self.episode_count % 10 == 0:
+                print(
+                    f"Process: {self.seed} - Episode {self.episode_count} - Mean reshuffles: {np.mean(games)}"
+                )
+                games = []
             env.close()
 
     def _get_env(self) -> Env:
