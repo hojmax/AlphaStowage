@@ -46,7 +46,10 @@ class TrainingProcess:
 
         while True:
             if self._should_swap():
-                self._swap_over()
+                self._swap()
+
+            if self._should_save():
+                self._save_model()
 
             self._handle_batch()
             self.batch += 1
@@ -69,17 +72,23 @@ class TrainingProcess:
         )
 
     def _should_swap(self) -> bool:
-        return self.batch % self.config["train"]["swap_and_save_interval"] == 0
+        return self.batch % self.config["train"]["swap_interval"] == 0
 
-    def _swap_over(self) -> None:
+    def _should_save(self) -> bool:
+        return (
+            self.batch % self.config["train"]["save_interval"] == 0
+            and self.config["wandb"]["should_log"]
+        )
+
+    def _swap(self) -> None:
         torch.save(self.model.state_dict(), f"shared_model.pt")
-
-        if self.config["wandb"]["should_log"]:
-            artifact = wandb.Artifact(name=f"model{self.batch}", type="model")
-            artifact.add_file("shared_model.pt")
-            wandb.run.log_artifact(artifact)
-
         self.gpu_update_event.set()
+
+    def _save_model(self) -> None:
+        torch.save(self.model.state_dict(), f"shared_model.pt")
+        artifact = wandb.Artifact(name=f"model{self.batch}", type="model")
+        artifact.add_file("shared_model.pt")
+        wandb.run.log_artifact(artifact)
 
     def _wait_for_buffer(self):
         while len(self.buffer) < 5:

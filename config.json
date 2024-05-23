@@ -37,7 +37,7 @@
   },
   "mcts": {
     "c_puct_constant": 0.02,
-    "temperature": 0.6,
+    "temperature": 0.8,
     "search_iterations": 200,
     "dirichlet_weight": 0.25,
     "dirichlet_alpha": 0.2
