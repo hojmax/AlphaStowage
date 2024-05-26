@@ -48,7 +48,6 @@ class InferenceProcess:
         )
 
     def loop(self):
-        games = []
         while True:
             env = self._get_env()
 
@@ -67,6 +66,7 @@ class InferenceProcess:
                     "value": value,
                     "reshuffles": reshuffles,
                     "remove_fraction": remove_fraction,
+                    "n_ports": env.N,
                 }
             )
             self.port_curriculum.step()
