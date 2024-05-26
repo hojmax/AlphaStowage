@@ -2,7 +2,7 @@ import torch
 import torch.optim as optim
 import wandb
 from NeuralNetwork import NeuralNetwork
-from StepLRWithMinLR import StepLRWithMinLR
+from ExponentialLRWithMinLR import ExponentialLRWithMinLR
 from typing import TypedDict
 import os
 import time
@@ -163,7 +163,7 @@ def get_optimizer(model, config):
 
 
 def get_scheduler(optimizer, config):
-    return StepLRWithMinLR(
+    return ExponentialLRWithMinLR(
         optimizer,
         config["train"]["scheduler_step_size_in_batches"],
         config["train"]["scheduler_gamma"],

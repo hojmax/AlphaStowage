@@ -11,11 +11,17 @@
     "local_model": "",
     "artifact": "",
     "entity": "pocs",
-    "project": "alphastowage"
+    "project": "alphastowage",
   },
   "replay_buffer": {
     "checkpoint_path": "",
     "max_size": 3600000
+  },
+  "port_curriculum": {
+    "start": 4,
+    "end": 6,
+    "increment": 2,
+    "episode_step_size": 100
   },
   "train": {
     "l2_weight_reg": 0.0001,
