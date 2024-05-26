@@ -11,7 +11,7 @@
     "local_model": "",
     "artifact": "",
     "entity": "pocs",
-    "project": "alphastowage",
+    "project": "alphastowage"
   },
   "replay_buffer": {
     "checkpoint_path": "",
