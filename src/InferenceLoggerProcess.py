@@ -17,15 +17,24 @@ class InferenceLoggerProcess:
         if self.config["wandb"]["should_log"]:
             init_wandb_run(self.config)
 
-        self.logger = StepLogger(
-            n=self.config["inference"]["log_interval"],
-            step_name="episode",
-            log_wandb=self.config["wandb"]["should_log"],
-        )
+        self.loggers = {}
 
-    def loop(self):
+    def loop(self) -> None:
         while True:
             if not self.queue.empty():
-                self.logger.log(self.queue.get())
+                data = self.queue.get()
+                tag = data.pop("tag")
+                self.log_for_tag(data, tag)
+                self.log_for_tag(data, "all")
             else:
                 time.sleep(5)
+
+    def log_for_tag(self, data, tag):
+        if tag not in self.loggers:
+            self.loggers[tag] = StepLogger(
+                n=self.config["inference"]["log_interval"],
+                step_name="episode",
+                log_wandb=self.config["wandb"]["should_log"],
+                tag=tag,
+            )
+        self.loggers[tag].log(data)

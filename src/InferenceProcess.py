@@ -66,7 +66,8 @@ class InferenceProcess:
                     "value": value,
                     "reshuffles": reshuffles,
                     "remove_fraction": remove_fraction,
-                    "n_ports": env.N,
+                    "n_observations": len(observations),
+                    "tag": f"R{env.R}C{env.C}N{env.N}",
                 }
             )
             self.port_curriculum.step()

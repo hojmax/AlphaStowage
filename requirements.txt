@@ -1,5 +1,5 @@
 wandb
 tqdm
 pygame
-MPSPEnv==0.1.3
+MPSPEnv==0.1.4
 torch
