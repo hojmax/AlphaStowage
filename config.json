@@ -1,8 +1,11 @@
 {
   "env": {
-    "R": 12,
-    "C": 12,
-    "N": 16
+    "max_R": 12,
+    "max_C": 12,
+    "max_N": 16,
+    "min_R": 12,
+    "min_C": 12,
+    "min_N": 16
   },
   "wandb": {
     "should_log": true,
@@ -18,8 +21,6 @@
     "max_size": 3600000
   },
   "port_curriculum": {
-    "start": 4,
-    "end": 6,
     "increment": 2,
     "episode_step_size": 100
   },

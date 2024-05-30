@@ -102,7 +102,7 @@ def backup(node: Node, value: float) -> None:
 
 def get_tree_probs(node: Node, config: dict) -> torch.Tensor:
     action_probs = torch.zeros(
-        2 * config["env"]["R"] * config["env"]["C"], dtype=torch.float64
+        2 * config["env"]["max_R"] * config["env"]["max_C"], dtype=torch.float64
     )
 
     for action in node.children.keys():

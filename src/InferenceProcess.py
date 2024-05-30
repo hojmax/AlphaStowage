@@ -10,9 +10,9 @@ from EpisodePlayer import EpisodePlayer
 
 
 class PortCurriculum:
-    def __init__(self, start, end, increment, step_size) -> None:
-        self.N = start
-        self._end = end
+    def __init__(self, min, max, increment, step_size) -> None:
+        self.N = min
+        self._end = max
         self._increment = increment
         self._step_size = step_size
         self._count = 0
@@ -41,8 +41,8 @@ class InferenceProcess:
         self.log_episode_queue = log_episode_queue
         self.config = config
         self.port_curriculum = PortCurriculum(
-            config["port_curriculum"]["start"],
-            config["port_curriculum"]["end"],
+            config["env"]["min_N"],
+            config["env"]["max_N"],
             config["port_curriculum"]["increment"],
             config["port_curriculum"]["episode_step_size"],
         )
@@ -75,12 +75,18 @@ class InferenceProcess:
 
     def _get_env(self) -> Env:
         env = PaddedEnv(
-            R=random.choice(range(6, self.config["env"]["R"] + 1, 2)),
-            C=random.choice(range(2, self.config["env"]["C"] + 1, 2)),
-            N=random.choice(range(4, self.port_curriculum.N + 1, 2)),
-            max_C=self.config["env"]["C"],
-            max_R=self.config["env"]["R"],
-            max_N=self.config["env"]["N"],
+            R=random.choice(
+                range(self.config["env"]["min_R"], self.config["env"]["max_R"] + 1, 2)
+            ),
+            C=random.choice(
+                range(self.config["env"]["min_C"], self.config["env"]["max_C"] + 1, 2)
+            ),
+            N=random.choice(
+                range(self.config["env"]["min_N"], self.port_curriculum.N + 1, 2)
+            ),
+            max_C=self.config["env"]["max_C"],
+            max_R=self.config["env"]["max_R"],
+            max_N=self.config["env"]["max_N"],
             auto_move=True,
             speedy=True,
         )
