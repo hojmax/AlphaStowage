@@ -89,5 +89,5 @@ class TrainingProcess:
         self.gpu_update_event.set()
 
     def _wait_for_buffer(self):
-        while len(self.buffer) < 5:
+        while len(self.buffer) == 0:
             time.sleep(1)

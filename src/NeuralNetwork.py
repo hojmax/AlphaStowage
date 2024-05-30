@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import math
 
 
 class Convolutional_Block(nn.Module):
@@ -62,8 +63,8 @@ class NeuralNetwork(nn.Module):
         nn_config = config["nn"]
         input_channels = 2
 
-        layers = []
-        layers.append(
+        tower1 = []
+        tower1.append(
             Convolutional_Block(
                 input_channels,
                 nn_config["hidden_channels"],
@@ -71,8 +72,8 @@ class NeuralNetwork(nn.Module):
                 stride=nn_config["hidden_stride"],
             )
         )
-        for _ in range(nn_config["blocks"]):
-            layers.append(
+        for _ in range(math.floor(nn_config["blocks"] / 2)):
+            tower1.append(
                 Residual_Block(
                     nn_config["hidden_channels"],
                     nn_config["hidden_channels"],
@@ -81,7 +82,20 @@ class NeuralNetwork(nn.Module):
                 )
             )
 
-        self.layers = nn.Sequential(*layers)
+        self.tower1 = nn.Sequential(*tower1)
+
+        tower2 = []
+        for _ in range(math.ceil(nn_config["blocks"] / 2)):
+            tower2.append(
+                Residual_Block(
+                    nn_config["hidden_channels"],
+                    nn_config["hidden_channels"],
+                    nn_config["hidden_kernel_size"],
+                    nn_config["hidden_stride"],
+                )
+            )
+
+        self.tower2 = nn.Sequential(*tower2)
 
         self.flat_T_reshaper = nn.Sequential(
             nn.Linear(
@@ -134,6 +148,14 @@ class NeuralNetwork(nn.Module):
             nn.SiLU(),
             nn.Linear(nn_config["embedding_hidden_size"], nn_config["hidden_channels"]),
         )
+        self.mask_embedding = nn.Sequential(
+            nn.Linear(
+                2 * self.env_config["R"] * self.env_config["C"],
+                nn_config["embedding_hidden_size"],
+            ),
+            nn.SiLU(),
+            nn.Linear(nn_config["embedding_hidden_size"], nn_config["hidden_channels"]),
+        )
 
     def forward(self, bay, flat_T, containers_left, mask):
         flat_T = self.flat_T_reshaper(flat_T)
@@ -142,15 +164,18 @@ class NeuralNetwork(nn.Module):
             bay = bay.unsqueeze(0).unsqueeze(0)
 
         x = torch.cat([bay, flat_T], dim=1)
-        out = self.layers(x)
-
+        tower1 = self.tower1(x)
         containers_left_embedding = (
             self.containers_left_embedding(containers_left).unsqueeze(-1).unsqueeze(-1)
         )
+        mask_embedding = self.mask_embedding(mask).unsqueeze(-1).unsqueeze(-1)
+        tower1 = tower1 + containers_left_embedding + mask_embedding
+        tower2 = self.tower2(tower1)
 
-        policy = self.policy_head(out)
+        policy = self.policy_head(tower2)
         policy = policy - (1 - mask) * 1e9  # mask out invalid moves
         policy = self.softmax(policy)
 
-        value = self.value_head(out + containers_left_embedding)
+        value = self.value_head(tower2)
+
         return policy, value

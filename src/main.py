@@ -1,6 +1,7 @@
-from InferenceLoggerProcess import InferenceLoggerProcess
+from InferenceControllerProcess import InferenceControllerProcess
 from InferenceProcess import InferenceProcess
 from TrainingProcess import TrainingProcess
+from multiprocessing import Array
 from GPUProcess import GPUProcess
 from Logging import init_wandb_group
 import torch.multiprocessing as mp
@@ -30,6 +31,9 @@ def run_processes(config: dict, pretrained: PretrainedModel):
     gpu_update_event = mp.Event()
     inference_pipes = [mp.Pipe() for _ in range(config["inference"]["n_processes"])]
     episode_queue = mp.Queue()
+    current_env_size = mp.Array(
+        "i", [config["env"]["R"], config["env"]["C"], config["env"]["start_N"]]
+    )
 
     processes = [
         mp.Process(
@@ -57,9 +61,10 @@ def run_processes(config: dict, pretrained: PretrainedModel):
         mp.Process(
             target=start_process_loop,
             args=(
-                InferenceLoggerProcess,
+                InferenceControllerProcess,
                 episode_queue,
                 config,
+                current_env_size,
             ),
         ),
     ] + [
@@ -72,6 +77,7 @@ def run_processes(config: dict, pretrained: PretrainedModel):
                 conn,
                 episode_queue,
                 config,
+                current_env_size,
             ),
         )
         for seed, (_, conn) in enumerate(inference_pipes)

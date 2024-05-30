@@ -1,11 +1,10 @@
 {
   "env": {
-    "max_R": 12,
-    "max_C": 12,
-    "max_N": 16,
-    "min_R": 12,
-    "min_C": 12,
-    "min_N": 16
+    "R": 12,
+    "C": 12,
+    "N": 16,
+    "start_N": 4,
+    "increment_N": 2
   },
   "wandb": {
     "should_log": true,
@@ -20,10 +19,6 @@
     "checkpoint_path": "",
     "max_size": 3600000
   },
-  "port_curriculum": {
-    "increment": 2,
-    "episode_step_size": 100
-  },
   "train": {
     "l2_weight_reg": 0.0001,
     "batch_size": 2048,
@@ -36,7 +31,8 @@
     "swap_interval": 1000,
     "save_interval": 6000,
     "clip_grad": 1,
-    "save_buffer_every_n_observations": 1e5
+    "save_buffer_every_n_observations": 1e5,
+    "episodes_to_avg_over": 500
   },
   "inference": {
     "n_processes": 80,
