@@ -48,7 +48,6 @@ if __name__ == "__main__":
     config = get_config(
         "config.json" if torch.cuda.is_available() else "local_config.json"
     )
-    config["train"]["swap_interval"] = int(1e9)
 
     pretrained = PretrainedModel(
         wandb_run=config["wandb"]["pretrained_run"],
