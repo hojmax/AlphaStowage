@@ -26,15 +26,15 @@ class ReplayBuffer:
         self.config = config
 
     def _create_buffers(self, max_size, config):
-        bay_size = (max_size, 1, config["env"]["max_R"], config["env"]["max_C"])
+        bay_size = (max_size, 1, config["env"]["R"], config["env"]["C"])
         flat_T_size = (
             max_size,
-            config["env"]["max_N"] * (config["env"]["max_N"] - 1) // 2,
+            config["env"]["N"] * (config["env"]["N"] - 1) // 2,
         )
-        prob_size = (max_size, 2 * config["env"]["max_R"] * config["env"]["max_C"])
+        prob_size = (max_size, 2 * config["env"]["R"] * config["env"]["C"])
         value_size = (max_size, 1)
         container_left_size = (max_size, 1)
-        mask_size = (max_size, 2 * config["env"]["max_R"] * config["env"]["max_C"])
+        mask_size = (max_size, 2 * config["env"]["R"] * config["env"]["C"])
 
         bay = torch.zeros(bay_size, dtype=torch.float32).share_memory_()
         flat_T = torch.zeros(flat_T_size, dtype=torch.float32).share_memory_()
