@@ -20,19 +20,19 @@ class PretrainedModel(TypedDict):
     local_model: str = None
 
 
+nn_cross_entropy = torch.nn.CrossEntropyLoss()
+
+
 def loss_fn(
     pred_value,
     value,
-    pred_prob,
+    pred_logits,
     prob,
     config,
 ):
-    pred_prob = torch.clamp(pred_prob, min=1e-9)
     pred_value = torch.clamp(pred_value, min=-1e6, max=1e6)
     value_error = torch.mean(torch.square(value - pred_value))
-    cross_entropy = (
-        -torch.sum(prob.flatten() * torch.log(pred_prob.flatten())) / prob.shape[0]
-    )
+    cross_entropy = nn_cross_entropy(pred_logits, prob)
     loss = config["train"]["value_scaling"] * value_error + cross_entropy
     return loss, value_error, cross_entropy
 
@@ -41,7 +41,7 @@ def optimize_model(
     model,
     pred_value,
     value,
-    pred_prob,
+    pred_logits,
     prob,
     optimizer,
     scheduler,
@@ -50,7 +50,7 @@ def optimize_model(
     loss, value_loss, cross_entropy = loss_fn(
         pred_value=pred_value,
         value=value,
-        pred_prob=pred_prob,
+        pred_logits=pred_logits,
         prob=prob,
         config=config,
     )
@@ -76,13 +76,13 @@ def train_batch(model, buffer, optimizer, scheduler, config):
     containers_left = containers_left.to(model.device)
     mask = mask.to(model.device)
 
-    pred_prob, pred_value = model(bay, flat_T, containers_left, mask)
+    _, pred_value, pred_logits = model(bay, flat_T, containers_left, mask)
 
     loss, value_loss, cross_entropy = optimize_model(
         model=model,
         pred_value=pred_value,
         value=value,
-        pred_prob=pred_prob,
+        pred_logits=pred_logits,
         prob=prob,
         optimizer=optimizer,
         scheduler=scheduler,

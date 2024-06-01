@@ -97,7 +97,7 @@ class GPUProcess:
         containers_left = self._process_containers_left()
 
         with torch.no_grad():
-            policies, values = self.model(bays, flat_ts, containers_left, masks)
+            policies, values, _ = self.model(bays, flat_ts, containers_left, masks)
             policies = policies.detach().cpu().numpy()
             values = values.detach().cpu().numpy()
 

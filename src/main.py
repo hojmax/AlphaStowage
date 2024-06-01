@@ -1,4 +1,5 @@
 from InferenceControllerProcess import InferenceControllerProcess
+from InferenceProcess import InferenceProcess
 from TrainingProcess import TrainingProcess
 from multiprocessing import Array
 from GPUProcess import GPUProcess
@@ -70,7 +71,7 @@ def run_processes(config: dict, pretrained: PretrainedModel):
         mp.Process(
             target=start_process_loop,
             args=(
-                InferenceControllerProcess,
+                InferenceProcess,
                 seed,
                 buffer,
                 conn,

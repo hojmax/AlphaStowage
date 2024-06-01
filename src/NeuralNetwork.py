@@ -172,10 +172,10 @@ class NeuralNetwork(nn.Module):
         tower1 = tower1 + containers_left_embedding + mask_embedding
         tower2 = self.tower2(tower1)
 
-        policy = self.policy_head(tower2)
-        policy = policy - (1 - mask) * 1e9  # mask out invalid moves
-        policy = self.softmax(policy)
+        logits = self.policy_head(tower2)
+        logits = logits - (1 - mask) * 1e9  # mask out invalid moves
+        policy = self.softmax(logits)
 
         value = self.value_head(tower2)
 
-        return policy, value
+        return policy, value, logits
