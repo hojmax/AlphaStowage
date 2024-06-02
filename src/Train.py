@@ -21,6 +21,7 @@ class PretrainedModel(TypedDict):
 
 
 nn_cross_entropy = torch.nn.CrossEntropyLoss()
+nn_mse = torch.nn.MSELoss()
 
 
 def loss_fn(
@@ -30,8 +31,7 @@ def loss_fn(
     prob,
     config,
 ):
-    pred_value = torch.clamp(pred_value, min=-1e6, max=1e6)
-    value_error = torch.mean(torch.square(value - pred_value))
+    value_error = nn_mse(pred_value, value)
     cross_entropy = nn_cross_entropy(pred_logits, prob)
     loss = config["train"]["value_scaling"] * value_error + cross_entropy
     return loss, value_error, cross_entropy
