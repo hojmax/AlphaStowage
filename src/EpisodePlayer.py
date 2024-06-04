@@ -6,6 +6,7 @@ from MPSPEnv import Env
 from multiprocessing.connection import Connection
 import torch
 import numpy as np
+from min_max import MinMaxStats
 
 
 class EpisodePlayer:
@@ -24,6 +25,7 @@ class EpisodePlayer:
         self.reused_tree = None
         self.transposition_table = {}
         self.n_removes = 0
+        self.min_max_stats = MinMaxStats()
 
         if self.deterministic:
             np.random.seed(0)
@@ -68,6 +70,7 @@ class EpisodePlayer:
             self.env,
             self.conn,
             self.config,
+            self.min_max_stats,
             self.reused_tree,
             self.transposition_table,
         )

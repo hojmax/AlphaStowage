@@ -40,7 +40,8 @@
     "log_interval": 200
   },
   "mcts": {
-    "c_puct_constant": 0.02,
+    "c_puct_init": 2.5,
+    "c_puct_base": 19652,
     "temperature": 0.8,
     "search_iterations": 200,
     "dirichlet_weight": 0.25,

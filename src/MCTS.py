@@ -3,6 +3,7 @@ import torch
 from MPSPEnv import Env
 from multiprocessing.connection import Connection
 from Node import Node
+from min_max import MinMaxStats
 
 
 def run_network(node: Node, conn: Connection) -> tuple[np.ndarray, np.ndarray]:
@@ -44,7 +45,7 @@ def expand_node(
 ) -> float:
 
     probabilities, state_value = get_prob_and_value(node, conn, transposition_table)
-    add_children(probabilities, state_value, node, config)
+    add_children(probabilities, node, config)
 
     if is_root(node):
         node.add_noise()
@@ -77,9 +78,7 @@ def evaluate(
         return state_value
 
 
-def add_children(
-    probabilities: np.ndarray, state_value: float, node: Node, config: dict
-) -> None:
+def add_children(probabilities: np.ndarray, node: Node, config: dict) -> None:
     for action in range(2 * node.env.R * node.env.C):
         if not node.env.mask[action]:
             continue
@@ -88,7 +87,6 @@ def add_children(
             action=action,
             new_env=node.env.copy(),
             prior=probabilities[action],
-            state_value=state_value,
             config=config,
         )
 
@@ -117,11 +115,11 @@ def is_leaf_node(node: Node) -> bool:
     return len(node.children) == 0
 
 
-def find_leaf(root_node: Node) -> Node:
+def find_leaf(root_node: Node, min_max_stats: MinMaxStats) -> Node:
     node = root_node
 
     while not is_leaf_node(node):
-        node = node.select_child()
+        node = node.select_child(min_max_stats)
 
     return node
 
@@ -140,13 +138,14 @@ def alpha_zero_search(
     root_env: Env,
     conn: Connection,
     config: dict,
+    min_max_stats: MinMaxStats,
     reused_tree: Node = None,
     transposition_table: dict[Env, tuple[np.ndarray, np.ndarray]] = {},
 ) -> tuple[torch.Tensor, Node, dict[Env, tuple[np.ndarray, np.ndarray]]]:
     root_node = get_new_root_node(root_env, reused_tree, config)
 
     for _ in range(config["mcts"]["search_iterations"]):
-        node = find_leaf(root_node)
+        node = find_leaf(root_node, min_max_stats)
 
         state_value = evaluate(
             node,
@@ -154,6 +153,8 @@ def alpha_zero_search(
             transposition_table,
             config,
         )
+
+        min_max_stats.update(state_value)
 
         backup(node, state_value)
 

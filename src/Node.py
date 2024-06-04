@@ -1,6 +1,7 @@
 import numpy as np
 from MPSPEnv import Env
 import warnings
+from min_max import MinMaxStats
 
 
 class Node:
@@ -9,7 +10,6 @@ class Node:
         env: Env,
         config: dict,
         prior_prob: float = 0,
-        estimated_value: float = 0,
         parent: "Node" = None,
         depth: int = 0,
         action: int = None,
@@ -17,15 +17,14 @@ class Node:
         self._env = env
         self.config = config
         self.visit_count = np.float16(0)
-        self.total_action_value = None
-        self.estimated_value = np.float16(estimated_value)
+        self.total_action_value = 0
         self.prior_prob = np.float16(prior_prob)
         self.children = {}
         self.parent = parent
         self.depth = depth
-        self.c_puct = np.float16(self.get_c_puct(env, config))
-        self._uct = None
         self.needed_action = action
+        self._Q = None
+        self._U = None
 
     def get_c_puct(self, env: Env, config: dict) -> float:
         return config["mcts"]["c_puct_constant"] * env.N * env.R * env.C
@@ -40,7 +39,7 @@ class Node:
             child.prior_prob = np.float16(
                 noise[child_index]
             ) * weight + child.prior_prob * (np.float16(1) - weight)
-            child._uct = None
+            child.clear_cache()
 
     @property
     def env(self) -> Env:
@@ -55,13 +54,19 @@ class Node:
 
     @property
     def Q(self) -> np.float16:
-        if self.total_action_value == None:
-            return self.estimated_value
+        if self._Q:
+            return self._Q
+
+        if self.visit_count == 0:
+            return 0
         else:
             return np.float16(self.total_action_value / np.float32(self.visit_count))
 
     @property
     def U(self) -> np.float16:
+        if self._U:
+            return self._U
+
         return (
             self.c_puct
             * self.prior_prob
@@ -70,11 +75,10 @@ class Node:
         )
 
     @property
-    def uct(self) -> np.float16:
-        if self._uct == None:
-            self._uct = self.Q + self.U
-
-        return self._uct
+    def c_puct(self) -> float:
+        base = self.config["mcts"]["c_puct_base"]
+        init = self.config["mcts"]["c_puct_init"]
+        return np.log((self.parent.visit_count + base + 1) / base) + init
 
     def increment_value(self, value: float) -> None:
         if self.total_action_value == None:
@@ -87,35 +91,40 @@ class Node:
         else:
             warnings.warn("visit count overflow")
 
-        self._uct = None
-        for child in self.children.values():
-            child._uct = None
+        self.clear_cache()
 
-    def add_child(
-        self, action: int, new_env: Env, prior: float, state_value: float, config: dict
-    ) -> None:
+    def add_child(self, action: int, new_env: Env, prior: float, config: dict) -> None:
         new_depth = self.depth + 1 if action < new_env.C else self.depth
         self.children[action] = Node(
             env=new_env,
             config=config,
             prior_prob=prior,
-            estimated_value=state_value,
             parent=self,
             depth=new_depth,
             action=action,
         )
 
-    def select_child(self) -> "Node":
+    def select_child(self, min_max_stats: MinMaxStats) -> "Node":
         best_child = None
+        best_uct = 0
 
         for child in self.children.values():
-            if best_child is None or child.uct > best_child.uct:
+            Q = min_max_stats.normalize(child.Q)
+            uct = Q + child.U
+            if uct > best_uct:
                 best_child = child
+                best_uct = uct
 
         return best_child
 
     def __str__(self) -> str:
         output = f"{self.env.bay_store.ndarray}\n{self.env.T}\nN={self.visit_count}, Q={self.Q:.2f}\nleft={self.env.containers_left}, placed={self.env.containers_placed}"
         if self.parent != None:
-            output += f"\nP={self.prior_prob:.2f},  U={self.U:.2f}, Q+U={self.uct:.2f}"
+            output += f"\nP={self.prior_prob:.2f},  U={self.U:.2f}"
         return output
+
+    def clear_cache(self):
+        self._Q = None
+        self._U = None
+        for child in self.children.values():
+            child._U = None

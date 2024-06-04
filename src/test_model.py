@@ -13,6 +13,7 @@ from PaddedEnv import PaddedEnv
 import networkx as nx
 from networkx.drawing.nx_pydot import graphviz_layout
 import plotly.graph_objects as go
+from min_max import MinMaxStats
 
 
 def _draw_tree_recursive(
@@ -42,7 +43,6 @@ def _draw_tree_recursive(
         node_colors[str(hash(child))] = child.Q  # Store the Q value
         node_data[str(hash(child))] = {
             "Q": child.Q,
-            "U": child.estimated_value,
             "N": child.visit_count,
         }  # Store additional data
         _draw_tree_recursive(graph, child, nodes, node_colors, node_data, edge_data)
@@ -54,9 +54,7 @@ def draw_tree(node: Node):
     graph.add_node(str(hash(node)))
 
     node_colors = {str(hash(node)): node.Q}
-    node_data = {
-        str(hash(node)): {"Q": node.Q, "N": node.visit_count, "U": node.estimated_value}
-    }
+    node_data = {str(hash(node)): {"Q": node.Q, "N": node.visit_count}}
     edge_data = {}
 
     _draw_tree_recursive(graph, node, nodes, node_colors, node_data, edge_data)
@@ -184,11 +182,11 @@ def draw_tree(node: Node):
 #     plt.show()
 
 
-def run_search(iters, env, conn, config):
+def run_search(iters, env, conn, config, min_max_stats):
     np.random.seed(0)
     config["mcts"]["search_iterations"] = iters
     probabilities, reused_tree, transposition_table = alpha_zero_search(
-        env, conn, config
+        env, conn, config, min_max_stats
     )
     draw_tree(reused_tree)
     print("search probs", probabilities)
@@ -238,7 +236,8 @@ if __name__ == "__main__":
     print("GPU Process Started...")
 
     _, conn = inference_pipes[0]
+    min_max_stats = MinMaxStats()
     # for i in range(1, 50):
-    run_search(200, env, conn, config)
+    run_search(800, env, conn, config, min_max_stats)
 
     env.close()
