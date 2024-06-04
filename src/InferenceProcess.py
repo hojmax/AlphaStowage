@@ -27,7 +27,6 @@ class InferenceProcess:
         self.conn = conn
         self.log_episode_queue = log_episode_queue
         self.config = config
-        self.current_env_size = current_env_size
 
     def loop(self):
         while True:
@@ -56,11 +55,11 @@ class InferenceProcess:
 
     def _get_env(self) -> Env:
         env = PaddedEnv(
-            R=self.current_env_size[0],
-            C=self.current_env_size[1],
-            N=self.current_env_size[2],
-            max_C=self.config["env"]["C"],
+            R=random.choice(range(6, self.config["env"]["R"] + 1, 2)),
+            C=random.choice(range(2, self.config["env"]["C"] + 1, 2)),
+            N=random.choice(range(4, self.config["env"]["N"] + 1, 2)),
             max_R=self.config["env"]["R"],
+            max_C=self.config["env"]["C"],
             max_N=self.config["env"]["N"],
             auto_move=True,
             speedy=True,
