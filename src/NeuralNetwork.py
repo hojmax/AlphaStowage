@@ -85,8 +85,8 @@ class NeuralNetwork(nn.Module):
 
         self.flat_T_reshaper = nn.Sequential(
             nn.Linear(
-                self.env_config["N"] * (self.env_config["N"] - 1) // 2,
-                self.env_config["R"] * self.env_config["C"],
+                self.env_config["max_N"] * (self.env_config["max_N"] - 1) // 2,
+                self.env_config["max_R"] * self.env_config["max_C"],
             ),
             nn.Sigmoid(),
         )
@@ -103,9 +103,9 @@ class NeuralNetwork(nn.Module):
             nn.Flatten(),
             nn.Linear(
                 nn_config["policy_channels"]
-                * self.env_config["R"]
-                * self.env_config["C"],
-                2 * self.env_config["R"] * self.env_config["C"],
+                * self.env_config["max_R"]
+                * self.env_config["max_C"],
+                2 * self.env_config["max_R"] * self.env_config["max_C"],
             ),
         )
         self.softmax = nn.Softmax(dim=1)
@@ -122,8 +122,8 @@ class NeuralNetwork(nn.Module):
             nn.Flatten(),
             nn.Linear(
                 nn_config["value_channels"]
-                * self.env_config["R"]
-                * self.env_config["C"],
+                * self.env_config["max_R"]
+                * self.env_config["max_C"],
                 nn_config["value_hidden"],
             ),
             nn.SiLU(),
@@ -137,7 +137,7 @@ class NeuralNetwork(nn.Module):
 
     def forward(self, bay, flat_T, containers_left, mask):
         flat_T = self.flat_T_reshaper(flat_T)
-        flat_T = flat_T.view(-1, 1, self.env_config["R"], self.env_config["C"])
+        flat_T = flat_T.view(-1, 1, self.env_config["max_R"], self.env_config["max_C"])
         if bay.dim() == 2:
             bay = bay.unsqueeze(0).unsqueeze(0)
 
