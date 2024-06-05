@@ -17,7 +17,7 @@ class Node:
         self._env = env
         self.config = config
         self.visit_count = np.float16(0)
-        self.total_action_value = 0
+        self.total_action_value = np.float32(0)
         self.prior_prob = np.float16(prior_prob)
         self.children = {}
         self.parent = parent
@@ -25,9 +25,6 @@ class Node:
         self.needed_action = action
         self._Q = None
         self._U = None
-
-    def get_c_puct(self, env: Env, config: dict) -> float:
-        return config["mcts"]["c_puct_constant"] * env.N * env.R * env.C
 
     def add_noise(self) -> None:
         noise = np.random.dirichlet(
@@ -58,7 +55,7 @@ class Node:
             return self._Q
 
         if self.visit_count == 0:
-            return 0
+            return np.float16(0)
         else:
             return np.float16(self.total_action_value / np.float32(self.visit_count))
 
@@ -76,9 +73,9 @@ class Node:
 
     @property
     def c_puct(self) -> float:
-        base = self.config["mcts"]["c_puct_base"]
-        init = self.config["mcts"]["c_puct_init"]
-        return np.log((self.parent.visit_count + base + 1) / base) + init
+        base = np.float16(self.config["mcts"]["c_puct_base"])
+        init = np.float16(self.config["mcts"]["c_puct_init"])
+        return np.log((self.parent.visit_count + base + np.float16(1)) / base) + init
 
     def increment_value(self, value: float) -> None:
         if self.total_action_value == None:

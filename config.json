@@ -3,7 +3,7 @@
     "R": 12,
     "C": 12,
     "N": 16,
-    "start_N": 4,
+    "start_N": 16,
     "increment_N": 2
   },
   "wandb": {
@@ -22,28 +22,28 @@
   "train": {
     "l2_weight_reg": 0.0001,
     "batch_size": 2048,
-    "learning_rate": 0.001,
-    "scheduler_step_size_in_batches": 3e4,
+    "learning_rate": 0.00005,
+    "scheduler_step_size_in_batches": 5000,
     "scheduler_gamma": 0.5,
-    "min_lr": 1e-5,
-    "value_scaling": 0.3,
-    "log_interval": 1000,
-    "swap_interval": 1000,
-    "save_interval": 6000,
+    "min_lr": 0.00005,
+    "value_scaling": 0.15,
+    "log_interval": 500,
+    "swap_interval": 2500,
+    "save_interval": 10000,
     "clip_grad": 1,
-    "save_buffer_every_n_observations": 1e5,
-    "episodes_to_avg_over": 500
+    "save_buffer_every_n_observations": 20000,
+    "episodes_to_avg_over": 1e9
   },
   "inference": {
     "n_processes": 80,
     "batch_size": 1,
-    "log_interval": 200
+    "log_interval": 300
   },
   "mcts": {
-    "c_puct_init": 2.5,
+    "c_puct_init": 1.25,
     "c_puct_base": 19652,
     "temperature": 0.8,
-    "search_iterations": 200,
+    "search_iterations": 300,
     "dirichlet_weight": 0.25,
     "dirichlet_alpha": 0.2
   },
