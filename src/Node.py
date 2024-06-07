@@ -103,7 +103,7 @@ class Node:
 
     def select_child(self, min_max_stats: MinMaxStats) -> "Node":
         best_child = None
-        best_uct = 0
+        best_uct = -np.inf
 
         for child in self.children.values():
             Q = min_max_stats.normalize(child.Q)
