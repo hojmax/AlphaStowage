@@ -61,7 +61,7 @@ class NeuralNetwork(nn.Module):
         self.device = device
         self.env_config = config["env"]
         nn_config = config["nn"]
-        input_channels = 2
+        input_channels = 3
 
         tower1 = []
         tower1.append(
@@ -100,6 +100,11 @@ class NeuralNetwork(nn.Module):
         self.flat_T_reshaper = nn.Sequential(
             nn.Linear(
                 self.env_config["N"] * (self.env_config["N"] - 1) // 2,
+                nn_config["embedding_hidden_size"],
+            ),
+            nn.SiLU(),
+            nn.Linear(
+                nn_config["embedding_hidden_size"],
                 self.env_config["R"] * self.env_config["C"],
             ),
             nn.Sigmoid(),
@@ -143,33 +148,25 @@ class NeuralNetwork(nn.Module):
             nn.SiLU(),
             nn.Linear(nn_config["value_hidden"], 1),
         )
-        self.containers_left_embedding = nn.Sequential(
-            nn.Linear(1, nn_config["embedding_hidden_size"]),
-            nn.SiLU(),
-            nn.Linear(nn_config["embedding_hidden_size"], nn_config["hidden_channels"]),
-        )
-        self.mask_embedding = nn.Sequential(
+        self.info_embedding = nn.Sequential(
             nn.Linear(
-                2 * self.env_config["R"] * self.env_config["C"],
+                1
+                + 2 * self.env_config["R"] * self.env_config["C"]
+                + self.env_config["C"],
                 nn_config["embedding_hidden_size"],
             ),
             nn.SiLU(),
             nn.Linear(nn_config["embedding_hidden_size"], nn_config["hidden_channels"]),
         )
 
-    def forward(self, bay, flat_T, containers_left, mask):
+    def forward(self, bay, flat_T, containers_left, mask, reshuffles, will_reshuffle):
         flat_T = self.flat_T_reshaper(flat_T)
         flat_T = flat_T.view(-1, 1, self.env_config["R"], self.env_config["C"])
-        if bay.dim() == 2:
-            bay = bay.unsqueeze(0).unsqueeze(0)
-
-        x = torch.cat([bay, flat_T], dim=1)
+        x = torch.cat([bay, flat_T, reshuffles], dim=1)
         tower1 = self.tower1(x)
-        containers_left_embedding = (
-            self.containers_left_embedding(containers_left).unsqueeze(-1).unsqueeze(-1)
-        )
-        mask_embedding = self.mask_embedding(mask).unsqueeze(-1).unsqueeze(-1)
-        tower1 = tower1 + containers_left_embedding + mask_embedding
+        info_input = torch.cat([containers_left, mask, will_reshuffle], dim=1)
+        info_embedding = self.info_embedding(info_input).unsqueeze(-1).unsqueeze(-1)
+        tower1 = tower1 + info_embedding
         tower2 = self.tower2(tower1)
 
         logits = self.policy_head(tower2)

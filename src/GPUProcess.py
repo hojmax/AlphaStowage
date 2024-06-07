@@ -2,6 +2,7 @@ from Train import init_model
 import numpy as np
 import torch
 from Train import PretrainedModel
+from buffer_operations import reshuffles_from_bays, will_result_in_reshuffle
 import torch.multiprocessing as mp
 from typing import Union
 
@@ -69,25 +70,25 @@ class GPUProcess:
         bays = np.stack(self.bays)
         bays = torch.tensor(bays)
         bays = bays.unsqueeze(1)  # Add channel dimension
-        bays = bays.to(self.device)
+        bays = bays
         return bays
 
     def _process_flat_ts(self):
         flat_ts = np.stack(self.flat_ts)
         flat_ts = torch.tensor(flat_ts)
-        flat_ts = flat_ts.to(self.device)
+        flat_ts = flat_ts
         return flat_ts
 
     def _process_masks(self):
         masks = np.stack(self.masks)
         masks = torch.tensor(masks)
-        masks = masks.to(self.device)
+        masks = masks
         return masks
 
     def _process_containers_left(self):
         containers_left = np.stack(self.containers_left)
         containers_left = torch.tensor(containers_left)
-        containers_left = containers_left.to(self.device)
+        containers_left = containers_left
         return containers_left
 
     def _process_data(self) -> None:
@@ -95,9 +96,19 @@ class GPUProcess:
         flat_ts = self._process_flat_ts()
         masks = self._process_masks()
         containers_left = self._process_containers_left()
+        with torch.no_grad():
+            reshuffles = reshuffles_from_bays(bays)
+            will_reshuffle = will_result_in_reshuffle(bays, flat_ts)
 
         with torch.no_grad():
-            policies, values, _ = self.model(bays, flat_ts, containers_left, masks)
+            policies, values, _ = self.model(
+                bays.to(self.device),
+                flat_ts.to(self.device),
+                containers_left.to(self.device),
+                masks.to(self.device),
+                reshuffles.to(self.device),
+                will_reshuffle.to(self.device),
+            )
             policies = policies.detach().cpu().numpy()
             values = values.detach().cpu().numpy()
 

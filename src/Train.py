@@ -4,6 +4,8 @@ import wandb
 from NeuralNetwork import NeuralNetwork
 from ExponentialLRWithMinLR import ExponentialLRWithMinLR
 from typing import TypedDict
+from buffer_operations import reshuffles_from_bays, will_result_in_reshuffle
+import numpy as np
 import os
 
 
@@ -69,14 +71,28 @@ def train_batch(model, buffer, optimizer, scheduler, config):
     bay, flat_T, prob, value, containers_left, mask = buffer.sample(
         config["train"]["batch_size"]
     )
+
+    with torch.no_grad():
+        reshuffles = reshuffles_from_bays(bay)
+        will_reshuffle = will_result_in_reshuffle(bay, flat_T)
+
     bay = bay.to(model.device)
     flat_T = flat_T.to(model.device)
     prob = prob.to(model.device)
     value = value.to(model.device)
     containers_left = containers_left.to(model.device)
     mask = mask.to(model.device)
+    reshuffles = reshuffles.to(model.device)
+    will_reshuffle = will_reshuffle.to(model.device)
 
-    _, pred_value, pred_logits = model(bay, flat_T, containers_left, mask)
+    _, pred_value, pred_logits = model(
+        bay,
+        flat_T,
+        containers_left,
+        mask,
+        reshuffles,
+        will_reshuffle,
+    )
 
     loss, value_loss, cross_entropy = optimize_model(
         model=model,
