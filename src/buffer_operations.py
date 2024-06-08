@@ -5,6 +5,7 @@ import numpy as np
 def reshuffles_from_bays(bays: torch.tensor):
     assert bays.dim() == 4
     flipped = torch.flip(bays, dims=[2])
+    flipped[flipped < 0] = float("inf")
     cummin_flipped, _ = torch.cummin(flipped, dim=2)
     min_below = torch.flip(cummin_flipped, dims=[2])
     is_reshuffle = bays > min_below
@@ -24,7 +25,7 @@ def will_result_in_reshuffle(bays: torch.tensor, flat_T: torch.tensor):
 
 
 def get_min_containers(bays: torch.tensor):
-    mask = bays != 0
+    mask = bays > 0
     masked_tensor = torch.where(mask, bays, torch.tensor(float("inf")))
     min_values = torch.min(masked_tensor, dim=2)[0]
     return min_values
