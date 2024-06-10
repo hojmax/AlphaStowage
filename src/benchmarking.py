@@ -5,10 +5,9 @@ import os
 import pandas as pd
 from main import get_config
 from EpisodePlayer import EpisodePlayer
-from Node import TruncatedEpisodeError
 import torch.multiprocessing as mp
 from Train import PretrainedModel
-from tqdm import tqdm
+from PaddedEnv import PaddedEnv
 from GPUProcess import GPUProcess
 from multiprocessing.connection import Connection
 import time
@@ -156,20 +155,19 @@ class InferenceProcess:
 
             e = self.env_queue.get()
 
-            env = Env(
+            env = PaddedEnv(
                 e["R"],
                 e["C"],
                 e["N"],
-                skip_last_port=True,
-                strict_mask=True,
+                max_C=self.config["env"]["C"],
+                max_R=self.config["env"]["R"],
+                max_N=self.config["env"]["N"],
             )
             env.reset_to_transportation(e["transportation_matrix"])
 
             try:
                 player = EpisodePlayer(env, self.conn, self.config, deterministic=False)
-                _, _, reshuffles, _, _ = player.run_episode()
-            except (TruncatedEpisodeError, KeyError):
-                reshuffles = -10000
+                _, _, reshuffles, _ = player.run_episode()
             finally:
                 env.close()
 

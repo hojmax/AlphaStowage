@@ -43,7 +43,11 @@ def _draw_tree_recursive(
         node_colors[str(hash(child))] = child.Q  # Store the Q value
         node_data[str(hash(child))] = {
             "Q": child.Q,
+            "U": child.estimated_value,
+            "Placed": child.env.containers_placed,
             "N": child.visit_count,
+            "P": child.prior_prob,
+            "Action": action_to_string(action, child.env.max_R, child.env.max_C),
         }  # Store additional data
         _draw_tree_recursive(graph, child, nodes, node_colors, node_data, edge_data)
 
@@ -54,7 +58,14 @@ def draw_tree(node: Node):
     graph.add_node(str(hash(node)))
 
     node_colors = {str(hash(node)): node.Q}
-    node_data = {str(hash(node)): {"Q": node.Q, "N": node.visit_count}}
+    node_data = {
+        str(hash(node)): {
+            "Q": node.Q,
+            "U": node.estimated_value,
+            "Placed": node.env.containers_placed,
+            "N": node.visit_count,
+        }
+    }
     edge_data = {}
 
     _draw_tree_recursive(graph, node, nodes, node_colors, node_data, edge_data)
@@ -141,7 +152,12 @@ def draw_tree(node: Node):
 #             str(hash(child)),
 #             label=node_to_str(child),
 #         )
-#         graph.add_edge(str(hash(node)), str(hash(child)), label=str(action))
+#         graph.add_edge(
+#             str(hash(node)),
+#             str(hash(child)),
+#             label=action_to_string(action, node.env.max_R, node.env.max_C)
+#             + f" {child.prior_prob:.2f}",
+#         )
 #         _draw_tree_recursive(graph, child)
 
 
@@ -153,6 +169,13 @@ def draw_tree(node: Node):
 #     output = f"N={node.visit_count},Q={node.Q:.2f}"
 
 #     return output
+
+
+def action_to_string(action, R, C):
+    if action >= R * C:
+        return f"r{action % R + 1}c{(action - R * C) // R}"
+    else:
+        return f"a{action % R + 1}c{action // R}"
 
 
 # def draw_tree(node):
@@ -224,10 +247,10 @@ if __name__ == "__main__":
             gpu_update_event,
             "mps",
             PretrainedModel(
-                local_model="",
+                local_model=config["wandb"]["local_model"],
                 wandb_model="",
-                artifact="model80000:v2",
-                wandb_run="pocs/alphastowage/ts4meydq",
+                artifact=config["wandb"]["artifact"],
+                wandb_run=config["wandb"]["pretrained_run"],
             ),
             config,
         ),
@@ -238,6 +261,7 @@ if __name__ == "__main__":
     _, conn = inference_pipes[0]
     min_max_stats = MinMaxStats()
     # for i in range(1, 50):
+    #     run_search(i, env, conn, config, min_max_stats)
     run_search(800, env, conn, config, min_max_stats)
 
     env.close()

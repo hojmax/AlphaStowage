@@ -3,3 +3,4 @@ tqdm
 pygame
 MPSPEnv==0.1.4
 torch
+openpyxl

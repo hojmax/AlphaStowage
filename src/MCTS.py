@@ -45,6 +45,8 @@ def expand_node(
 ) -> float:
 
     probabilities, state_value = get_prob_and_value(node, conn, transposition_table)
+    # probabilities = probabilities ** (1 / 0.05)
+    # probabilities /= np.sum(probabilities)
     add_children(probabilities, node, config)
 
     if is_root(node):

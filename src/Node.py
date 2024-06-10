@@ -17,7 +17,7 @@ class Node:
         self._env = env
         self.config = config
         self.visit_count = np.float16(0)
-        self.total_action_value = np.float32(0)
+        self.total_action_value = None
         self.prior_prob = np.float16(prior_prob)
         self.children = {}
         self.parent = parent
@@ -25,6 +25,7 @@ class Node:
         self.needed_action = action
         self._Q = None
         self._U = None
+        self.estimated_value = None
 
     def add_noise(self) -> None:
         noise = np.random.dirichlet(
@@ -55,7 +56,7 @@ class Node:
             return self._Q
 
         if self.visit_count == 0:
-            return np.float16(0)
+            return None
         else:
             return np.float16(self.total_action_value / np.float32(self.visit_count))
 
@@ -78,6 +79,9 @@ class Node:
         return np.log((self.parent.visit_count + base + np.float16(1)) / base) + init
 
     def increment_value(self, value: float) -> None:
+        if self.estimated_value == None:
+            self.estimated_value = value
+
         if self.total_action_value == None:
             self.total_action_value = np.float32(value)
         else:
@@ -106,7 +110,9 @@ class Node:
         best_uct = -np.inf
 
         for child in self.children.values():
-            Q = min_max_stats.normalize(child.Q)
+            Q = min_max_stats.normalize(
+                child.Q if child.Q != None else min_max_stats.minimum
+            )
             uct = Q + child.U
             if uct > best_uct:
                 best_child = child
