@@ -25,7 +25,6 @@ class Node:
         self.needed_action = action
         self._Q = None
         self._U = None
-        self.estimated_value = None
 
     def add_noise(self) -> None:
         noise = np.random.dirichlet(
@@ -79,9 +78,6 @@ class Node:
         return np.log((self.parent.visit_count + base + np.float16(1)) / base) + init
 
     def increment_value(self, value: float) -> None:
-        if self.estimated_value == None:
-            self.estimated_value = value
-
         if self.total_action_value == None:
             self.total_action_value = np.float32(value)
         else:
