@@ -114,7 +114,10 @@ class Node:
                 best_child = child
                 best_uct = uct
 
-        return best_child
+        if best_child == None:
+            return list(self.children.values())[0]
+        else:
+            return best_child
 
     def __str__(self) -> str:
         output = f"{self.env.bay_store.ndarray}\n{self.env.T}\nN={self.visit_count}, Q={self.Q:.2f}\nleft={self.env.containers_left}, placed={self.env.containers_placed}"
