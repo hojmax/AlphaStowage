@@ -16,7 +16,7 @@ class Node:
     ) -> None:
         self._env = env
         self.config = config
-        self.visit_count = np.float16(0)
+        self.visit_count = np.int32(0)
         self.total_action_value = None
         self.prior_prob = np.float16(prior_prob)
         self.children = {}
@@ -83,10 +83,7 @@ class Node:
         else:
             self.total_action_value += np.float32(value)
 
-        if self.visit_count < np.finfo(np.float16).max:
-            self.visit_count += np.float16(1)
-        else:
-            warnings.warn("visit count overflow")
+        self.visit_count += np.int32(1)
 
         self.clear_cache()
 

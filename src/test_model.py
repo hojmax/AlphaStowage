@@ -43,11 +43,13 @@ def _draw_tree_recursive(
         node_colors[str(hash(child))] = child.Q  # Store the Q value
         node_data[str(hash(child))] = {
             "Q": child.Q,
-            "U": child.estimated_value,
+            # "U": child.estimated_value,
             "Placed": child.env.containers_placed,
             "N": child.visit_count,
             "P": child.prior_prob,
             "Action": action_to_string(action, child.env.max_R, child.env.max_C),
+            "bay": child.env.bay,
+            "T": child.env.T,
         }  # Store additional data
         _draw_tree_recursive(graph, child, nodes, node_colors, node_data, edge_data)
 
@@ -61,9 +63,11 @@ def draw_tree(node: Node):
     node_data = {
         str(hash(node)): {
             "Q": node.Q,
-            "U": node.estimated_value,
+            # "U": node.estimated_value,
             "Placed": node.env.containers_placed,
             "N": node.visit_count,
+            "bay": node.env.bay,
+            "T": node.env.T,
         }
     }
     edge_data = {}
@@ -108,7 +112,12 @@ def draw_tree(node: Node):
     for node in graph.nodes():
         hover_text = ""
         for key, value in node_data[node].items():
-            hover_text += f"{key}: {value}, "
+            if key == "bay" or key == "T":
+                continue
+            hover_text += f"{key}: {value},<br /> "
+
+        hover_text += f"bay:<br />{matrix_to_string(node_data[node]['bay']).replace('\n', '<br />')}<br /><br /> "
+        hover_text += f"T:<br />{matrix_to_string(node_data[node]['T']).replace('\n', '<br />')}<br /> "
         x, y = pos[node]
         node_x.append(x)
         node_y.append(y)
@@ -143,7 +152,39 @@ def draw_tree(node: Node):
             yaxis=dict(showgrid=False, zeroline=False),
         ),
     )
+
     fig.show()
+
+
+def matrix_to_string(matrix):
+    # Determine the maximum width for each column
+    col_widths = []
+    for col in range(matrix.shape[1]):
+        max_width = 0
+        for row in range(matrix.shape[0]):
+            element = matrix[row, col]
+            element_str = (
+                f"{element:.2f}"
+                if isinstance(element, (float, np.float32, np.float64))
+                else str(element)
+            )
+            max_width = max(max_width, len(element_str))
+        col_widths.append(max_width)
+
+    # Print the matrix with formatted columns
+    output = ""
+    for row in matrix:
+        row_str = ""
+        for col, element in enumerate(row):
+            element_str = (
+                f"{element:.2f}"
+                if isinstance(element, (float, np.float32, np.float64))
+                else str(element)
+            )
+            row_str += element_str.rjust(col_widths[col] + 2)  # +2 for padding
+        output += row_str + "\n"
+
+    return output
 
 
 # def _draw_tree_recursive(graph, node):
@@ -220,6 +261,7 @@ if __name__ == "__main__":
     env = PaddedEnv(
         R=10, C=10, N=10, max_R=12, max_C=12, max_N=16, speedy=True, auto_move=True
     )
+
     env.reset()
     # env.reset_to_transportation(
     #     np.array(
