@@ -1,7 +1,4 @@
-from MCTS import (
-    close_envs_in_tree,
-    alpha_zero_search,
-)
+from MCTS import close_envs_in_tree, alpha_zero_search, get_tree_probs
 from MPSPEnv import Env
 from multiprocessing.connection import Connection
 import torch
@@ -25,6 +22,7 @@ class EpisodePlayer:
         self.reused_tree = None
         self.transposition_table = {}
         self.n_removes = 0
+        self.found_optimal_path = False
         self.min_max_stats = MinMaxStats()
 
         if self.deterministic:
@@ -66,14 +64,22 @@ class EpisodePlayer:
         )
 
     def _get_action(self):
-        probabilities, self.reused_tree, self.transposition_table = alpha_zero_search(
-            self.env,
-            self.conn,
-            self.config,
-            self.min_max_stats,
-            self.reused_tree,
-            self.transposition_table,
-        )
+        if self.found_optimal_path:
+            probabilities = get_tree_probs(self.reused_tree, self.config)
+        else:
+            (
+                probabilities,
+                self.reused_tree,
+                self.transposition_table,
+                self.found_optimal_path,
+            ) = alpha_zero_search(
+                self.env,
+                self.conn,
+                self.config,
+                self.min_max_stats,
+                self.reused_tree,
+                self.transposition_table,
+            )
         self._add_observation(probabilities, self.env)
         action = torch.argmax(probabilities).item()
         self._update_tree(action)

@@ -134,6 +134,16 @@ def get_new_root_node(root_env: Env, reused_tree: Node, config: dict) -> Node:
         return Node(root_env.copy(), config)
 
 
+def backup_max_visits(node: Node, value: float) -> None:
+    """Increase the number of visits of the node to the maximum possible value.
+    This is done if a best possible path is found.
+    """
+    node.visit_count = np.iinfo(np.int32).max
+
+    if not is_root(node):
+        backup_max_visits(node.parent, value)
+
+
 def alpha_zero_search(
     root_env: Env,
     conn: Connection,
@@ -143,6 +153,8 @@ def alpha_zero_search(
     transposition_table: dict[Env, tuple[np.ndarray, np.ndarray]] = {},
 ) -> tuple[torch.Tensor, Node, dict[Env, tuple[np.ndarray, np.ndarray]]]:
     root_node = get_new_root_node(root_env, reused_tree, config)
+
+    found_optimal_path = False
 
     for _ in range(config["mcts"]["search_iterations"]):
         node = find_leaf(root_node, min_max_stats)
@@ -158,8 +170,17 @@ def alpha_zero_search(
 
         backup(node, state_value)
 
+        is_optimal_path = (
+            node.env.terminated and node.env.total_reward == root_node.env.total_reward
+        )  # The optimal path if the path that has the same reward as the root node
+        if is_optimal_path:
+            backup_max_visits(node, state_value)
+            found_optimal_path = True
+            break
+
     return (
         get_tree_probs(root_node, config),
         root_node,
         transposition_table,
+        found_optimal_path,
     )
