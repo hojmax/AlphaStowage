@@ -27,9 +27,14 @@ class Node:
         self._U = None
 
     def add_noise(self) -> None:
-        noise = np.random.dirichlet(
-            np.full(len(self.children), self.config["mcts"]["dirichlet_alpha"])
+        alpha = (
+            0.03
+            * 2
+            * self.config["env"]["C"]
+            * self.config["env"]["R"]
+            / len(self.children)
         )
+        noise = np.random.dirichlet(np.full(len(self.children), alpha))
         weight = np.float16(self.config["mcts"]["dirichlet_weight"])
 
         for child_index, child in enumerate(self.children.values()):
