@@ -194,8 +194,7 @@ if __name__ == "__main__":
 
     gpu_device = "cuda:0" if torch.cuda.is_available() else "mps"
 
-    workers = 2
-    inference_pipes = [mp.Pipe() for _ in range(workers)]
+    inference_pipes = [mp.Pipe() for _ in range(config["inference"]["n_processes"])]
 
     env_queue = mp.Queue()
 

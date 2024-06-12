@@ -249,7 +249,7 @@ def action_to_string(action, R, C):
 def run_search(iters, env, conn, config, min_max_stats):
     np.random.seed(0)
     config["mcts"]["search_iterations"] = iters
-    probabilities, reused_tree, transposition_table = alpha_zero_search(
+    probabilities, reused_tree, _, _ = alpha_zero_search(
         env, conn, config, min_max_stats
     )
     draw_tree(reused_tree)
