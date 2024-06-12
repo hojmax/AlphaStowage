@@ -89,6 +89,9 @@ class BenchmarkLogger:
                         continue
                     avg = np.mean(results)
                     print(f"N={N} - Avg: {avg:.2f}, count: {len(results)}")
+
+                df = pd.DataFrame(self.results)
+                df.to_excel("benchmark_results.xlsx", index=False)
         finally:
             print("Benchmarking done")
             df = pd.DataFrame(self.results)
@@ -166,7 +169,7 @@ class InferenceProcess:
             env.reset_to_transportation(e["transportation_matrix"])
 
             try:
-                player = EpisodePlayer(env, self.conn, self.config, deterministic=False)
+                player = EpisodePlayer(env, self.conn, self.config, deterministic=True)
                 _, _, reshuffles, _ = player.run_episode()
             finally:
                 env.close()
@@ -181,6 +184,7 @@ def start_process_loop(process_class, *args, **kwargs):
 
 
 if __name__ == "__main__":
+    mp.set_start_method("spawn")
     config = get_config("local_config.json")
 
     pretrained = PretrainedModel(
