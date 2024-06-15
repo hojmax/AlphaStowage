@@ -23,6 +23,7 @@ def _draw_tree_recursive(
     node_colors: dict,
     node_data: dict,
     edge_data: dict,
+    states: set,
 ):
     for (
         action,
@@ -43,15 +44,19 @@ def _draw_tree_recursive(
         node_colors[str(hash(child))] = child.Q  # Store the Q value
         node_data[str(hash(child))] = {
             "Q": child.Q,
-            # "U": child.estimated_value,
+            "U": child.estimate,
             "Placed": child.env.containers_placed,
             "N": child.visit_count,
             "P": child.prior_prob,
             "Action": action_to_string(action, child.env.max_R, child.env.max_C),
             "bay": child.env.bay,
             "T": child.env.T,
+            "total_reward": child.env.total_reward,
         }  # Store additional data
-        _draw_tree_recursive(graph, child, nodes, node_colors, node_data, edge_data)
+        states.add(child.env)
+        _draw_tree_recursive(
+            graph, child, nodes, node_colors, node_data, edge_data, states
+        )
 
 
 def draw_tree(node: Node):
@@ -63,16 +68,22 @@ def draw_tree(node: Node):
     node_data = {
         str(hash(node)): {
             "Q": node.Q,
-            # "U": node.estimated_value,
+            "U": node.estimate,
             "Placed": node.env.containers_placed,
             "N": node.visit_count,
             "bay": node.env.bay,
             "T": node.env.T,
+            "total_reward": node.env.total_reward,
         }
     }
     edge_data = {}
 
-    _draw_tree_recursive(graph, node, nodes, node_colors, node_data, edge_data)
+    states = set([node.env])
+
+    _draw_tree_recursive(graph, node, nodes, node_colors, node_data, edge_data, states)
+
+    print(f"Number of nodes: {len(nodes)}")
+    print(f"Number of states: {len(states)}")
 
     pos = graphviz_layout(graph, prog="dot")
 
@@ -259,7 +270,7 @@ def run_search(iters, env, conn, config, min_max_stats):
 if __name__ == "__main__":
     print("Started...")
     env = PaddedEnv(
-        R=10, C=10, N=10, max_R=12, max_C=12, max_N=16, speedy=True, auto_move=True
+        R=6, C=2, N=8, max_R=12, max_C=12, max_N=16, speedy=True, auto_move=True
     )
 
     env.reset()
@@ -304,6 +315,6 @@ if __name__ == "__main__":
     min_max_stats = MinMaxStats()
     # for i in range(1, 50):
     #     run_search(i, env, conn, config, min_max_stats)
-    run_search(800, env, conn, config, min_max_stats)
+    run_search(1000, env, conn, config, min_max_stats)
 
     env.close()
