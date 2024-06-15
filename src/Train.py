@@ -127,8 +127,8 @@ def init_model(
     print("Model initialized")
 
     if (
-        pretrained["wandb_model"]
-        and (pretrained["wandb_run"] or pretrained["artifact"])
+        pretrained["wandb_run"]
+        and (pretrained["wandb_model"] or pretrained["artifact"])
         or pretrained["local_model"]
     ):
         print("Loading model weights...")
