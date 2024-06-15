@@ -25,6 +25,7 @@ class Node:
         self.needed_action = action
         self._Q = None
         self._U = None
+        self.estimate = None
 
     def add_noise(self) -> None:
         alpha = (
@@ -62,7 +63,7 @@ class Node:
         if self.visit_count == 0:
             return None
         else:
-            return np.float16(self.total_action_value / np.float32(self.visit_count))
+            return np.float16(self.total_action_value / self.visit_count)
 
     @property
     def U(self) -> np.float16:
@@ -72,7 +73,7 @@ class Node:
         return (
             self.c_puct
             * self.prior_prob
-            * np.sqrt(self.parent.visit_count, dtype=np.float16)
+            * np.sqrt(self.parent.visit_count, dtype=np.float32)
             / (np.float16(1) + self.visit_count)
         )
 
@@ -84,6 +85,7 @@ class Node:
 
     def increment_value(self, value: float) -> None:
         if self.total_action_value == None:
+            self.estimate = value
             self.total_action_value = np.float32(value)
         else:
             self.total_action_value += np.float32(value)

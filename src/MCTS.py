@@ -91,11 +91,19 @@ def add_children(probabilities: np.ndarray, node: Node, config: dict) -> None:
         )
 
 
-def backup(node: Node, value: float) -> None:
+def backup(node: Node, value: float, min_reward: int | None) -> None:
     node.increment_value(value)
 
     if not is_root(node):
-        backup(node.parent, value)
+        # If an optimal path is found, the visit count of the parent node is set to the maximum possible value
+        if min_reward and node.parent.env.total_reward == min_reward:
+            node.visit_count = np.iinfo(np.int32).max
+            node.total_action_value = (
+                -(node.env.containers_placed + node.env.containers_left)
+                * node.visit_count
+            )  # Done to have the right value for the Q value
+
+        backup(node.parent, value, min_reward)
 
 
 def get_tree_probs(node: Node, config: dict) -> torch.Tensor:
@@ -115,13 +123,16 @@ def is_leaf_node(node: Node) -> bool:
     return len(node.children) == 0
 
 
-def find_leaf(root_node: Node, min_max_stats: MinMaxStats) -> Node:
+def find_leaf(root_node: Node, min_max_stats: MinMaxStats) -> tuple[Node, int | None]:
     node = root_node
+
+    min_reward = node.env.total_reward
 
     while not is_leaf_node(node):
         node = node.select_child(min_max_stats)
+        min_reward = min(min_reward, node.env.total_reward)
 
-    return node
+    return node, min_reward if node.env.terminated else None
 
 
 def get_new_root_node(root_env: Env, reused_tree: Node, config: dict) -> Node:
@@ -132,16 +143,6 @@ def get_new_root_node(root_env: Env, reused_tree: Node, config: dict) -> Node:
         return reused_tree
     else:
         return Node(root_env.copy(), config)
-
-
-def backup_max_visits(node: Node, value: float) -> None:
-    """Increase the number of visits of the node to the maximum possible value.
-    This is done if a best possible path is found.
-    """
-    node.visit_count = np.iinfo(np.int32).max
-
-    if not is_root(node):
-        backup_max_visits(node.parent, value)
 
 
 def alpha_zero_search(
@@ -157,7 +158,7 @@ def alpha_zero_search(
     found_optimal_path = False
 
     for _ in range(config["mcts"]["search_iterations"]):
-        node = find_leaf(root_node, min_max_stats)
+        node, min_reward = find_leaf(root_node, min_max_stats)
 
         state_value = evaluate(
             node,
@@ -168,13 +169,12 @@ def alpha_zero_search(
 
         min_max_stats.update(state_value)
 
-        backup(node, state_value)
+        backup(node, state_value, min_reward)
 
         is_optimal_path = (
             node.env.terminated and node.env.total_reward == root_node.env.total_reward
         )  # The optimal path if the path that has the same reward as the root node
         if is_optimal_path:
-            backup_max_visits(node, state_value)
             found_optimal_path = True
             break
 
