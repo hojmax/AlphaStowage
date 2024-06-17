@@ -91,19 +91,23 @@ def add_children(probabilities: np.ndarray, node: Node, config: dict) -> None:
         )
 
 
-def backup(node: Node, value: float, min_reward: int | None) -> None:
+def backup(
+    node: Node, value: float, min_reward: int, found_terminal_state: bool
+) -> None:
     node.increment_value(value)
 
     if not is_root(node):
         # If an optimal path is found, the visit count of the parent node is set to the maximum possible value
-        if min_reward and node.parent.env.total_reward == min_reward:
+        if found_terminal_state and node.parent.env.total_reward == min_reward:
             node.visit_count = np.iinfo(np.int32).max
             node.total_action_value = (
-                -(node.env.containers_placed + node.env.containers_left)
-                * node.visit_count
+                value * node.visit_count
             )  # Done to have the right value for the Q value
 
-        backup(node.parent, value, min_reward)
+        if found_terminal_state:
+            node.best_end_value = value
+
+        backup(node.parent, value, min_reward, found_terminal_state)
 
 
 def get_tree_probs(node: Node, config: dict) -> torch.Tensor:
@@ -123,7 +127,7 @@ def is_leaf_node(node: Node) -> bool:
     return len(node.children) == 0
 
 
-def find_leaf(root_node: Node, min_max_stats: MinMaxStats) -> tuple[Node, int | None]:
+def find_leaf(root_node: Node, min_max_stats: MinMaxStats) -> tuple[Node, int, bool]:
     node = root_node
 
     min_reward = node.env.total_reward
@@ -132,7 +136,7 @@ def find_leaf(root_node: Node, min_max_stats: MinMaxStats) -> tuple[Node, int | 
         node = node.select_child(min_max_stats)
         min_reward = min(min_reward, node.env.total_reward)
 
-    return node, min_reward if node.env.terminated else None
+    return node, min_reward, node.env.terminated
 
 
 def get_new_root_node(root_env: Env, reused_tree: Node, config: dict) -> Node:
@@ -158,7 +162,7 @@ def alpha_zero_search(
     found_optimal_path = False
 
     for _ in range(config["mcts"]["search_iterations"]):
-        node, min_reward = find_leaf(root_node, min_max_stats)
+        node, min_reward, found_terminal_state = find_leaf(root_node, min_max_stats)
 
         state_value = evaluate(
             node,
@@ -169,7 +173,7 @@ def alpha_zero_search(
 
         min_max_stats.update(state_value)
 
-        backup(node, state_value, min_reward)
+        backup(node, state_value, min_reward, found_terminal_state)
 
         is_optimal_path = (
             node.env.terminated and node.env.total_reward == root_node.env.total_reward
